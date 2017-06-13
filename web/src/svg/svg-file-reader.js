@@ -3,7 +3,7 @@ import {Either, startswith} from '../utils.js'
 import {t} from '../locale.js'
 
 /*
- * @method parse_svg(svg_text: string): object
+ * @method parse_svg(svg_text: svg string): object
  * parse svg text
  */
 export function parse_svg(svg_text){
@@ -56,7 +56,7 @@ export default function()
     var new_svg = function(d) { dispatch.call('new_svg', this, d)};
 
     /*
-    * @function reader_fn(el: string): void
+    * @function reader_fn(e: event): void
     * handler for 'change' event of input[type='file']
     */
     var reader_fn = function(e){

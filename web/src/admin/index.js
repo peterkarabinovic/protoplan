@@ -40,6 +40,8 @@ svg_file_reader.on('new_svg', function(e){
     var bounds = [[0,0], [e.height, e.width]];
     image = L.imageOverlay(e.data_uri, bounds).addTo(map);
     map.fitBounds(bounds);
+    map.removeLayer(gridLayer)
+    map.addLayer(gridLayer)
 })
 
 var coord_vm = new Vue({
@@ -51,4 +53,25 @@ map.on('mousemove', function(e){
     var latlng = e.latlng;
     coord_vm.x = L.Util.formatNum(latlng.lng, 2);
     coord_vm.y = L.Util.formatNum(latlng.lat, 2);
-})
+});
+
+var gridLayer =  L.d3SvgOverlay(function(selection, proj) {
+    var points = [];
+    if(image) {
+        var ll = image.getBounds().getCenter()
+        var x = d3.randomNormal(ll.lng, 100)
+        var y = d3.randomNormal(ll.lat, 100)
+        points = d3.range(10).map( it => {
+            return proj.latLngToLayerPoint(L.latLng(y(), x()))
+        })
+    }
+    var p = it => proj.latLngToLayerPoint(it)
+    var circles = selection.selectAll('circle').data(points);
+    circles.enter()
+            .append('circle')
+            .style("opacity", "0.3")
+            .attr("r", 5)
+    .merge(circles)
+            .attr("cx", d => d.x )
+            .attr("cy", d => d.y );                
+});
