@@ -6,6 +6,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link href="css/w3.css" rel="stylesheet">
         <link href="css/w3-theme-blue-grey.css" rel="stylesheet">
+        <link href="css/leaflet.css" rel="stylesheet">
         <style>
             html, body { height: 100%; }
             #app {
@@ -14,7 +15,6 @@
             #map {
                 width: 800px;
                 height: 600px;
-
             }
             #map img {
                 height: 100%;
@@ -25,13 +25,16 @@
     <body>
         <div id='app' class='w3-padding-large w3-row'>
             <h2>Базовый слой</h2>
-            <div id='map' class="w3-panel w3-col s8 w3-display-container">
-                <img src="svg/drawing.svg" alt="" class='w3-display-middle w3-card-4'>
+            <div class="w3-panel w3-col s8 w3-display-container">
+                <div id='map'></div>
+                <div id='coords'>x={{x}} y={{y}}</div>
+                <!--<img src="svg/drawing.svg" alt="" class='w3-display-middle w3-card-4'>-->
             </div>
             <div id='svg-file' class="w3-col s4">
                 <form class="w3-panel">
+                    <span class='w3-padding w3-tiny w3-text-pink' v-if='error'>{{error}}</span>
                     <div class="w3-padding w3-section">
-                        <input id="file" type="file" accept=".svg" class="">
+                        <input id="file" type="file" accept=".svg" @change='on_change'>
                     </div>
                     <div class="w3-row-padding w3-section">
                         <div class="w3-half ">
@@ -51,6 +54,7 @@
         <script src='dist/libs/underscore-min.js'></script>
         <script src='dist/libs/leaflet.js'></script>
         <script src='dist/libs/d3.js'></script>
+        <script src='dist/libs/vue.js'></script>
         <script src='dist/admin.js'></script>
         
     </body>
