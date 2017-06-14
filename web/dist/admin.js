@@ -6,25 +6,6 @@ function startswith(str, substr) {
 }
 
 
-var Maybe = (function () {
-  var Some = function (x) { this.x = x; };
-  Some.prototype.fmap = function (fn) { return Maybe.of(fn(this.x)); };
-  Some.prototype.bind = function (fn) { return fn(this.x); };
-  Some.prototype.toString = function () { return `Some(${this.x})`; };
-
-  var None = function () {};
-  None.fmap = function() { return None };
-  None.bind = function() { return None };
-  None.toString = function() { return 'None' }; 
-
-  return {
-    //of: (x) => x === null || x === undefined ? None : new Some(x),
-    // lift: (fn) => (...args) => Maybe.of(fn(...args)),
-    Some,
-    None
-  };
-})();
-
 
 /***
  *  Either monad
@@ -77,10 +58,6 @@ var translations =
     }
 };
 
-/*
- * @method parse_svg(svg_text: svg string): object
- * parse svg text
- */
 function parse_svg(svg_text){
     if(!svg_text || svg_text.length < 7) 
         return Either.left(t('invalid_svg_content'))
@@ -173,13 +150,75 @@ function transformation(map_size, img_size){
     return new L.Transformation(a,b,c,d);        
 }
 
+function AxisWidget(map_div, map)
+{
+    var rect = map_div.getBoundingClientRect();
+    var marginX = {left: 20, right: 0, top: 0, bottom: 10},
+        heightX = 20;
+    var marginY = {left:20, top:5, right:0, bottom: 10},
+        widthY = 30 + marginY.left + marginY.right;
+
+    var format_meters = function(d) { return d + ' м'};
+
+    var $x = d3.select('body')
+        .append('svg')
+            .style('position', 'absolute')
+            .style('top', (rect.bottom ) + 'px')
+            .style('left', (rect.left - marginX.left-1) + 'px')
+            .style('height', (heightX + marginX.bottom + marginX.top) + 'px')
+            .style('width', (rect.width + marginX.left + marginX.right) + 'px')
+        .append('g')
+            .attr('class', 'x axis')
+            .attr("transform", "translate("+ marginX.left+"," + marginX.top + ")");
+
+    var scaleX = d3.scaleLinear().range([0, rect.width]);
+    var axisX = d3.axisBottom(scaleX).ticks(10).tickFormat(format_meters);
+
+    var $y = d3.select('body')
+        .append('svg')
+            .style('position', 'absolute')
+            .style('top', (rect.top - marginY.top) + 'px')
+            .style('left', (rect.left - widthY) + 'px')
+            .style('height', (rect.height + marginY.bottom + + marginY.top) + 'px')
+            .style('width', widthY  + 'px')
+        .append('g')
+            .attr('class', 'y axis')
+            .attr("transform", "translate("+ (widthY-1) +"," + marginY.top + ")");
+
+    var scaleY = d3.scaleLinear().range([rect.height, 0]);
+    var axisY = d3.axisLeft(scaleY).ticks(10).tickFormat(format_meters);
+
+    
+    var render = function()
+    {
+        var b = map.getBounds();
+        scaleX.domain([b.getWest(), b.getEast()]);
+        $x.call(axisX);
+
+        var w = b.getNorth() - b.getSouth();
+        scaleY.domain([w-b.getNorth(),w-b.getSouth() ]);
+        $y.call(axisY);
+    };
+
+    var enable = function(){
+        map.off('viewreset  move', render);
+        map.on('viewreset  move', render);
+        render();
+    };
+    return enable;
+}
+
 var svg_file_reader = SvgFileReader();
 
 
 var vm = new Vue({
     el: '#svg-file',
     data: {
-        error: ''
+        error: '',
+        width_m: null,
+        height_m: null,
+        width_px: null,
+        height_px: null
     },
     methods: {
         on_change: function(e){
@@ -188,11 +227,17 @@ var vm = new Vue({
     }
 });
 
+vm.$watch('width_m', function(newVal){
+    vm.height_m = newVal; 
+});
+
 var map = L.map('map', {
     crs: L.CRS.Simple,
     zoomControl: false,
     attributionControl: false
 });
+
+var axis = AxisWidget(map._container, map);
 
 svg_file_reader.on('error', function(er){
     vm.error = er;
@@ -203,6 +248,8 @@ svg_file_reader.on('new_svg', function(e){
     if(image){
         map.removeLayer(image);
     }
+    vm.width_px = vm.width_m = e.width;
+    vm.height_px = vm.height_m = e.height;
     var map_div = document.getElementById('map');
     var map_size = {x: map_div.offsetWidth,
                     y: map_div.offsetHeight};
@@ -212,40 +259,13 @@ svg_file_reader.on('new_svg', function(e){
     var bounds = [[0,0], [e.height, e.width]];
     image = L.imageOverlay(e.data_uri, bounds).addTo(map);
     map.fitBounds(bounds);
-    map.removeLayer(gridLayer);
-    map.addLayer(gridLayer);
-});
+    map.setMaxBounds([[-e.height, -e.width], [e.height*2, e.width*2]]);
 
-var coord_vm = new Vue({
-    el: '#coords',
-    data: { x:0, y:0}
-});
+    // set max zoom
+    var maxZoom = Math.floor(Math.sqrt(Math.max(e.height, e.width) / 10 ));
+    map.setMaxZoom(maxZoom);
+    axis();
 
-map.on('mousemove', function(e){
-    var latlng = e.latlng;
-    coord_vm.x = L.Util.formatNum(latlng.lng, 2);
-    coord_vm.y = L.Util.formatNum(latlng.lat, 2);
-});
-
-var gridLayer =  L.d3SvgOverlay(function(selection, proj) {
-    var points = [];
-    if(image) {
-        var ll = image.getBounds().getCenter();
-        var x = d3.randomNormal(ll.lng, 100);
-        var y = d3.randomNormal(ll.lat, 100);
-        points = d3.range(10).map( it => {
-            return proj.latLngToLayerPoint(L.latLng(y(), x()))
-        });
-    }
-    var p = it => proj.latLngToLayerPoint(it);
-    var circles = selection.selectAll('circle').data(points);
-    circles.enter()
-            .append('circle')
-            .style("opacity", "0.3")
-            .attr("r", 5)
-    .merge(circles)
-            .attr("cx", d => d.x )
-            .attr("cy", d => d.y );                
 });
 
 }());

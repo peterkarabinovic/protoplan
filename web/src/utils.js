@@ -7,25 +7,6 @@ export function startswith(str, substr) {
 };
 
 
-export var Maybe = (function () {
-  var Some = function (x) { this.x = x; };
-  Some.prototype.fmap = function (fn) { return Maybe.of(fn(this.x)); };
-  Some.prototype.bind = function (fn) { return fn(this.x); };
-  Some.prototype.toString = function () { return `Some(${this.x})`; };
-
-  var None = function () {};
-  None.fmap = function() { return None };
-  None.bind = function() { return None };
-  None.toString = function() { return 'None' }; 
-
-  return {
-    //of: (x) => x === null || x === undefined ? None : new Some(x),
-    // lift: (fn) => (...args) => Maybe.of(fn(...args)),
-    Some,
-    None
-  };
-})();
-
 
 /***
  *  Either monad
