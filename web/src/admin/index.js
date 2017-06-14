@@ -74,13 +74,14 @@ svg_file_reader.on('new_svg', function(e){
     var img_size = {x: e.width, 
                     y: e.height};
 
-    var img_size_m = {x: e.width*0.5, 
-                    y: e.height*0.5}               
+    var img_size_m = {x: e.width, 
+                    y: e.height}               
     var bounds = update_image_scale( img_size_m)     
     // map.options.crs = _.extend({}, L.CRS.Simple, {transformation: transformation(map_size,img_size) });
 
     // var bounds = [[0,0], [img_size_m.y, img_size_m.x]];
     image = L.imageOverlay(e.data_uri, bounds).addTo(map);
+    L.imageOverlay('svg/examples/atm.svg', [[100,100],[120,120]]).addTo(map);
     map.fitBounds(bounds);
     
 
@@ -88,15 +89,15 @@ svg_file_reader.on('new_svg', function(e){
 
 })
 
-// var vm2 = new Vue({
-//     el: '#coords',
-//     data:{
-//         x:0,
-//         y:0
-//     }
-// })
+var vm2 = new Vue({
+    el: '#coords',
+    data:{
+        x:0,
+        y:0
+    }
+})
 
-// map.on('mousemove', function( e) {
-//     vm2.x = e.latlng.lng
-//     vm2.y = e.latlng.lat
-// })
+map.on('mousemove', function( e) {
+    vm2.x = e.latlng.lng
+    vm2.y = e.latlng.lat
+})
