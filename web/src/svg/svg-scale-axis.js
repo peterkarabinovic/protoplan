@@ -33,22 +33,22 @@ export function AxisWidget(map_div, map)
             .attr('class', 'y axis')
             .attr("transform", "translate("+ (widthY-1) +"," + marginY.top + ")")
 
-    var scaleY = d3.scaleLinear().range([rect.height, 0]);
+    var scaleY = d3.scaleLinear().range([0, rect.height ]);
     var axisY = d3.axisLeft(scaleY).ticks(10).tickFormat(format_meters);
 
-    
+    var image_heigth = 0;
     var render = function()
     {
         var b = map.getBounds()
         scaleX.domain([b.getWest(), b.getEast()]);
         $x.call(axisX)
 
-        var w = b.getNorth() - b.getSouth()
-        scaleY.domain([w-b.getNorth(),w-b.getSouth() ]);
+        scaleY.domain([image_heigth-b.getSouth(),image_heigth-b.getNorth() ]);
         $y.call(axisY)
     }
 
-    var enable = function(){
+    var enable = function(baseimage_size){
+        image_heigth = baseimage_size.y;
         map.off('viewreset  move', render)
         map.on('viewreset  move', render)
         render()

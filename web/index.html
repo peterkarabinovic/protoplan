@@ -13,7 +13,8 @@
                 height:90vh;
             }
             #map {
-                margin: 20px;
+                margin-left: 20px;
+                margin-bottom: 20px;
                 width: 800px;
                 height: 600px;
             }
@@ -38,13 +39,14 @@
     </head>
     <body>
         <div id='app' class='w3-padding-large w3-row'>
-            <h2>Базовый слой</h2>
-            <div class="w3-panel w3-col s8 w3-display-container">
+            
+            <div class="w3-panel w3-col s8">
                 <div id='map' class="w3-card-4"></div>
                 <!--<img src="svg/drawing.svg" alt="" class='w3-display-middle w3-card-4'>-->
             </div>
             <div id='svg-file' class="w3-col s4">
-                <form class="w3-panel">
+                <form class="w3-panel w3-border">
+                    <h3>Базовый слой</h3>
                     <span class='w3-padding w3-tiny w3-text-pink' v-if='error'>{{error}}</span>
                     <div class="w3-padding w3-section">
                         <input id="file" type="file" accept=".svg" @change='on_change'>
