@@ -15,15 +15,15 @@
             #map {
                 margin-left: 20px;
                 margin-bottom: 20px;
-                width: 800px;
+                width: 700px;
                 height: 600px;
             }
             #map img {
                 height: 100%;
                 width: 100%;
             }
-            #grid {
-                font: 12px Arial;
+            .axis text{
+                pointer-events: none;
             }
             .axis path,
             .axis line {
@@ -32,8 +32,16 @@
                 stroke-width: 1;
                 shape-rendering: crispEdges;
             }            
+            .grid .tick line {
+                stroke: gray;
+                stroke-opacity: 0.4;
+                shape-rendering: crispEdges;
+            }
+            .grid path {
+                stroke-width: 0;
+            }
             .leaflet-container {
-                /*background-color:rgba(255,0,0,0.0);*/
+                background-color:rgba(255,0,0,0.0);
             }            
         </style>
     </head>
@@ -51,14 +59,14 @@
                     <div class="w3-padding w3-section">
                         <input id="file" type="file" accept=".svg" @change='on_change'>
                     </div>
-                    <div class="w3-row-padding w3-section">
-                        <div class="w3-half ">
-                            <input class="w3-input w3-border" type="number" min="0" v-model='width_m' placeholder="Ширина (м)">
-                        </div>
-                        <div class="w3-half">
-                            <input class="w3-input w3-border" type="number" v-model='height_m' placeholder="Высота (м)">
-                        </div>                    
+                    <div class="w3-padding w3-section">
+                        <label>Ширина(м):</label>
+                        <input class="w3-input w3-border" type="number" min="0" v-model='width' placeholder="Ширина (м)">
                     </div>
+                    <div class="w3-padding w3-section">
+                        <label>Высота(м):</label>
+                        <input class="w3-input w3-border" type="number" v-model='height' placeholder="Высота (м)">
+                    </div>    
                     <div class="w3-padding w3-section">
                         <button class="w3-button">Принять</button>
                     </div>                    
