@@ -1,6 +1,6 @@
 import SvgFileReader from '../svg/svg-file-reader.js'
 import {transformation} from '../svg/transformation.js'
-import {AxisWidget} from '../svg/svg-scale-axis.js'
+import {GridPanel} from '../svg/grid-panel.js'
 
 var svg_file_reader = SvgFileReader()
 
@@ -42,9 +42,6 @@ var vm = new Vue({
     }
 });
 
-vm.$watch('width_m', function(newVal){
-    // vm.height_m = newVal; 
-});
 
 var map = L.map('map', {
     crs: L.CRS.Simple,
@@ -52,7 +49,7 @@ var map = L.map('map', {
     attributionControl: false
 });
 
-var axis = AxisWidget(map._container, map)
+var gridPanel = GridPanel(map);
 
 svg_file_reader.on('error', function(er){
     vm.error = er
@@ -80,7 +77,7 @@ function update_image_scale(img_size_m){
     if(image) {
         image.setBounds(bounds);
         map.fitBounds(bounds);
-        axis(img_size_m);
+        gridPanel(img_size_m);
     }
     return bounds
 
@@ -132,8 +129,7 @@ svg_file_reader.on('new_svg', function(e){
 
     // }
 
-    axis(img_size_m)
-
+    gridPanel(img_size_m)
 })
 
 var vm2 = new Vue({

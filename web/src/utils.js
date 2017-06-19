@@ -6,6 +6,16 @@ export function startswith(str, substr) {
     return str && str.indexOf(str) === 0;
 };
 
+export function memorize(f) {
+	if (!f.cache) f.cache = {};
+	return function() {
+		var cacheId = [].slice.call(arguments).join('');
+		return f.cache[cacheId] ?
+				f.cache[cacheId] :
+				f.cache[cacheId] = f.apply(window, arguments);
+	};
+}
+
 
 
 /***
