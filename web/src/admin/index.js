@@ -80,7 +80,7 @@ function update_image_scale(img_size_m){
     if(image) {
         image.setBounds(bounds);
         map.fitBounds(bounds);
-        axis.redraw(img_size_m);
+        axis(img_size_m);
     }
     return bounds
 

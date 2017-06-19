@@ -209,21 +209,22 @@ function AxisWidget(map_div, map)
                     .attr('class', 'grid')
                     .attr("transform", "translate(-1," + rect.height + ")");
     
-    var gridY = d3.axisRight(scaleY).ticks(40)
+    var gridY = d3.axisRight(scaleY)
+                                    .ticks(40)
                                    .tickSize(rect.width, 0, 0)
                                    .tickFormat('');
     var $gridY1 = $grid.append('g')
                     .attr('class', 'grid')
                     .attr("transform", "translate(0,0)");
 
-    var image_heigth = 0;
+    var size_m = 0;
     var render = function()
     {
         var b = map.getBounds();
         scaleX.domain([b.getWest(), b.getEast()]);
         $x.call(axisX);
 
-        scaleY.domain([image_heigth-b.getSouth(), image_heigth-b.getNorth() ]);
+        scaleY.domain([size_m.y-b.getSouth(), size_m.y-b.getNorth() ]);
         $y.call(axisY);
 
     };
@@ -231,30 +232,43 @@ function AxisWidget(map_div, map)
     var update_grid = function(){
         var b = map.getBounds();
         scaleX.domain([b.getWest(), b.getEast()]);
-        scaleY.domain([image_heigth-b.getSouth(), image_heigth-b.getNorth()]);
+        scaleY.domain([size_m.y-b.getSouth(), size_m.y-b.getNorth() ]);
+
+        // gridY.ticks(ticksY)
+        // gridX.ticks(80)
 
         $gridX1.call(gridX);
         $gridY1.call(gridY);
     };
 
+    var update_grid_ticks = function(){
+        var b = map.getBounds(),
+            domainX = [b.getWest(), b.getEast()],
+            domainY = [size_m.y-b.getSouth(), size_m.y-b.getNorth() ];
 
+        var stepX = Math.abs(d3.tickStep.apply(null, domainX.concat(40)));
+        var stepY = Math.abs(d3.tickStep.apply(null, domainY.concat(40)));
+        var step = Math.max(0.5, Math.min(stepX , stepY) );
+        // gridY.tickValues ( d3.range( domainY[0],domainY[1], step ) );
+        // gridX.tickValues ( d3.range( domainX[0],domainX[1], step ) );
+        gridY.ticks(  Math.abs( (domainY[1] - domainY[0]) / step)  );
+        gridX.ticks(  Math.abs( (domainX[1] - domainX[0]) / step)  );
+
+    };
+
+
+    map.on('move', render);
+    map.on('move', update_grid);
+    map.on('zoomend', update_grid_ticks);
 
 
     var enable = function(baseimage_size){
-        image_heigth = baseimage_size.y;
-        map.off('move', render);
-        map.on('move', render);
-        map.off('move', update_grid);
-        map.on('move', update_grid);
+        size_m = baseimage_size;
         render();
+        update_grid_ticks();
         update_grid();
     };
-    enable.redraw = function(baseimage_size){
-        image_heigth = baseimage_size.y;
-        render();
-        update_grid();
-    };
-    
+   
     return enable;
 }
 
@@ -336,7 +350,7 @@ function update_image_scale(img_size_m){
     if(image) {
         image.setBounds(bounds);
         map.fitBounds(bounds);
-        axis.redraw(img_size_m);
+        axis(img_size_m);
     }
     return bounds
 
