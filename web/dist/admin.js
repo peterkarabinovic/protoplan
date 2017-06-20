@@ -234,7 +234,6 @@ function GridPanel(map){
         gridAxisY.ticks(ticks[1]);
         $gridX.call(gridAxisX);
         $gridY.call(gridAxisY);
-    
     }; 
 
     map.on('move', render);
@@ -245,61 +244,67 @@ function GridPanel(map){
     }
 }
 
+L.Browser.touch = false;
+
 var svg_file_reader = SvgFileReader();
 
-
 var vm = new Vue({
-    el: '#svg-file',
+    el: '#app',
     data: {
         error: '',
         width_m: null,
         height_m: null,
         width_px: null,
-        height_px: null
+        height_px: null,
+        line: null,
+        lineLength: null
     },
     methods: {
         on_change: function(e){
             svg_file_reader(e);            
+        },
+        on_line: function(e){
+            this.line = map.editTools.startPolyline(undefined, {weight:1, color: 'red'});
+        },
+        needLine: function(){
+            return this.width_m && !this.line;
+        },
+        isLine: function(){
+            return this.line && this.line.getLatLngs().length == 2;
+        },
+        recalculateScale: function(){
+            var bounds = this.line.getBounds();
+            this.line.bindTooltip('dsdsds');
         }
     },
     computed: {
-        width: {
-            get: function(){ return this.width_m;},
-            set: function(val) {
-                if(+val <= 1) return;
-                this.width_m = +val;
-                this.height_m = Math.round((this.height_px / this.width_px) * this.width_m);
-                update_image_scale({x:this.width_m, y: this.height_m});
-            }
-        },
-        height: {
-            get: function(){ return this.height_m;},
-            set: function(val) {
-                if(+val <= 1) return;
-                this.height_m = +val;
-                this.width_m = Math.round((this.width_px / this.height_px) * this.height_m);
-                update_image_scale({x:this.width_m, y: this.height_m});
-            }
+        widthHeight: function(){
+            return  this.width_m ? (this.width_m + " м / " + this.height_m + " м") : "";
         }
-        
     }
 });
-
 
 var map = L.map('map', {
     crs: L.CRS.Simple,
     zoomControl: false,
-    attributionControl: false
+    attributionControl: false,
+    editable: true,
+    editOptions: {
+        skipMiddleMarkers: true
+    }
 });
+
+map.on('editable:editing', function(event){
+    var line = event.layer;
+    if(line.getLatLngs().length == 2)
+        map.editTools.stopDrawing();
+});
+
+
 
 var gridPanel = GridPanel(map);
 
-svg_file_reader.on('error', function(er){
-    vm.error = er;
-});
-
 var image = null;
-
 function update_image_scale(img_size_m){
     var map_div = document.getElementById('map');
     var map_size = {x: map_div.offsetWidth,
@@ -326,6 +331,10 @@ function update_image_scale(img_size_m){
 
 
 }
+
+svg_file_reader.on('error', function(er){
+    vm.error = er;
+});
 
 svg_file_reader.on('new_svg', function(e){
     if(image){
@@ -373,19 +382,6 @@ svg_file_reader.on('new_svg', function(e){
     // }
 
     gridPanel(img_size_m);
-});
-
-var vm2 = new Vue({
-    el: '#coords',
-    data:{
-        x:0,
-        y:0
-    }
-});
-
-map.on('mousemove', function( e) {
-    vm2.x = e.latlng.lng;
-    vm2.y = e.latlng.lat;
 });
 
 }());

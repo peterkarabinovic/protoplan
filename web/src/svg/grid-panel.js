@@ -74,7 +74,6 @@ export function GridPanel(map){
         gridAxisY.ticks(ticks[1]);
         $gridX.call(gridAxisX);
         $gridY.call(gridAxisY);
-    
     } 
 
     map.on('move', render);

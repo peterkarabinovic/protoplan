@@ -8,20 +8,32 @@
         <link href="css/w3-theme-blue-grey.css" rel="stylesheet">
         <link href="css/leaflet.css" rel="stylesheet">
         <style>
-            html, body { height: 100%; }
+            /* Layout */
+            html, body { height: 100%; }            
             #app {
-                height:90vh;
+                position: absolute;
+                top: 7px; bottom: 7px; left: 7px; right: 7px;
             }
             #map {
-                margin-left: 20px;
-                margin-bottom: 20px;
-                width: 700px;
-                height: 600px;
+                position: absolute;
+                top: 7px; bottom: 50px; left: 350px; right: 7px;
             }
             #map img {
                 height: 100%;
                 width: 100%;
             }
+            #line {
+                z-index: 1000;
+                position: absolute;
+                top: 14px; left: 357px; 
+            }
+
+            #svg-file {
+                position: absolute;
+                top: 7px; bottom: 7px; left: 7px; width: 250px;
+            }
+
+            /* Drawing */
             .axis text{
                 pointer-events: none;
             }
@@ -43,43 +55,45 @@
             .leaflet-container {
                 background-color:rgba(255,0,0,0.0);
             }            
+           
         </style>
     </head>
     <body>
-        <div id='app' class='w3-padding-large w3-row'>
-            <div id='coords'>{{x}} {{y}}</div>
-            <div class="w3-panel w3-col s8">
-                <div id='map' class="w3-card-4"></div>
-                <!--<img src="svg/drawing.svg" alt="" class='w3-display-middle w3-card-4'>-->
+        <div id='app'>
+            <div id="svg-file" class="w3-margin">
+                <h3>Базовый слой</h3>
+                <span class='w3-tiny w3-text-pink' v-if='error'>{{error}}</span>
+                <div class="w3-section">
+                    <input id="file" type="file" accept=".svg" @change='on_change'>
+                </div>
+                <div class="w3-section">
+                    <span>Ширина/Высота:</span>
+                    <input type="text" disabled v-model="widthHeight">
+                </div>
+                <div class="w3-section" v-if="isLine()">
+                    <span>Длина линии (м):</span>
+                    <input type="number" min="1" v-model="lineLength">
+                    <a href="#" class="w3-tiny" v-if='lineLength > 0' 
+                                @click='recalculateScale()'>
+                        Пересчитать масштаб
+                    </a>
+                </div>
             </div>
-            <div id='svg-file' class="w3-col s4">
-                <form class="w3-panel w3-border">
-                    <h3>Базовый слой</h3>
-                    <span class='w3-padding w3-tiny w3-text-pink' v-if='error'>{{error}}</span>
-                    <div class="w3-padding w3-section">
-                        <input id="file" type="file" accept=".svg" @change='on_change'>
-                    </div>
-                    <div class="w3-padding w3-section">
-                        <label>Ширина(м):</label>
-                        <input class="w3-input w3-border" type="number" min="0" v-model='width' placeholder="Ширина (м)">
-                    </div>
-                    <div class="w3-padding w3-section">
-                        <label>Высота(м):</label>
-                        <input class="w3-input w3-border" type="number" v-model='height' placeholder="Высота (м)">
-                    </div>    
-                    <div class="w3-padding w3-section">
-                        <button class="w3-button">Принять</button>
-                    </div>                    
-                </form> 
-            </div>
+            <button id="line" v-show="needLine()" 
+                    @click="on_line"
+                    :disabled='line'
+                    class="w3-button w3-black w3-border">Задать длину</button>
+            <div id="map" class="w3-card"></div>
         </div>
-
+        
         <script src='dist/libs/underscore-min.js'></script>
         <script src='dist/libs/leaflet.js'></script>
         <script src='dist/libs/d3.js'></script>
         <script src='dist/libs/L.D3SvgOverlay.js'></script>
+        <script src='dist/libs/Leaflet.Editable.js'></script>
         <script src='dist/libs/vue.js'></script>
         <script src='dist/admin.js'></script>
-        
+
+
     </body>
 </html>
