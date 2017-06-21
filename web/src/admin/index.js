@@ -40,8 +40,8 @@ var vm = new Vue({
                                 map.fitBounds(bounds);
                                 gridPanel(img_size_m);
                                 
-                                new_svg(e, bounds);
-                                new_canvas(e, bounds);
+                                // new_svg(e, bounds);
+                                new_canvas2(e, bounds);
                              });
                 }
                 reader.readAsText(file)
@@ -59,7 +59,7 @@ var vm = new Vue({
         },
         recalculateScale: function(){
             var bounds = this.line.getBounds();
-            this.line.bindTooltip('dsdsds');
+            this.line.bindTooltip('dsdsds', {permanent:true});
         }
     },
     computed: {
@@ -143,55 +143,65 @@ function new_svg(e, bounds)
 };
 
 
-function new_canvas(e, bounds)
-{
+function new_canvas2(e, img_bounds) {
+    var img_size = {x: e.width, y: e.height};
+    var map_size = map.getSize();
+    var img_env = math.Envelope(img_bounds);
+    var ppm = L.point(img_size.x / img_env.max_x, img_size.y / img_env.max_y) ; // pixels per meter
 
-    // points
-    var env = math.Envelope(bounds); 
-    var randomX = d3.randomUniform(env.min_x, env.max_x);
-    var randomY = d3.randomUniform(env.min_y, env.max_y) 
-    var points = [];
-    for (var i = 0; i < 10000; i++) {
-        points.push({x:randomX(), y:randomY() })
-    }
 
-    var memoryImages = new Image()
-    memoryImages.src = e.data_uri;
-    memoryImages.onload = function(){
-        L.canvasLayer()
-         .delegate(ca)    
-         .addTo(map);
-    }
-
-    var ca = {}
-    ca.onDrawLayer = function(info) 
+    var img = new Image();
+    img.src = e.data_uri;
+    img.onload = function()
     {
-        var ctx = info.canvas.getContext('2d');
-        ctx.clearRect(0, 0, info.canvas.width, info.canvas.height);
-        var env = math.Envelope(info.bounds); 
-        var layer_env = math.toLayerEnvelope(env, info.layer._map)
-        var container_env = math.toContainerEnvelope(env, info.layer._map)
-        console.log('map.getPixelOrigin()',info.layer._map.getPixelOrigin())
-        console.log('env',env)
-        console.log('layer_env',layer_env)
-        console.log('container_env',container_env)
-
-
-
-        {
-        // ctx.fillStyle = "rgba(255,116,0, 1)";
-        // points.forEach( p => {
-        //     if(!info.bounds.contains([p.y, p.x])) {
-        //         return;
-        //     }
-        //     var dot = info.layer._map.latLngToContainerPoint([p.y, p.x]);
-        //     ctx.beginPath();
-        //     ctx.arc(dot.x, dot.y, 3, 0, Math.PI * 2);
-        //     ctx.fill();
-        //     ctx.closePath();
-        // })
-        }
+        L.canvasLayer2(drawImage).addTo(map)
     }
-    
+
+    function drawImage(canvas)
+    {
+        var container_img_env = math.toContainerEnvelope(img_env, map);
+        var canvas_place = { 
+            x: Math.max(0, container_img_env.min_x),
+            y: Math.max(0, container_img_env.min_y)
+        } 
+        var canvas_img_size = {
+            width: Math.min(container_img_env.max_x, map_size.x) - canvas_place.x,
+            height: Math.min(container_img_env.max_y, map_size.y) - canvas_place.y,
+        }
+        var zoom = map.getZoom()
+        var visible_env = math.Envelope(map.getBounds()).intersection(img_env);
+        var img_clip_place = visible_env.min().scaleBy(ppm).round();
+        var img_clip_size = visible_env.max().scaleBy(ppm).round().subtract(img_clip_place);
+
+
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // ctx.clearRect(canvas_place.x, canvas_place.y, canvas_img_size.width, canvas_img_size.height);
+        ctx.drawImage(img, img_clip_place.x, 
+                           img_clip_place.y, 
+                           img_clip_size.x, 
+                           img_clip_size.y, 
+                           canvas_place.x, 
+                           canvas_place.y, 
+                           canvas_img_size.width, canvas_img_size.height )
+
+        // var visible_min = visible_env.min().scaleBy(ppm).round();
+        // var visible_max = visible_env.max().scaleBy(ppm).round();
+        // console.log('visible_min',visible_min);
+        // console.log('visible_max',visible_max);
+        // console.log( 'drawImage', img_clip_place.x, img_clip_place.y, img_clip_size.x, img_clip_size.y, canvas_place.x, canvas_place.y, canvas_img_size.width, canvas_img_size.height )
+
+        // console.log(canvas.width, canvas.height);
+        // console.log('map.env', math.Envelope(map.getBounds()));
+        // console.log('img.env', img_env);
+        // console.log('visible_env',visible_env)
+        // console.log('img.size',img_size);
+        // console.log('map size', map.getSize());
+        // console.log('container map.env', math.toContainerEnvelope(math.Envelope(map.getBounds()), map));
+        // console.log('container img.env', math.toContainerEnvelope(math.Envelope(img_bounds), map));
+        // console.log('layer img.env', math.toLayerEnvelope(math.Envelope(img_bounds), map));
+        // console.log('map. getPixelOrigin', map.getPixelOrigin());
+    }
+
 
 }

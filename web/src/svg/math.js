@@ -14,7 +14,7 @@ export function transformation(map_size, img_size){
         var c = x_ratio;
         var d = (map_size.y - (x_ratio * img_size.y)) / 2;
     }
-    else {
+    else { 
         var a = y_ratio;
         var b = (map_size.x - (y_ratio * img_size.x)) / 2;
         var c = y_ratio;
@@ -37,40 +37,59 @@ export function maxZoom(img_size, min_width){
 }
 
 /**
+ * Constructor of Envelope
+ * @param {*} min_x 
+ * @param {*} min_y 
+ * @param {*} max_x 
+ * @param {*} max_y 
+ */
+function Env(min_x, min_y,max_x, max_y){
+    return {
+        min_x: min_x,
+        min_y: min_y,
+        max_x: max_x,
+        max_y: max_y,
+        intersection: function(env){
+            return Env(
+                Math.max(this.min_x, env.min_x),
+                Math.max(this.min_y, env.min_y),
+                Math.min(this.max_x, env.max_x),
+                Math.min(this.max_y, env.max_y)
+            )            
+        },
+        min: function(){ return L.point(this.min_x, this.min_y); },
+        max: function(){ return L.point(this.max_x, this.max_y); },
+        minLatLng: function(){ return L.latLng(this.min_y, this.min_x); },
+        maxLatLng: function(){ return L.latLng(this.max_y, this.max_x); }
+        
+    }
+}
+
+/**
  * As LatLngBounds with its SouthNorthWestEast stuff mislead with planar metric space
  * Envelope seems more convenient 
  * @param {LatLngBounds} bounds 
  */
 export function Envelope(bounds)
 {
-    return {
-        min_x: bounds.getWest(),
-        min_y: bounds.getSouth(),
-        max_x: bounds.getEast(),
-        max_y: bounds.getNorth()
-    }
+    return Env(
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth()
+    )
 }
 
 export function toContainerEnvelope(env, map)
 {
     var min = map.latLngToContainerPoint({lat: env.min_y, lng: env.min_x});
     var max = map.latLngToContainerPoint({lat: env.max_y, lng: env.max_x});
-    return {
-        min_x: min.x,
-        min_y: min.y,
-        max_x: max.x,
-        max_y: max.y
-    }
+    return Env(min.x, min.y, max.x, max.y);
 }
 
 export function toLayerEnvelope(env, map)
 {
     var min = map.latLngToLayerPoint({lat: env.min_y, lng: env.min_x});
     var max = map.latLngToLayerPoint({lat: env.max_y, lng: env.max_x});
-    return {
-        min_x: min.x,
-        min_y: min.y,
-        max_x: max.x,
-        max_y: max.y
-    }
+    return Env(min.x, min.y, max.x, max.y);
 }
