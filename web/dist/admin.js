@@ -68,28 +68,29 @@ var translations =
     }
 };
 
-function parse_svg(svg_text){
+function svgToBase64(svg_text)
+{
     if(!svg_text || svg_text.length < 7) 
         return Either.left(t('invalid_svg_content'))
       
     var parser = new DOMParser();    
-    var svg_doc = parser.parseFromString(svg_text, "image/svg+xml").documentElement;
-    if( !svg_doc ||
-        !svg_doc.getAttribute ||
-        !startswith(svg_doc.getAttribute('xmlns'), 'http://www.w3.org/2000/svg'))
+    var svg_document = parser.parseFromString(svg_text, "image/svg+xml").documentElement;
+    if( !svg_document ||
+        !svg_document.getAttribute ||
+        !startswith(svg_document.getAttribute('xmlns'), 'http://www.w3.org/2000/svg'))
         return Either.left(t('invalid_svg_content'))
-    if(!svg_doc.height || !svg_doc.width)
+    if(!svg_document.height || !svg_document.width)
         return Either.left(t('no_svg_size'))
 
     var viewBox = null;
-    if(svg_doc.viewBox.baseVal && svg_doc.viewBox.baseVal.width != 0) {
-        var vb = svg_doc.viewBox.baseVal;
+    if(svg_document.viewBox.baseVal && svg_document.viewBox.baseVal.width != 0) {
+        var vb = svg_document.viewBox.baseVal;
         viewBox = [vb.x, vb.y, vb.width, vb.height];
     }
-    var svg_raw =   new XMLSerializer().serializeToString(svg_doc); 
+    var svg_raw =   new XMLSerializer().serializeToString(svg_document); 
     var data_uri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg_raw)));
     
-    if(!viewBox && (svg_doc.width.baseVal.value == 0 || svg_doc.height.baseVal.value == 0 )){
+    if(!viewBox && (svg_document.width.baseVal.value == 0 || svg_document.height.baseVal.value == 0 )){
         return Either.left(t('no_svg_dimensions'))
     }
     var width = 0, height = 0;
@@ -97,12 +98,12 @@ function parse_svg(svg_text){
         width = viewBox[2];
         height = viewBox[3];
     }
-    if(svg_doc.width.baseVal.value != 0)
-        width = svg_doc.width.baseVal.value;
-    if(svg_doc.height.baseVal.value != 0)
-        height = svg_doc.height.baseVal.value;
+    if(svg_document.width.baseVal.value != 0)
+        width = svg_document.width.baseVal.value;
+    if(svg_document.height.baseVal.value != 0)
+        height = svg_document.height.baseVal.value;
     return Either.right({
-        svg_doc: svg_doc,
+        svg_document: svg_document,
         svg_raw: svg_raw,
         width: width,
         height: height,
@@ -110,37 +111,11 @@ function parse_svg(svg_text){
     })    
 }
 
-
-var SvgFileReader = function()
-{
-    var dispatch = d3.dispatch('new_svg', 'error');
-    var error = function(msg) { dispatch.call('error', this, msg);};
-    var new_svg = function(d) { dispatch.call('new_svg', this, d);};
-
-    /*
-    * @function reader_fn(e: event): void
-    * handler for 'change' event of input[type='file']
-    */
-    var reader_fn = function(e){
-        var file = e.target.files[0]; 
-        if(!file) return;
-        if(file.type !== 'image/svg+xml') {
-            error(t('invalid_svg_type', {type: file.type}));
-        }
-        else {
-            var reader = new FileReader();
-            reader.onloadend = function(e){
-                var res = parse_svg(reader.result);
-                res.fold(error, new_svg);
-            };
-            reader.readAsText(file);
-        }
-    };
-
-    reader_fn.on = function(type,fn) { dispatch.on(type,fn); }; 
-    return reader_fn
-};
-
+/**
+ * Calculate map transformation 
+ * @param {Size} map_size  - size of map's div
+ * @param {Size} img_size  - size of images in custom unit (meters)
+ */
 function transformation(map_size, img_size){
    
     var x_ratio = map_size.x / img_size.x;
@@ -158,6 +133,58 @@ function transformation(map_size, img_size){
         var d = 0;
     }
     return new L.Transformation(a,b,c,d);        
+}
+
+/**
+ * Calculate max zoom
+ * @param {Size} img_size - size of images in custom unit (meters)
+ * @param {int} min_width - length of min visible width (default 10)
+ */
+function maxZoom(img_size, min_width){
+    min_width = min_width || 10;
+    var max_width = Math.max(img_size.y, img_size.x);
+    // var maxZoom = Math.log2( max_width / (1 * min_width) )   -- IE 11 not supported log2
+    var maxZoom = Math.log( max_width / (1 * min_width) )  / Math.log(2);
+    return Math.round(maxZoom);
+}
+
+/**
+ * As LatLngBounds with its SouthNorthWestEast stuff mislead with planar metric space
+ * Envelope seems more convenient 
+ * @param {LatLngBounds} bounds 
+ */
+function Envelope(bounds)
+{
+    return {
+        min_x: bounds.getWest(),
+        min_y: bounds.getSouth(),
+        max_x: bounds.getEast(),
+        max_y: bounds.getNorth()
+    }
+}
+
+function toContainerEnvelope(env, map)
+{
+    var min = map.latLngToContainerPoint({lat: env.min_y, lng: env.min_x});
+    var max = map.latLngToContainerPoint({lat: env.max_y, lng: env.max_x});
+    return {
+        min_x: min.x,
+        min_y: min.y,
+        max_x: max.x,
+        max_y: max.y
+    }
+}
+
+function toLayerEnvelope(env, map)
+{
+    var min = map.latLngToLayerPoint({lat: env.min_y, lng: env.min_x});
+    var max = map.latLngToLayerPoint({lat: env.max_y, lng: env.max_x});
+    return {
+        min_x: min.x,
+        min_y: min.y,
+        max_x: max.x,
+        max_y: max.y
+    }
 }
 
 function GridPanel(map){
@@ -246,7 +273,6 @@ function GridPanel(map){
 
 L.Browser.touch = false;
 
-var svg_file_reader = SvgFileReader();
 
 var vm = new Vue({
     el: '#app',
@@ -260,8 +286,34 @@ var vm = new Vue({
         lineLength: null
     },
     methods: {
-        on_change: function(e){
-            svg_file_reader(e);            
+        on_change: function(e)
+        {
+            var file = e.target.files[0]; 
+            if(!file) return;
+            if(file.type !== 'image/svg+xml') {
+                this.error = t('invalid_svg_type', {type: file.type});
+            }
+            else {
+                var reader = new FileReader();
+                reader.onloadend = function(e){
+                    var res = svgToBase64(reader.result);
+                    res.fold(function(e) { vm.error = e;},
+                             function(e){
+                                vm.width_px = vm.width_m = Math.round(e.width);
+                                vm.height_px = vm.height_m = Math.round(e.height);
+                                var map_size = {x: map._container.offsetWidth, y: map._container.offsetHeight};
+                                var img_size_m = {x: e.width, y: e.height};               
+                                var bounds = update_image_scale(map_size, img_size_m);
+                                map.fitBounds(bounds);
+                                gridPanel(img_size_m);
+                                
+                                new_svg(e, bounds);
+                                new_canvas(e, bounds);
+                             });
+                };
+                reader.readAsText(file);
+            }
+            
         },
         on_line: function(e){
             this.line = map.editTools.startPolyline(undefined, {weight:1, color: 'red'});
@@ -305,22 +357,13 @@ map.on('editable:editing', function(event){
 var gridPanel = GridPanel(map);
 
 var image = null;
-function update_image_scale(img_size_m){
-    var map_div = document.getElementById('map');
-    var map_size = {x: map_div.offsetWidth,
-                    y: map_div.offsetHeight};
-
+function update_image_scale(map_size, img_size_m){
     var trans =  transformation(map_size, img_size_m);
     map.options.crs = _.extend({}, L.CRS.Simple, {transformation: trans });  
     map.setMaxBounds([[-img_size_m.y, -img_size_m.x], [img_size_m.y*2, img_size_m.x*2]]);    
     var bounds =  L.latLngBounds([[0,0], [img_size_m.y, img_size_m.x]]);
 
-    // set max zoom
-    var max_dimension = Math.max(img_size_m.y, img_size_m.x);
-    // var maxZoom = Math.log2( max_dimension / (1 * 10) )   -- IE 11 not supported log2
-    var maxZoom = Math.log( max_dimension / (1 * 10) )  / Math.log(2);
-    maxZoom =  Math.round(maxZoom);
-    map.setMaxZoom(maxZoom);
+    map.setMaxZoom( maxZoom(img_size_m) );
         
     if(image) {
         image.setBounds(bounds);
@@ -328,33 +371,15 @@ function update_image_scale(img_size_m){
         gridPanel(img_size_m);
     }
     return bounds
-
-
 }
 
-svg_file_reader.on('error', function(er){
-    vm.error = er;
-});
-
-svg_file_reader.on('new_svg', function(e){
+function new_svg(e, bounds) 
+{
     if(image){
         map.removeLayer(image);
     }
-    vm.width_px = vm.width_m = Math.round(e.width);
-    vm.height_px = vm.height_m = Math.round(e.height);
-    var map_div = document.getElementById('map');
-    var map_size = {x: map_div.offsetWidth,
-                    y: map_div.offsetHeight};
-    var img_size = {x: e.width, 
-                    y: e.height};
-
-    var img_size_m = {x: e.width, 
-                    y: e.height};               
-    var bounds = update_image_scale( img_size_m);     
-
     image = L.imageOverlay(e.data_uri, bounds).addTo(map);
-    map.fitBounds(bounds);
-
+ 
     // {
     //     var randomX = d3.randomUniform(bounds[0][1], bounds[1][1]) 
     //     var randomY = d3.randomUniform(bounds[0][0], bounds[1][0]) 
@@ -381,7 +406,61 @@ svg_file_reader.on('new_svg', function(e){
 
     // }
 
-    gridPanel(img_size_m);
-});
+    
+}
+
+
+function new_canvas(e, bounds)
+{
+
+    // points
+    var env = Envelope(bounds); 
+    var randomX = d3.randomUniform(env.min_x, env.max_x);
+    var randomY = d3.randomUniform(env.min_y, env.max_y); 
+    var points = [];
+    for (var i = 0; i < 10000; i++) {
+        points.push({x:randomX(), y:randomY() });
+    }
+
+    var memoryImages = new Image();
+    memoryImages.src = e.data_uri;
+    memoryImages.onload = function(){
+        L.canvasLayer()
+         .delegate(ca)    
+         .addTo(map);
+    };
+
+    var ca = {};
+    ca.onDrawLayer = function(info) 
+    {
+        var ctx = info.canvas.getContext('2d');
+        ctx.clearRect(0, 0, info.canvas.width, info.canvas.height);
+        var env = Envelope(info.bounds); 
+        var layer_env = toLayerEnvelope(env, info.layer._map);
+        var container_env = toContainerEnvelope(env, info.layer._map);
+        console.log('map.getPixelOrigin()',info.layer._map.getPixelOrigin());
+        console.log('env',env);
+        console.log('layer_env',layer_env);
+        console.log('container_env',container_env);
+
+
+
+        {
+        // ctx.fillStyle = "rgba(255,116,0, 1)";
+        // points.forEach( p => {
+        //     if(!info.bounds.contains([p.y, p.x])) {
+        //         return;
+        //     }
+        //     var dot = info.layer._map.latLngToContainerPoint([p.y, p.x]);
+        //     ctx.beginPath();
+        //     ctx.arc(dot.x, dot.y, 3, 0, Math.PI * 2);
+        //     ctx.fill();
+        //     ctx.closePath();
+        // })
+        }
+    };
+    
+
+}
 
 }());

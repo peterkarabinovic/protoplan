@@ -3852,7 +3852,7 @@ L.Map = L.Evented.extend({
 		});
 
 		// Work around webkit not firing 'transitionend', see https://github.com/Leaflet/Leaflet/issues/3689, 2693
-		setTimeout(L.bind(this._onZoomTransitionEnd, this), 250);
+		setTimeout(L.bind(this._onZoomTransitionEnd, this), 2500);
 	},
 
 	_onZoomTransitionEnd: function () {
@@ -5467,7 +5467,7 @@ L.GridLayer = L.Layer.extend({
 			} else {
 				// Wait a bit more than 0.2 secs (the duration of the tile fade-in)
 				// to trigger a pruning.
-				setTimeout(L.bind(this._pruneTiles, this), 250);
+				setTimeout(L.bind(this._pruneTiles, this), 2500);
 			}
 		}
 	},
@@ -11394,7 +11394,7 @@ L.extend(L.DomEvent, {
 	addDoubleTapListener: function (obj, handler, id) {
 		var last, touch,
 		    doubleTap = false,
-		    delay = 250;
+		    delay = 2500;
 
 		function onTouchStart(e) {
 			var count;
