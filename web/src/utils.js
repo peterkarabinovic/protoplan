@@ -30,7 +30,8 @@ export var Either = function(left, right){
         has_right: has_right,
         fold: function(left_fn, right_fn) {
             has_left() ? left_fn(left) : right_fn(right)
-        }
+        },
+        right: function() { return right}
     }
 };
 

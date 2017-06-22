@@ -40,8 +40,8 @@ var vm = new Vue({
                                 map.fitBounds(bounds);
                                 gridPanel(img_size_m);
                                 
-                                // new_svg(e, bounds);
-                                new_canvas2(e, bounds);
+                                 new_svg(e, bounds);
+                                //new_canvas2(e, bounds);
                              });
                 }
                 reader.readAsText(file)
@@ -183,7 +183,7 @@ function new_canvas2(e, img_bounds) {
                            img_clip_size.y, 
                            canvas_place.x, 
                            canvas_place.y, 
-                           canvas_img_size.width, canvas_img_size.height )
+                           canvas_img_size.width, canvas_img_size.height );
 
         // var visible_min = visible_env.min().scaleBy(ppm).round();
         // var visible_max = visible_env.max().scaleBy(ppm).round();

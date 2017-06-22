@@ -1,4 +1,4 @@
-
+ 
 var cur_locale = 'ru'
 
 export function t(s, o, loc){

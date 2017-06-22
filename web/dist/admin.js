@@ -29,7 +29,8 @@ var Either = function(left, right){
         has_right: has_right,
         fold: function(left_fn, right_fn) {
             has_left() ? left_fn(left) : right_fn(right);
-        }
+        },
+        right: function() { return right}
     }
 };
 
@@ -155,49 +156,6 @@ function maxZoom(img_size, min_width){
  * @param {*} max_x 
  * @param {*} max_y 
  */
-function Env(min_x, min_y,max_x, max_y){
-    return {
-        min_x: min_x,
-        min_y: min_y,
-        max_x: max_x,
-        max_y: max_y,
-        intersection: function(env){
-            return Env(
-                Math.max(this.min_x, env.min_x),
-                Math.max(this.min_y, env.min_y),
-                Math.min(this.max_x, env.max_x),
-                Math.min(this.max_y, env.max_y)
-            )            
-        },
-        min: function(){ return L.point(this.min_x, this.min_y); },
-        max: function(){ return L.point(this.max_x, this.max_y); },
-        minLatLng: function(){ return L.latLng(this.min_y, this.min_x); },
-        maxLatLng: function(){ return L.latLng(this.max_y, this.max_x); }
-        
-    }
-}
-
-/**
- * As LatLngBounds with its SouthNorthWestEast stuff mislead with planar metric space
- * Envelope seems more convenient 
- * @param {LatLngBounds} bounds 
- */
-function Envelope(bounds)
-{
-    return Env(
-        bounds.getWest(),
-        bounds.getSouth(),
-        bounds.getEast(),
-        bounds.getNorth()
-    )
-}
-
-function toContainerEnvelope(env, map)
-{
-    var min = map.latLngToContainerPoint({lat: env.min_y, lng: env.min_x});
-    var max = map.latLngToContainerPoint({lat: env.max_y, lng: env.max_x});
-    return Env(min.x, min.y, max.x, max.y);
-}
 
 function GridPanel(map){
 
@@ -319,8 +277,8 @@ var vm = new Vue({
                                 map.fitBounds(bounds);
                                 gridPanel(img_size_m);
                                 
-                                // new_svg(e, bounds);
-                                new_canvas2(e, bounds);
+                                 new_svg(e, bounds);
+                                //new_canvas2(e, bounds);
                              });
                 };
                 reader.readAsText(file);
@@ -385,70 +343,40 @@ function update_image_scale(map_size, img_size_m){
     return bounds
 }
 
-
-
-
-function new_canvas2(e, img_bounds) {
-    var img_size = {x: e.width, y: e.height};
-    var map_size = map.getSize();
-    var img_env = Envelope(img_bounds);
-    var ppm = L.point(img_size.x / img_env.max_x, img_size.y / img_env.max_y); // pixels per meter
-
-
-    var img = new Image();
-    img.src = e.data_uri;
-    img.onload = function()
-    {
-        L.canvasLayer2(drawImage).addTo(map);
-    };
-
-    function drawImage(canvas)
-    {
-        var container_img_env = toContainerEnvelope(img_env, map);
-        var canvas_place = { 
-            x: Math.max(0, container_img_env.min_x),
-            y: Math.max(0, container_img_env.min_y)
-        }; 
-        var canvas_img_size = {
-            width: Math.min(container_img_env.max_x, map_size.x) - canvas_place.x,
-            height: Math.min(container_img_env.max_y, map_size.y) - canvas_place.y,
-        };
-        var zoom = map.getZoom();
-        var visible_env = Envelope(map.getBounds()).intersection(img_env);
-        var img_clip_place = visible_env.min().scaleBy(ppm).round();
-        var img_clip_size = visible_env.max().scaleBy(ppm).round().subtract(img_clip_place);
-
-
-        var ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // ctx.clearRect(canvas_place.x, canvas_place.y, canvas_img_size.width, canvas_img_size.height);
-        ctx.drawImage(img, img_clip_place.x, 
-                           img_clip_place.y, 
-                           img_clip_size.x, 
-                           img_clip_size.y, 
-                           canvas_place.x, 
-                           canvas_place.y, 
-                           canvas_img_size.width, canvas_img_size.height );
-
-        // var visible_min = visible_env.min().scaleBy(ppm).round();
-        // var visible_max = visible_env.max().scaleBy(ppm).round();
-        // console.log('visible_min',visible_min);
-        // console.log('visible_max',visible_max);
-        // console.log( 'drawImage', img_clip_place.x, img_clip_place.y, img_clip_size.x, img_clip_size.y, canvas_place.x, canvas_place.y, canvas_img_size.width, canvas_img_size.height )
-
-        // console.log(canvas.width, canvas.height);
-        // console.log('map.env', math.Envelope(map.getBounds()));
-        // console.log('img.env', img_env);
-        // console.log('visible_env',visible_env)
-        // console.log('img.size',img_size);
-        // console.log('map size', map.getSize());
-        // console.log('container map.env', math.toContainerEnvelope(math.Envelope(map.getBounds()), map));
-        // console.log('container img.env', math.toContainerEnvelope(math.Envelope(img_bounds), map));
-        // console.log('layer img.env', math.toLayerEnvelope(math.Envelope(img_bounds), map));
-        // console.log('map. getPixelOrigin', map.getPixelOrigin());
+function new_svg(e, bounds) 
+{
+    if(image){
+        map.removeLayer(image);
     }
+    image = L.imageOverlay(e.data_uri, bounds).addTo(map);
+ 
+    // {
+    //     var randomX = d3.randomUniform(bounds[0][1], bounds[1][1]) 
+    //     var randomY = d3.randomUniform(bounds[0][0], bounds[1][0]) 
+    //     for(var i=0; i<100; i++) {
+    //         var x = randomX();
+    //         var y = randomY();
+    //         var b = [[y,x],[y+20,x+20]];
+    //         var image2 = L.imageOverlay('svg/examples/atm.svg', 
+    //                         b, 
+    //                         {interactive: true}).addTo(map);
 
+    //         // image2.on('mousedown click mousemove mouseover mouseout contextmenu', function(e){
+    //         //     console.log('mousedown')
+    //         //     L.DomEvent.preventDefault(e)
+    //         //     L.DomEvent.stop(e)
+    //         // })
 
+    //         var draggable = new L.Draggable(image2._image);
+    //         draggable.enable();
+    //         draggable.on('dragend', function(e){
+    //             console.log(e);
+    //         })
+    //     }
+
+    // }
+
+    
 }
 
 }());
