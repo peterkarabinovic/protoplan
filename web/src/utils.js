@@ -21,7 +21,7 @@ export function memorize(f) {
 /***
  *  Either monad
  */
-export var Either = function(left, right){
+export function Either(left, right){
     var has_left = function() { return left ? true : false }; 
     var has_right = function() { return right ? true : false };
 

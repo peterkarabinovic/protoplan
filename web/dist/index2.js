@@ -34,6 +34,17 @@ Either.left = function(value){
     return Either(value)
 };
 
+/**
+ * Take from here: https://stackoverflow.com/a/16788517/728960
+ * @param {*} x 
+ * @param {*} y 
+ */
+
+
+
+ // Is a given variable an object?
+ // (copy from underscore.js)
+
 var cur_locale = 'ru';
 
 function t(s, o, loc){

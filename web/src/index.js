@@ -1,7 +1,7 @@
-import {svgToBase64} from '../svg/svg-utils.js'
-import * as math from '../svg/math.js' 
-import {GridPanel} from '../svg/grid-panel.js'
-import {t} from '../locale.js'
+import {svgToBase64} from './svg/svg-utils.js'
+import * as math from './svg/math.js' 
+import {GridPanel} from './svg/grid-panel.js'
+import {t} from './locale.js'
 
 
 L.Browser.touch = false;
@@ -34,9 +34,8 @@ var vm = new Vue({
                              function(e){
                                 vm.width_px = vm.width_m = Math.round(e.width);
                                 vm.height_px = vm.height_m = Math.round(e.height);
-                                var map_size = {x: map._container.offsetWidth, y: map._container.offsetHeight};
                                 var img_size_m = {x: e.width, y: e.height}               
-                                var bounds = update_image_scale(map_size, img_size_m);
+                                var bounds = update_image_scale(img_size_m);
                                 map.fitBounds(bounds);
                                 gridPanel(img_size_m);
                                 
@@ -58,8 +57,22 @@ var vm = new Vue({
             return this.line && this.line.getLatLngs().length == 2;
         },
         recalculateScale: function(){
-            var bounds = this.line.getBounds();
-            this.line.bindTooltip('dsdsds', {permanent:true});
+            
+            var points = this.line.getLatLngs()
+                             .map( function(ll) { return map.latLngToContainerPoint(ll); });
+            var length_px = points[0].distanceTo(points[1]);
+
+            var ratio = this.lineLength / length_px;
+            var img_size_m = {
+                x: this.width_px * ratio,
+                y: this.height_px * ratio
+            };
+            update_image_scale(img_size_m);
+            // var latLngs = points.map(function(p) { return map.latLngToContainerPoint(p);});
+            // this.line.setLatLngs(latLngs);
+
+
+            this.line.bindTooltip(this.lineLength + ' м', {permanent:true, interactive:true});
         }
     },
     computed: {
@@ -68,6 +81,8 @@ var vm = new Vue({
         }
     }
 });
+
+window.vm = vm;
 
 var map = L.map('map', {
     crs: L.CRS.Simple,
@@ -90,9 +105,10 @@ map.on('editable:editing', function(event){
 var gridPanel = GridPanel(map);
 
 var image = null;
-function update_image_scale(map_size, img_size_m){
+function update_image_scale(img_size_m){
+    var map_size = {x: map._container.offsetWidth, y: map._container.offsetHeight};
     var trans =  math.transformation(map_size, img_size_m)
-    map.options.crs = _.extend({}, L.CRS.Simple, {transformation: trans });  
+    map.options.crs = L.extend({}, L.CRS.Simple, {transformation: trans });  
     map.setMaxBounds([[-img_size_m.y, -img_size_m.x], [img_size_m.y*2, img_size_m.x*2]])    
     var bounds =  L.latLngBounds([[0,0], [img_size_m.y, img_size_m.x]]);
 
@@ -100,7 +116,7 @@ function update_image_scale(map_size, img_size_m){
         
     if(image) {
         image.setBounds(bounds);
-        map.fitBounds(bounds);
+        // map.fitBounds(bounds);
         gridPanel(img_size_m);
     }
     return bounds
@@ -112,36 +128,11 @@ function new_svg(e, bounds)
         map.removeLayer(image)
     }
     image = L.imageOverlay(e.data_uri, bounds).addTo(map);
- 
-    // {
-    //     var randomX = d3.randomUniform(bounds[0][1], bounds[1][1]) 
-    //     var randomY = d3.randomUniform(bounds[0][0], bounds[1][0]) 
-    //     for(var i=0; i<100; i++) {
-    //         var x = randomX();
-    //         var y = randomY();
-    //         var b = [[y,x],[y+20,x+20]];
-    //         var image2 = L.imageOverlay('svg/examples/atm.svg', 
-    //                         b, 
-    //                         {interactive: true}).addTo(map);
-
-    //         // image2.on('mousedown click mousemove mouseover mouseout contextmenu', function(e){
-    //         //     console.log('mousedown')
-    //         //     L.DomEvent.preventDefault(e)
-    //         //     L.DomEvent.stop(e)
-    //         // })
-
-    //         var draggable = new L.Draggable(image2._image);
-    //         draggable.enable();
-    //         draggable.on('dragend', function(e){
-    //             console.log(e);
-    //         })
-    //     }
-
-    // }
-
-    
 };
 
+map.on('moveend', function(){
+    console.log('moveend');
+})
 
 function new_canvas2(e, img_bounds) {
     var img_size = {x: e.width, y: e.height};
