@@ -4,12 +4,32 @@
         <title></title>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            #map {
+                position: absolute;
+                top: 14px; left: 54px; width: 800px; height: 600px;
+            }
+            #form{
+                position: absolute;
+                top: 654px; left: 54px; 
+            }
+        </style>
     </head>
     <body>
-
+        <div id="map">
+            
+        </div>
+        <div id='form'>
+            <span>1 m =</span>
+            <input type="number" v-model="m_px">px
+            <div>
+                <a href="#" @click='update'>Обновить</a>
+            </div>
+        </div>
         <script src='dist/libs/underscore-min.js'></script>
         <script src='dist/libs/leaflet.js'></script>
         <script src='dist/libs/d3.js'></script>
+        <script src='dist/libs/vue.js'></script>
         <script src='dist/test.js'></script>
         
     </body>
