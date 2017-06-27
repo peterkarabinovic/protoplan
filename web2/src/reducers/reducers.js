@@ -22,7 +22,7 @@ var layers = handle(
 var map = handle(
     {
         drawMode: null,
-        distance: null
+        distance: null // { points:Array<Point>, }
     },
     {
         DRAW_MODE_SET: function(state, action){
