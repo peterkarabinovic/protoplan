@@ -4,7 +4,7 @@ import {combine, handle} from '../redux.js'
 var mapReducers = handle(
     {
         drawMode: null,    // distance_line, polyline, carpet ... 
-        baseImage: null,   // Layer
+        baseImage: null,   // {}
         distanceLine: null, // <Number>
         envLayer: null
     },

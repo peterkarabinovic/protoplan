@@ -62,7 +62,7 @@ export function BaseImageView(store)
         }
     });
 
-    store.on('map.baseImage.size_m', function(e){
+    store.on('map.baseImage', function(e){
         vm.$forceUpdate();
     });
 

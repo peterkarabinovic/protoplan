@@ -23,11 +23,13 @@ export function Store(reducers, middleware)
     s.dispatch = function(action){
         var old_state = s.state;
         s.state = reducers(s.state, action);
-        var diffs = diff_paths(s.state, old_state);
-        if(!_.isEmpty(diffs)) {
-            var events = _collect_diff_event([], diffs);
-            fire(listeners, exactly_listeners, events);
-        }
+        listener_pairs = _.chain(listeners).pairs().sortBy(function(it){ return it[0] }).values();
+        find_and_fire(s.state, old_state, listener_pairs, [])
+        // var diffs = diff_paths(s.state, old_state);
+        // if(!_.isEmpty(diffs)) {
+        //     var events = _collect_diff_event([], diffs);
+        //     fire(listeners, exactly_listeners, events);
+        // }
         return s.state;
     }
 
@@ -37,6 +39,32 @@ export function Store(reducers, middleware)
 
 
     return s;
+}
+
+function find_and_fire(new_obj, old_obj, listeners, path)
+{
+    listeners = _.chain(listeners).pairs().sortBy(function(it){ return it[0] }).values();
+
+    var it = listeners[0];
+    if(it) 
+    {
+        var deep = it[0],
+              ll = it[1];
+        if(path.length == deep-1) {
+            var props = diffs(new_obj, old_obj);    
+            props.forEach(function(prop){
+                var p = path.concat([prop]);
+                var o1 = new_obj[prop];
+                var o2 = old_obj[prop];
+                var interested_ll = _.filter(ll, function(it) { return _match(p, it.path) } )
+                if(interested_ll.length) {
+                    var event = {new_val: o1, old_val: o2, path: p};
+                    interested_ll.forEach(function(it) { it.fn(event) } );
+                }
+                diff_events(o1, o2, listeners.slice(1), p);
+            })
+        }
+    }
 }
 
 /**
