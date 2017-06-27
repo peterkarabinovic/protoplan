@@ -66,7 +66,7 @@ export function BaseImageView(store)
         vm.$forceUpdate();
     });
 
-    store.on('map.distance', function(e){
+    store.on('modules.distance', function(e){
         vm.lineLength = e.new_val;
     });
 }

@@ -22,19 +22,24 @@ var layers = handle(
 var map = handle(
     {
         drawMode: null,
-        distance: null // { points:Array<Point>, }
     },
     {
         DRAW_MODE_SET: function(state, action){
             var mode = action.payload;
             return _.extend({}, state, {drawMode: mode});
-        },
+        }
+    }
+);
+
+var modules = handle({
+        distance: null
+    },
+    {
         DISTANCE_SET: function(state, action){
             var dist_m = action.payload;
             return _.extend({}, state, {distance: dist_m});
-        },
-    }
-);
+        }
+    });
 
 var root = handle({},{
 
@@ -42,8 +47,9 @@ var root = handle({},{
 
 
 export default combine({
+    layers: layers,
     map: map,
-    layers: layers
+    modules: modules
 }, root);
 
 

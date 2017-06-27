@@ -30,6 +30,7 @@ export default function(store, map)
             map.editTools.stopDrawing();
         }
         
+        
         store('DRAW_MODE_SET', null);
     }
 
