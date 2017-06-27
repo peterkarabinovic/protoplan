@@ -16,20 +16,33 @@ function Store(reducers, middleware)
     };
     s.state = {};
 
-    var listeners = {}, exactly_listeners = {};
-    s.on = _.partial(_on, listeners);
-    s.on_exactly = _.partial(_on, exactly_listeners);
-    s.off = _.partial(_off, listeners);
-    s.off_exactly = _.partial(_off, exactly_listeners);
+    var listeners = {};
+    
+    s.on = function(path, fn){
+        var paths = path.split(' ');
+        paths.forEach(function(p){
+            p = p.trim().split('.');
+            listeners[p.length] = listeners[p.length] || [];
+            listeners[p.length].push( {path:p, fn:fn} );
+        });
+    };
+
+    s.off = function(path, fn){
+        var paths = path.split(' ');
+        paths.forEach(function(p){
+            p = p.split('.');
+            var ln = p.length;
+            listeners = reject_array_prop(listeners, ln, function(it){ 
+                return _.isEqual(it.path, p) &&  it.fn == fn; 
+            });
+        });
+        
+    };
 
     s.dispatch = function(action){
         var old_state = s.state;
         s.state = reducers(s.state, action);
-        var diffs = diff_paths(s.state, old_state);
-        if(!_.isEmpty(diffs)) {
-            var events = _collect_diff_event([], diffs);
-            fire(listeners, exactly_listeners, events);
-        }
+        find_and_fire(s.state, old_state, _.clone(listeners), []);
         return s.state;
     };
 
@@ -42,20 +55,48 @@ function Store(reducers, middleware)
 }
 
 /**
- * find all diff paths in two objects
- * @param {Object} obj1 
- * @param {Object} obj2 
+ * Recursive run by properties search diff and fire events 
+ * @param {*} new_obj 
+ * @param {*} old_obj 
+ * @param {*} listeners 
+ * @param {*} path 
  */
-function diff_paths(new_obj, old_obj){
-    var props = diffs(new_obj, old_obj);
-    var paths = {};
+function find_and_fire(new_obj, old_obj, listeners, path)
+{
+    if( _.isEmpty(listeners) )
+        return
+
+    new_obj = new_obj || {};
+    old_obj = old_obj || {};
+       
+    var props = diffs(new_obj, old_obj);    
+    var max_level = +_.max(_.keys(listeners));
     props.forEach(function(prop){
         var o1 = new_obj[prop];
         var o2 = old_obj[prop];
-        paths[prop] = {new_val:o1, old_val:o2};
-        paths[prop].paths = L.extend({}, diff_paths(o1, o2));
+        var p = path.concat([prop]);
+        listeners = reject_array_prop(listeners, p.length, function(it){
+            if(_match(p, it.path)) {
+                it.fn({new_val: o1, old_val: o2, path: p});
+                return true;
+            }
+            return false;
+        });
+        if(max_level > p.length)
+            find_and_fire(o1, o2, listeners, p);
     });
-    return paths;
+}
+
+function reject_array_prop(obj, prop, reject_fn){
+    var a = obj[prop];
+    if(a){
+        a =  _.reject(a, reject_fn);
+        if(a.length)
+            obj[prop] = a;
+        else
+            delete obj[prop];
+    }
+    return obj;
 }
 
 /**
@@ -67,43 +108,10 @@ function diffs(new_obj, old_obj)
 {
     if(!_.isObject(new_obj) || !_.isObject(old_obj))
         return [];
-    if(_.isArray(new_obj) || _.isArray(old_obj))
-        return [];
     var keys = _.uniq( Object.keys(new_obj).concat( Object.keys(old_obj) ) );
     return keys.reduce(function(diffs, key){
         return _.isEqual(new_obj[key], old_obj[key]) ? diffs : diffs.concat(key);
     },[]);
-}
-
-function _on(listeners, path, fn) {
-    path = path.split('.');
-    listeners[path.length] = listeners[path.length] || [];
-    listeners[path.length].push( {path:path, fn:fn} );
-}
-
-function _off(listeners, path, fn) {
-    path = path.split('.');
-    var ln = path.length;
-    var ll = listeners[ln];
-    if(ll){
-        ll = _.reject(ll, function(it){ return _.isEqual(it.path, path) &&  it.fn == fn; });
-        listeners[ln] = ll.length ? ll : undefined;  
-    }
-}
-
-
-function fire(listeners, terminal_listeners, events)
-{
-    _.each(events, function(e){
-        var len = e.path.length;
-        var ll = listeners[len] || [];
-        if(e.terminal)
-            ll = ll.concat( terminal_listeners[len] || [] );
-        _.each(ll, function(it){
-            if(_match(e.path, it.path))
-                it.fn(e);
-        });
-    });
 }
 
 
@@ -116,35 +124,18 @@ function _match(path, mask_path){
     return _.isEqual(path, mask_path);
 }
 
-/**
- * Return list of change event
- *  Change event is:
- *               { path: Array, - property list
- *                 old_val: Any, 
- *                 new_val: Any,
- *                 terminal: Boolean - is terminal diff property or not
- *               }
- */
-function _collect_diff_event(path, diff_paths){
-    return _.reduce(diff_paths, function(events, diff, prop) {
-        var p = path.concat([prop]);
-        events.push({ path: p, old_val: diff.old_val, new_val: diff.new_val, terminal: _.isEmpty(diff.paths) });
-        events = events.concat( _collect_diff_event(p, diff.paths) );
-        return events;
-    },[]);
-}
-
-
-
 
 /**
  *  Reducer helpers
  */
 
-function combine(reducerMap)
+function combine(reducerMap, rootReducer)
 {
     return function(state, action){
-        if(_.isEmpty(state))
+        
+        if(rootReducer)
+            state = rootReducer(state, action);
+        else if(_.isEmpty(state))
             state = {};
         
         var new_state={};
@@ -166,43 +157,55 @@ function handle(defaultState, handlers)
     }
 }
 
-var mapReducers = handle(
+var layers = handle(
     {
-        drawMode: null,    // distance_line, polyline, carpet ... 
-        baseImage: null,   // {}
-        distanceLine: null, // <Number>
-        envLayer: null
+        base: null,
+        additional: null,
+        stands: null,
+        equipment: null
     },
     {
-        
         BASE_IMAGE_SET: function(state, action){
-            return _.extend({}, state, {baseImage: action.payload});
+            return _.extend({}, state, {base: action.payload});
         },
         BASE_IMAGE_SIZE_UPDATE: function(state, action){
             var size_m = action.payload;
-            return _.extend({}, state, {baseImage: _.extend(state.baseImage, {size_m: size_m})});
+            return _.extend({}, state, {base: _.extend(state.base, {size_m: size_m})});
         },
+    }
+);
+
+var map = handle(
+    {
+        drawMode: null,
+        distance: null
+    },
+    {
         DRAW_MODE_SET: function(state, action){
             var mode = action.payload;
             return _.extend({}, state, {drawMode: mode});
         },
         DISTANCE_SET: function(state, action){
             var dist_m = action.payload;
-            return _.extend({}, state, {distanceLine: dist_m});
+            return _.extend({}, state, {distance: dist_m});
         },
-        
     }
 );
 
+var root = handle({},{
 
-var Reducers = combine({
-    map: mapReducers
 });
 
 
+var Reducers = combine({
+    map: map,
+    layers: layers
+}, root);
+
+
 // SELECTORS
-function getBaseLayer(store) { return store.state.map && store.state.map.baseImage; }
-function getDistanceLine(store) { return store.state.map && store.state.map.distanceLine; }
+function getBaseLayer(store) { return store.state.layers && store.state.layers.base; }
+function getDistanceLine(store) { return store.state.map && store.state.map.distance; }
 
 /**
  * Calculate map transformation 
@@ -383,7 +386,7 @@ L.Browser.touch = false;
 
 function Map(el, store)
 {
-    map = L.map(el, 
+    map$1 = L.map(el, 
     {
         crs: L.CRS.Simple,
         zoomControl: false,
@@ -394,36 +397,36 @@ function Map(el, store)
             }
     });
 
-    gridPanel = GridPanel(map);
+    gridPanel = GridPanel(map$1);
 
     // State changes
-    store.on_exactly('map.baseImage', function(e) { updateBaseLayer(e.new_val); });
-    store.on('map.baseImage.size_m', function(e) { updateBaseLayerSize(e.new_val); });
+    store.on('layers.base', function(e) { updateBaseLayer(e.new_val); });
+    store.on('layers.base.size_m', function(e) { updateBaseLayerSize(e.new_val); });
 }
 
 
-var map  = null;
+var map$1  = null;
 var baseLayer = null;
 var gridPanel = null;
 
 function updateBaseLayer(img)
 {
     if(baseLayer) {
-        map.removeLayer(baseLayer);
+        map$1.removeLayer(baseLayer);
     }
     var bounds = updateBaseLayerSize(img.size_m);
-    baseLayer = L.imageOverlay(img.url, bounds).addTo(map);
+    baseLayer = L.imageOverlay(img.url, bounds).addTo(map$1);
 }
 
 function updateBaseLayerSize(size_m)
 {
-    var map_size = {x: map._container.offsetWidth, y: map._container.offsetHeight};
+    var map_size = {x: map$1._container.offsetWidth, y: map$1._container.offsetHeight};
     var trans =  transformation(map_size, size_m);
-    map.options.crs = L.extend({}, L.CRS.Simple, {transformation: trans });  
-    map.setMaxBounds([[-size_m.y, -size_m.x], [size_m.y*2, size_m.x*2]]);
-    map.setMaxZoom( maxZoom(size_m) );
+    map$1.options.crs = L.extend({}, L.CRS.Simple, {transformation: trans });  
+    map$1.setMaxBounds([[-size_m.y, -size_m.x], [size_m.y*2, size_m.x*2]]);
+    map$1.setMaxZoom( maxZoom(size_m) );
     var bounds =  L.latLngBounds([[0,0], [size_m.y, size_m.x]]);
-    map.fitBounds(bounds);
+    map$1.fitBounds(bounds);
     gridPanel(size_m);
     if(baseLayer)
         baseLayer.setBounds(bounds);
@@ -457,7 +460,7 @@ var translations =
     }
 };
 
-var DRAW_DISTANCE = 'draw_line';
+var DRAW_DISTANCE = 'draw-distance';
 
 function svgToBase64(svg_text)
 {
@@ -540,7 +543,7 @@ function BaseImageView(store)
                 return getDistanceLine(store);
             },
             draw_line: function(){
-                store('DRAW_MODE_DISTANCE', DRAW_DISTANCE);
+                store('DRAW_MODE_SET', DRAW_DISTANCE);
             },
             recalculateScale: function(){
                 if(lineLength <= 0) return;
@@ -561,11 +564,11 @@ function BaseImageView(store)
         }
     });
 
-    store.on('map.baseImage', function(e){
+    store.on('layers.base', function(e){
         vm.$forceUpdate();
     });
 
-    store.on('map.distanceLine', function(e){
+    store.on('map.distance', function(e){
         vm.lineLength = e.new_val;
     });
 }

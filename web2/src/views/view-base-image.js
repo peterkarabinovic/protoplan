@@ -1,6 +1,6 @@
 import {t} from '../locale.js'
 import {getDistanceLine, getBaseLayer} from '../reducers/reducers.js'
-import {DRAW_DISTANCE} from '../map/draw-modes.js'
+import {DRAW_DISTANCE} from '../drawing/modes.js'
 import {svgToBase64} from '../svg/parser.js'
 
 export function BaseImageView(store) 
@@ -41,7 +41,7 @@ export function BaseImageView(store)
                 return getDistanceLine(store);
             },
             draw_line: function(){
-                store('DRAW_MODE_DISTANCE', DRAW_DISTANCE)
+                store('DRAW_MODE_SET', DRAW_DISTANCE)
             },
             recalculateScale: function(){
                 if(lineLength <= 0) return;
@@ -62,11 +62,11 @@ export function BaseImageView(store)
         }
     });
 
-    store.on('map.baseImage', function(e){
+    store.on('layers.base', function(e){
         vm.$forceUpdate();
     });
 
-    store.on('map.distanceLine', function(e){
+    store.on('map.distance', function(e){
         vm.lineLength = e.new_val;
     });
 }

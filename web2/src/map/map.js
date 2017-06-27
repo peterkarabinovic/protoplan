@@ -19,8 +19,8 @@ export function Map(el, store)
     gridPanel = GridPanel(map);
 
     // State changes
-    store.on_exactly('map.baseImage', function(e) { updateBaseLayer(e.new_val); });
-    store.on('map.baseImage.size_m', function(e) { updateBaseLayerSize(e.new_val); });
+    store.on('layers.base', function(e) { updateBaseLayer(e.new_val); });
+    store.on('layers.base.size_m', function(e) { updateBaseLayerSize(e.new_val); });
 }
 
 

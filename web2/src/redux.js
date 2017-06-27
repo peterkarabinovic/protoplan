@@ -14,20 +14,33 @@ export function Store(reducers, middleware)
     }
     s.state = {};
 
-    var listeners = {}, exactly_listeners = {};
-    s.on = _.partial(_on, listeners);
-    s.on_exactly = _.partial(_on, exactly_listeners);
-    s.off = _.partial(_off, listeners);
-    s.off_exactly = _.partial(_off, exactly_listeners);
+    var listeners = {};
+    
+    s.on = function(path, fn){
+        var paths = path.split(' ');
+        paths.forEach(function(p){
+            p = p.trim().split('.');
+            listeners[p.length] = listeners[p.length] || []
+            listeners[p.length].push( {path:p, fn:fn} );
+        });
+    };
+
+    s.off = function(path, fn){
+        var paths = path.split(' ');
+        paths.forEach(function(p){
+            p = p.split('.');
+            var ln = p.length;
+            listeners = reject_array_prop(listeners, ln, function(it){ 
+                return _.isEqual(it.path, p) &&  it.fn == fn; 
+            });
+        });
+        
+    };
 
     s.dispatch = function(action){
         var old_state = s.state;
         s.state = reducers(s.state, action);
-        var diffs = diff_paths(s.state, old_state);
-        if(!_.isEmpty(diffs)) {
-            var events = _collect_diff_event([], diffs);
-            fire(listeners, exactly_listeners, events);
-        }
+        find_and_fire(s.state, old_state, _.clone(listeners), [])
         return s.state;
     }
 
@@ -40,20 +53,48 @@ export function Store(reducers, middleware)
 }
 
 /**
- * find all diff paths in two objects
- * @param {Object} obj1 
- * @param {Object} obj2 
+ * Recursive run by properties search diff and fire events 
+ * @param {*} new_obj 
+ * @param {*} old_obj 
+ * @param {*} listeners 
+ * @param {*} path 
  */
-function diff_paths(new_obj, old_obj){
-    var props = diffs(new_obj, old_obj);
-    var paths = {};
+function find_and_fire(new_obj, old_obj, listeners, path)
+{
+    if( _.isEmpty(listeners) )
+        return
+
+    new_obj = new_obj || {};
+    old_obj = old_obj || {};
+       
+    var props = diffs(new_obj, old_obj);    
+    var max_level = +_.max(_.keys(listeners));
     props.forEach(function(prop){
         var o1 = new_obj[prop];
         var o2 = old_obj[prop];
-        paths[prop] = {new_val:o1, old_val:o2};
-        paths[prop].paths = L.extend({}, diff_paths(o1, o2));
-    })
-    return paths;
+        var p = path.concat([prop]);
+        listeners = reject_array_prop(listeners, p.length, function(it){
+            if(_match(p, it.path)) {
+                it.fn({new_val: o1, old_val: o2, path: p});
+                return true;
+            }
+            return false;
+        });
+        if(max_level > p.length)
+            find_and_fire(o1, o2, listeners, p);
+    });
+}
+
+function reject_array_prop(obj, prop, reject_fn){
+    var a = obj[prop];
+    if(a){
+        a =  _.reject(a, reject_fn);
+        if(a.length)
+            obj[prop] = a;
+        else
+            delete obj[prop];
+    }
+    return obj;
 }
 
 /**
@@ -65,43 +106,10 @@ function diffs(new_obj, old_obj)
 {
     if(!_.isObject(new_obj) || !_.isObject(old_obj))
         return [];
-    if(_.isArray(new_obj) || _.isArray(old_obj))
-        return [];
     var keys = _.uniq( Object.keys(new_obj).concat( Object.keys(old_obj) ) );
     return keys.reduce(function(diffs, key){
         return _.isEqual(new_obj[key], old_obj[key]) ? diffs : diffs.concat(key);
     },[]);
-}
-
-function _on(listeners, path, fn) {
-    path = path.split('.');
-    listeners[path.length] = listeners[path.length] || []
-    listeners[path.length].push( {path:path, fn:fn} );
-}
-
-function _off(listeners, path, fn) {
-    path = path.split('.');
-    var ln = path.length;
-    var ll = listeners[ln];
-    if(ll){
-        ll = _.reject(ll, function(it){ return _.isEqual(it.path, path) &&  it.fn == fn; });
-        listeners[ln] = ll.length ? ll : undefined;  
-    }
-}
-
-
-function fire(listeners, terminal_listeners, events)
-{
-    _.each(events, function(e){
-        var len = e.path.length;
-        var ll = listeners[len] || [];
-        if(e.terminal)
-            ll = ll.concat( terminal_listeners[len] || [] );
-        _.each(ll, function(it){
-            if(_match(e.path, it.path))
-                it.fn(e);
-        })
-    });
 }
 
 
@@ -114,35 +122,18 @@ function _match(path, mask_path){
     return _.isEqual(path, mask_path);
 }
 
-/**
- * Return list of change event
- *  Change event is:
- *               { path: Array, - property list
- *                 old_val: Any, 
- *                 new_val: Any,
- *                 terminal: Boolean - is terminal diff property or not
- *               }
- */
-function _collect_diff_event(path, diff_paths){
-    return _.reduce(diff_paths, function(events, diff, prop) {
-        var p = path.concat([prop])
-        events.push({ path: p, old_val: diff.old_val, new_val: diff.new_val, terminal: _.isEmpty(diff.paths) });
-        events = events.concat( _collect_diff_event(p, diff.paths) );
-        return events;
-    },[]);
-};
-
-
-
 
 /**
  *  Reducer helpers
  */
 
-export function combine(reducerMap)
+export function combine(reducerMap, rootReducer)
 {
     return function(state, action){
-        if(_.isEmpty(state))
+        
+        if(rootReducer)
+            state = rootReducer(state, action);
+        else if(_.isEmpty(state))
             state = {};
         
         var new_state={}

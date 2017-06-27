@@ -1,43 +1,55 @@
 import {combine, handle} from '../redux.js'
 
 
-var mapReducers = handle(
+var layers = handle(
     {
-        drawMode: null,    // distance_line, polyline, carpet ... 
-        baseImage: null,   // {}
-        distanceLine: null, // <Number>
-        envLayer: null
+        base: null,
+        additional: null,
+        stands: null,
+        equipment: null
     },
     {
-        
         BASE_IMAGE_SET: function(state, action){
-            return _.extend({}, state, {baseImage: action.payload});
+            return _.extend({}, state, {base: action.payload});
         },
         BASE_IMAGE_SIZE_UPDATE: function(state, action){
             var size_m = action.payload;
-            return _.extend({}, state, {baseImage: _.extend(state.baseImage, {size_m: size_m})});
+            return _.extend({}, state, {base: _.extend(state.base, {size_m: size_m})});
         },
+    }
+);
+
+var map = handle(
+    {
+        drawMode: null,
+        distance: null
+    },
+    {
         DRAW_MODE_SET: function(state, action){
             var mode = action.payload;
             return _.extend({}, state, {drawMode: mode});
         },
         DISTANCE_SET: function(state, action){
             var dist_m = action.payload;
-            return _.extend({}, state, {distanceLine: dist_m});
+            return _.extend({}, state, {distance: dist_m});
         },
-        
     }
 );
 
+var root = handle({},{
 
-export default combine({
-    map: mapReducers
 });
 
 
+export default combine({
+    map: map,
+    layers: layers
+}, root);
+
+
 // SELECTORS
-export function getBaseLayer(store) { return store.state.map && store.state.map.baseImage; }
-export function getDistanceLine(store) { return store.state.map && store.state.map.distanceLine; }
+export function getBaseLayer(store) { return store.state.layers && store.state.layers.base; }
+export function getDistanceLine(store) { return store.state.map && store.state.map.distance; }
 
 
 
