@@ -13,8 +13,6 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "babel-cli": "^6.24.1",
-    "babel-preset-env": "^1.5.2",
     "rollup": "^0.43.0",
     "rollup-watch": "^4.0.0",
     "uglify-js": "^3.0.20"

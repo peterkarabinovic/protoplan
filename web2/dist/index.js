@@ -366,7 +366,8 @@ function GridPanel(map){
             .style('left', (map_size.left - margin.left - 1) + 'px')
             .style('height', (map_size.height + margin.top + margin.bottom) + 'px')
             .style('width', (map_size.width + margin.left + margin.right) + 'px')
-            .style('pointer-events', 'none');
+            .style('pointer-events', 'none')
+            .style('z-index', "2001");
 
     // Axis X
     var $axisX = $graphPanel.append('g')
@@ -480,7 +481,8 @@ function updateBaseLayerSize(size_m)
     map$2.setMaxBounds([[-size_m.y, -size_m.x], [size_m.y*2, size_m.x*2]]);
     map$2.setMaxZoom( maxZoom(size_m) );
     var bounds =  L.latLngBounds([[0,0], [size_m.y, size_m.x]]);
-    map$2.fitBounds(bounds);
+    if(_.isUndefined(map$2.getZoom()))
+        map$2.fitBounds(bounds);
     gridPanel(size_m);
     if(baseLayer)
         baseLayer.setBounds(bounds);

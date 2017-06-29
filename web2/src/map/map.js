@@ -46,7 +46,8 @@ function updateBaseLayerSize(size_m)
     map.setMaxBounds([[-size_m.y, -size_m.x], [size_m.y*2, size_m.x*2]]);
     map.setMaxZoom( math.maxZoom(size_m) );
     var bounds =  L.latLngBounds([[0,0], [size_m.y, size_m.x]]);
-    map.fitBounds(bounds);
+    if(_.isUndefined(map.getZoom()))
+        map.fitBounds(bounds);
     gridPanel(size_m);
     if(baseLayer)
         baseLayer.setBounds(bounds);
