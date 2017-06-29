@@ -51,7 +51,7 @@ export function BaseImageView(store)
             needRecalculate: function(){
                 return this.lineLength > 0 && this.lineLength != Math.round(getModuleBase(store).length_m);
             }
-        },
+        }, 
         computed: {
             widthHeight: function(){
                 return this.width ? this.width + ' m / ' + this.height + ' m' : ''
