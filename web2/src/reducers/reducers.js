@@ -1,5 +1,5 @@
 import {combine, handle} from '../redux.js'
-
+import {Immutable} from '../utils.js'
 
 var layers = handle(
     {
@@ -21,28 +21,48 @@ var layers = handle(
 
 var map = handle(
     {
-        drawMode: null,
+        drawing_mode: null,
     },
     {
-        DRAW_MODE_SET: function(state, action){
+        DRAWING_MODE_SET: function(state, action){
             var mode = action.payload;
-            return _.extend({}, state, {drawMode: mode});
+            return _.extend({}, state, {drawing_mode: mode});
         }
     }
 );
 
-var modules = handle({
-        distance: null
-    },
-    {
-        DISTANCE_SET: function(state, action){
-            var dist_m = action.payload;
-            return _.extend({}, state, {distance: dist_m});
-        }
-    });
 
-var root = handle({},{
+var modules = combine(
+{
+    base: handle(
+        {
+            points: [],
+            length_px: null,
+            length_m: null,
+        },
+        {
+            DISTANCE_LINE_SET: function(state, action){
+                return _.extend({}, state, {points: action.payload.points,
+                                            length_m: action.payload.length_m,
+                                            length_px: action.payload.length_px});
+            }
+    })
+})
 
+var root = handle({},
+{
+    DISTANCE_SET: function(state, action){
+        var length_m = action.payload;
+        var ratio =  length_m / state.modules.base.length_m;
+        var size_m = state.layers.base.size_m;
+        size_m = {
+            x: size_m.x * ratio,
+            y: size_m.y * ratio
+        };
+        state = Immutable.update(state, 'layers.base.size_m', size_m);
+        state = Immutable.update(state, 'modules.base.length_m', length_m);
+        return state;
+    }
 });
 
 
@@ -55,7 +75,7 @@ export default combine({
 
 // SELECTORS
 export function getBaseLayer(store) { return store.state.layers && store.state.layers.base; }
-export function getDistanceLine(store) { return store.state.map && store.state.map.distance; }
+export function getModuleBase(store) { return store.state.modules.base; }
 
 
 

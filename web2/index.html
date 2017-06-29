@@ -54,7 +54,7 @@
             }
             .leaflet-container {
                 background-color:rgba(255,0,0,0.0);
-            }            
+            }
            
         </style>
     </head>
@@ -70,10 +70,10 @@
                     <span>Ширина/Высота:</span>
                     <input type="text" disabled v-model="widthHeight">
                 </div>
-                <div class="w3-section" v-if="hasLine()">
+                <div class="w3-section" v-if="lineLength">
                     <span>Длина линии (м):</span>
                     <input type="number" min="1" v-model="lineLength">
-                    <a href="#" class="w3-tiny" v-if='lineLength > 0' 
+                    <a href="#" class="w3-tiny" v-if='needRecalculate()' 
                                 @click='recalculateScale()'>
                         Пересчитать масштаб
                     </a>

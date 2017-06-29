@@ -1,5 +1,5 @@
 import {t} from '../locale.js'
-import {getDistanceLine, getBaseLayer} from '../reducers/reducers.js'
+import {getModuleBase} from '../reducers/reducers.js'
 import {DRAW_DISTANCE} from '../drawing/modes.js'
 import {svgToBase64} from '../svg/parser.js'
 
@@ -8,6 +8,7 @@ export function BaseImageView(store)
     var vm = new Vue({
         el: '#base-layer',
         data: {
+            width: null, height: null,
             lineLength: null,
             error: ''
         },
@@ -37,36 +38,34 @@ export function BaseImageView(store)
                     reader.readAsText(file);
                 }
             },
-            hasLine: function(){
-                return getDistanceLine(store);
-            },
             draw_line: function(){
-                store('DRAW_MODE_SET', DRAW_DISTANCE)
+                store('DRAWING_MODE_SET', DRAW_DISTANCE)
             },
             recalculateScale: function(){
-                if(lineLength <= 0) return;
-                store('DISTANCE_SET', lineLength);
+                if(this.lineLength <= 0) return;
+                store('DISTANCE_SET', this.lineLength);
             },
             needDrawLine: function(){
-                return getBaseLayer(store) && !vm.hasLine();
-            } 
+                return this.width && !this.lineLength;
+            },
+            needRecalculate: function(){
+                return this.lineLength > 0 && this.lineLength != Math.round(getModuleBase(store).length_m);
+            }
         },
         computed: {
             widthHeight: function(){
-                var bi = getBaseLayer(store);
-                return bi ? bi.size_m.x + ' m / ' + bi.size_m.y + ' m' : ''
-            },
-            distance: function(){
-
+                return this.width ? this.width + ' m / ' + this.height + ' m' : ''
             }
         }
     });
 
     store.on('layers.base', function(e){
-        vm.$forceUpdate();
+        var base = e.new_val;
+        vm.width = Math.round(base.size_m.x);
+        vm.height = Math.round(base.size_m.y);
     });
 
-    store.on('modules.distance', function(e){
-        vm.lineLength = e.new_val;
+    store.on('modules.base.length_m', function(e){
+        vm.lineLength = Math.round(e.new_val);
     });
 }

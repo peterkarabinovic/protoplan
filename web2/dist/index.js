@@ -78,7 +78,7 @@ function find_and_fire(new_obj, old_obj, listeners, path)
         listeners = reject_array_prop(listeners, p.length, function(it){
             if(_match(p, it.path)) {
                 it.fn({new_val: o1, old_val: o2, path: p});
-                return true;
+                return !_.contains(it.path, '*');
             }
             return false;
         });
@@ -157,101 +157,6 @@ function handle(defaultState, handlers)
     }
 }
 
-var layers = handle(
-    {
-        base: null,
-        additional: null,
-        stands: null,
-        equipment: null
-    },
-    {
-        BASE_IMAGE_SET: function(state, action){
-            return _.extend({}, state, {base: action.payload});
-        },
-        BASE_IMAGE_SIZE_UPDATE: function(state, action){
-            var size_m = action.payload;
-            return _.extend({}, state, {base: _.extend(state.base, {size_m: size_m})});
-        },
-    }
-);
-
-var map = handle(
-    {
-        drawMode: null,
-        distance: null
-    },
-    {
-        DRAW_MODE_SET: function(state, action){
-            var mode = action.payload;
-            return _.extend({}, state, {drawMode: mode});
-        },
-        DISTANCE_SET: function(state, action){
-            var dist_m = action.payload;
-            return _.extend({}, state, {distance: dist_m});
-        },
-    }
-);
-
-var root = handle({},{
-
-});
-
-
-var Reducers = combine({
-    map: map,
-    layers: layers
-}, root);
-
-
-// SELECTORS
-function getBaseLayer(store) { return store.state.layers && store.state.layers.base; }
-function getDistanceLine(store) { return store.state.map && store.state.map.distance; }
-
-/**
- * Calculate map transformation 
- * @param {Size} map_size  - size of map's div
- * @param {Size} img_size  - size of images in custom unit (meters)
- */
-function transformation(map_size, img_size){
-   
-    var x_ratio = map_size.x / img_size.x;
-    var y_ratio = map_size.y / img_size.y;
-    if(x_ratio <= y_ratio){
-        var a = x_ratio;
-        var b = 0;
-        var c = x_ratio;
-        var d = (map_size.y - (x_ratio * img_size.y)) / 2;
-    }
-    else { 
-        var a = y_ratio;
-        var b = (map_size.x - (y_ratio * img_size.x)) / 2;
-        var c = y_ratio;
-        var d = 0;
-    }
-    return new L.Transformation(a,b,c,d);        
-}
-
-/**
- * Calculate max zoom
- * @param {Size} img_size - size of images in custom unit (meters)
- * @param {int} min_width - length of min visible width (default 10)
- */
-function maxZoom(img_size, min_width){
-    min_width = min_width || 10;
-    var max_width = Math.max(img_size.y, img_size.x);
-    // var maxZoom = Math.log2( max_width / (1 * min_width) )   -- IE 11 not supported log2
-    var maxZoom = Math.log( max_width / (1 * min_width) )  / Math.log(2);
-    return Math.round(maxZoom);
-}
-
-/**
- * Constructor of Envelope
- * @param {*} min_x 
- * @param {*} min_y 
- * @param {*} max_x 
- * @param {*} max_y 
- */
-
 function startswith(str, substr) { 
     return str && str.indexOf(str) === 0;
 }
@@ -296,6 +201,154 @@ Either.left = function(value){
 
 /*
  * Selfcheck - wrap callback function for check if it already called in stack above
+ */
+
+
+
+/***
+ * Immutable helper
+ */
+var Immutable = (function(){
+    var i = {};
+    i.update = function(obj, path, value){
+        if(!_.isArray(path))
+            path = path.split('.');
+        obj = obj || {};
+        if(path.length == 1){
+           obj = _.clone(obj);
+           obj[path[0]]  = value;
+        }
+        else {
+            var prop = path[0];
+            var prop_val = obj[prop];
+            prop_val = i.update(prop_val, path.slice(1), value);
+            obj = _.clone(obj);
+            obj[prop] = prop_val;
+        }
+        return obj;
+    };
+    return i;
+})();
+
+var layers = handle(
+    {
+        base: null,
+        additional: null,
+        stands: null,
+        equipment: null
+    },
+    {
+        BASE_IMAGE_SET: function(state, action){
+            return _.extend({}, state, {base: action.payload});
+        },
+        BASE_IMAGE_SIZE_UPDATE: function(state, action){
+            var size_m = action.payload;
+            return _.extend({}, state, {base: _.extend(state.base, {size_m: size_m})});
+        },
+    }
+);
+
+var map$1 = handle(
+    {
+        drawing_mode: null,
+    },
+    {
+        DRAWING_MODE_SET: function(state, action){
+            var mode = action.payload;
+            return _.extend({}, state, {drawing_mode: mode});
+        }
+    }
+);
+
+
+var modules = combine(
+{
+    base: handle(
+        {
+            points: [],
+            length_px: null,
+            length_m: null,
+        },
+        {
+            DISTANCE_LINE_SET: function(state, action){
+                return _.extend({}, state, {points: action.payload.points,
+                                            length_m: action.payload.length_m,
+                                            length_px: action.payload.length_px});
+            }
+    })
+});
+
+var root = handle({},
+{
+    DISTANCE_SET: function(state, action){
+        var length_m = action.payload;
+        var ratio =  length_m / state.modules.base.length_m;
+        var size_m = state.layers.base.size_m;
+        size_m = {
+            x: size_m.x * ratio,
+            y: size_m.y * ratio
+        };
+        state = Immutable.update(state, 'layers.base.size_m', size_m);
+        state = Immutable.update(state, 'modules.base.length_m', length_m);
+        return state;
+    }
+});
+
+
+var Reducers = combine({
+    layers: layers,
+    map: map$1,
+    modules: modules
+}, root);
+
+
+// SELECTORS
+
+function getModuleBase(store) { return store.state.modules.base; }
+
+/**
+ * Calculate map transformation 
+ * @param {Size} map_size  - size of map's div
+ * @param {Size} img_size  - size of images in custom unit (meters)
+ */
+function transformation(map_size, img_size){
+   
+    var x_ratio = map_size.x / img_size.x;
+    var y_ratio = map_size.y / img_size.y;
+    if(x_ratio <= y_ratio){
+        var a = x_ratio;
+        var b = 0;
+        var c = x_ratio;
+        var d = (map_size.y - (x_ratio * img_size.y)) / 2;
+    }
+    else { 
+        var a = y_ratio;
+        var b = (map_size.x - (y_ratio * img_size.x)) / 2;
+        var c = y_ratio;
+        var d = 0;
+    }
+    return new L.Transformation(a,b,c,d);        
+}
+
+/**
+ * Calculate max zoom
+ * @param {Size} img_size - size of images in custom unit (meters)
+ * @param {int} min_width - length of min visible width (default 10)
+ */
+function maxZoom(img_size, min_width){
+    min_width = min_width || 10;
+    var max_width = Math.max(img_size.y, img_size.x);
+    // var maxZoom = Math.log2( max_width / (1 * min_width) )   -- IE 11 not supported log2
+    var maxZoom = Math.log( max_width / (1 * min_width) )  / Math.log(2);
+    return Math.round(maxZoom);
+}
+
+/**
+ * Constructor of Envelope
+ * @param {*} min_x 
+ * @param {*} min_y 
+ * @param {*} max_x 
+ * @param {*} max_y 
  */
 
 function GridPanel(map){
@@ -386,7 +439,7 @@ L.Browser.touch = false;
 
 function Map(el, store)
 {
-    map$1 = L.map(el, 
+    map$2 = L.map(el, 
     {
         crs: L.CRS.Simple,
         zoomControl: false,
@@ -397,36 +450,37 @@ function Map(el, store)
             }
     });
 
-    gridPanel = GridPanel(map$1);
+    gridPanel = GridPanel(map$2);
 
     // State changes
     store.on('layers.base', function(e) { updateBaseLayer(e.new_val); });
     store.on('layers.base.size_m', function(e) { updateBaseLayerSize(e.new_val); });
+    return map$2;
 }
 
 
-var map$1  = null;
+var map$2  = null;
 var baseLayer = null;
 var gridPanel = null;
 
 function updateBaseLayer(img)
 {
     if(baseLayer) {
-        map$1.removeLayer(baseLayer);
+        map$2.removeLayer(baseLayer);
     }
     var bounds = updateBaseLayerSize(img.size_m);
-    baseLayer = L.imageOverlay(img.url, bounds).addTo(map$1);
+    baseLayer = L.imageOverlay(img.url, bounds).addTo(map$2);
 }
 
 function updateBaseLayerSize(size_m)
 {
-    var map_size = {x: map$1._container.offsetWidth, y: map$1._container.offsetHeight};
+    var map_size = {x: map$2._container.offsetWidth, y: map$2._container.offsetHeight};
     var trans =  transformation(map_size, size_m);
-    map$1.options.crs = L.extend({}, L.CRS.Simple, {transformation: trans });  
-    map$1.setMaxBounds([[-size_m.y, -size_m.x], [size_m.y*2, size_m.x*2]]);
-    map$1.setMaxZoom( maxZoom(size_m) );
+    map$2.options.crs = L.extend({}, L.CRS.Simple, {transformation: trans });  
+    map$2.setMaxBounds([[-size_m.y, -size_m.x], [size_m.y*2, size_m.x*2]]);
+    map$2.setMaxZoom( maxZoom(size_m) );
     var bounds =  L.latLngBounds([[0,0], [size_m.y, size_m.x]]);
-    map$1.fitBounds(bounds);
+    map$2.fitBounds(bounds);
     gridPanel(size_m);
     if(baseLayer)
         baseLayer.setBounds(bounds);
@@ -510,6 +564,7 @@ function BaseImageView(store)
     var vm = new Vue({
         el: '#base-layer',
         data: {
+            width: null, height: null,
             lineLength: null,
             error: ''
         },
@@ -539,46 +594,105 @@ function BaseImageView(store)
                     reader.readAsText(file);
                 }
             },
-            hasLine: function(){
-                return getDistanceLine(store);
-            },
             draw_line: function(){
-                store('DRAW_MODE_SET', DRAW_DISTANCE);
+                store('DRAWING_MODE_SET', DRAW_DISTANCE);
             },
             recalculateScale: function(){
-                if(lineLength <= 0) return;
-                store('DISTANCE_SET', lineLength);
+                if(this.lineLength <= 0) return;
+                store('DISTANCE_SET', this.lineLength);
             },
             needDrawLine: function(){
-                return getBaseLayer(store) && !vm.hasLine();
-            } 
+                return this.width && !this.lineLength;
+            },
+            needRecalculate: function(){
+                return this.lineLength > 0 && this.lineLength != Math.round(getModuleBase(store).length_m);
+            }
         },
         computed: {
             widthHeight: function(){
-                var bi = getBaseLayer(store);
-                return bi ? bi.size_m.x + ' m / ' + bi.size_m.y + ' m' : ''
-            },
-            distance: function(){
-
+                return this.width ? this.width + ' m / ' + this.height + ' m' : ''
             }
         }
     });
 
     store.on('layers.base', function(e){
-        vm.$forceUpdate();
+        var base = e.new_val;
+        vm.width = Math.round(base.size_m.x);
+        vm.height = Math.round(base.size_m.y);
     });
 
-    store.on('map.distance', function(e){
-        vm.lineLength = e.new_val;
+    store.on('modules.base.length_m', function(e){
+        vm.lineLength = Math.round(e.new_val);
     });
+}
+
+var DRAW_DISTANCE$1 = 'draw-distance';
+
+//export function DistanceLine
+
+function BaseScaleEditor(map, store){
+
+    var line = null;
+    var tooltip = null; 
+    store.on('map.drawing_mode', function(e)
+    {
+        if(e.new_val == DRAW_DISTANCE$1)
+        {
+            line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'});   
+            line.on('editable:editing', on_edit);
+        }
+    });
+
+    store.on('layers.base.size_m', function(){
+        if(!line) return
+        var points = getModuleBase(store).points;
+        var latLngs = points.map(function(it){
+            return map.layerPointToLatLng(it);
+        });
+        line.disableEdit();
+        line.setLatLngs(latLngs);
+        line.enableEdit(map);
+        updateTooltip(getModuleBase(store).length_m);
+    });
+
+    function on_edit(event)
+    {
+        var line = event.layer;
+        if(line.getLatLngs().length == 2) 
+        {
+            var latLngs = line.getLatLngs();
+            map.editTools.stopDrawing();
+            var points = latLngs.map(function(it){
+                return map.latLngToLayerPoint(it);
+            });
+            var length_px = points[0].distanceTo(points[1]);
+            var length_m = Math.round(L.CRS.Simple.distance(latLngs[0], latLngs[1]));
+            updateTooltip(length_m);
+            store('DISTANCE_LINE_SET', {length_px: length_px, length_m:length_m, points: points});
+            store('DRAWING_MODE_SET', null);
+        }
+    }
+
+    function updateTooltip(length_m){
+        var content = length_m + ' m';
+        if(line.getTooltip())
+            line.getTooltip().setLatLng(line.getCenter()).setContent(content);
+        else
+            line.bindTooltip(content, {permanent:true, interactive:true}); 
+                
+    }
+
+    
+
+
 }
 
 var store = Store(Reducers);
 window.store = store;
 
-store("INIT");
 
-Map('map', store);
+var map = Map('map', store);
 BaseImageView(store);
+BaseScaleEditor(map, store);
 
 }());

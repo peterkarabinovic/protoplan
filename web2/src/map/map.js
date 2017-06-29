@@ -21,6 +21,7 @@ export function Map(el, store)
     // State changes
     store.on('layers.base', function(e) { updateBaseLayer(e.new_val); });
     store.on('layers.base.size_m', function(e) { updateBaseLayerSize(e.new_val); });
+    return map;
 }
 
 

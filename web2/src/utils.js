@@ -48,7 +48,7 @@ Either.left = function(value){
  * Selfcheck - wrap callback function for check if it already called in stack above
  */
 
-function Selfcheck(){
+export function Selfcheck(){
     var me = false;
     return function(callback){
         return function(){
@@ -59,3 +59,28 @@ function Selfcheck(){
         } 
     }
 }
+
+/***
+ * Immutable helper
+ */
+export var Immutable = (function(){
+    var i = {};
+    i.update = function(obj, path, value){
+        if(!_.isArray(path))
+            path = path.split('.');
+        obj = obj || {};
+        if(path.length == 1){
+           obj = _.clone(obj);
+           obj[path[0]]  = value;
+        }
+        else {
+            var prop = path[0];
+            var prop_val = obj[prop];
+            prop_val = i.update(prop_val, path.slice(1), value);
+            obj = _.clone(obj);
+            obj[prop] = prop_val;
+        }
+        return obj;
+    }
+    return i;
+})();

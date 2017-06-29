@@ -76,7 +76,7 @@ function find_and_fire(new_obj, old_obj, listeners, path)
         listeners = reject_array_prop(listeners, p.length, function(it){
             if(_match(p, it.path)) {
                 it.fn({new_val: o1, old_val: o2, path: p});
-                return true;
+                return !_.contains(it.path, '*');
             }
             return false;
         });
