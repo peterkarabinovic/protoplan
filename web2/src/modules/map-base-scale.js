@@ -22,7 +22,7 @@ export function BaseScaleEditor(map, store){
         if(!line) return
         var points = getModuleBase(store).points;
         var latLngs = points.map(function(it){
-            return map.layerPointToLatLng(it);
+            return map.unproject(it,1);
         });
         line.disableEdit()
         line.setLatLngs(latLngs);
@@ -38,7 +38,7 @@ export function BaseScaleEditor(map, store){
             var latLngs = line.getLatLngs();
             map.editTools.stopDrawing();
             var points = latLngs.map(function(it){
-                return map.latLngToLayerPoint(it);
+                return map.project(it,1);
             });
             var length_px = points[0].distanceTo(points[1]);
             var length_m = Math.round(L.CRS.Simple.distance(latLngs[0], latLngs[1]));
@@ -60,6 +60,4 @@ export function BaseScaleEditor(map, store){
     function log(name, event){
         console.log(name, event.type, event);
     }
-
-
 }
