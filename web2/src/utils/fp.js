@@ -1,10 +1,8 @@
-export function str() {
-    return "".concat.apply("",arguments);
-}
+/**
+ *  Small functional programming stuff 
+ */
 
-export function startswith(str, substr) { 
-    return str && str.indexOf(str) === 0;
-};
+
 
 export function memorize(f) {
 	if (!f.cache) f.cache = {};
@@ -22,21 +20,15 @@ export function memorize(f) {
  *  Either monad
  */
 export function Either(left, right){
-    var has_left = function() { return left ? true : false }; 
-    var has_right = function() { return right ? true : false };
-
     return {
-        has_left: has_left,
-        has_right: has_right,
         fold: function(left_fn, right_fn) {
-            has_left() ? left_fn(left) : right_fn(right)
-        },
-        right: function() { return right}
+            left === void 0 ? right_fn(right) : left_fn(left)
+        }
     }
 };
 
 Either.right = function(value){
-    return Either(null, value)
+    return Either(undefined, value)
 }
 
 Either.left = function(value){
@@ -44,24 +36,8 @@ Either.left = function(value){
 }
 
 
-/*
- * Selfcheck - wrap callback function for check if it already called in stack above
- */
-
-export function Selfcheck(){
-    var me = false;
-    return function(callback){
-        return function(){
-            if(me) return; 
-            me = true;
-            try{var res = callback.apply(this, arguments); } finally {me = false;}
-            return res;
-        } 
-    }
-}
-
 /***
- * Immutable helper
+ * Immutable 
  */
 export var Immutable = (function(){
     var i = {};

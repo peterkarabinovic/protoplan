@@ -1,4 +1,4 @@
-import {memorize} from '../utils.js'
+import {memorize} from '../utils/fp.js'
 
 export function GridPanel(map){
 

@@ -1,5 +1,6 @@
-import {Either, startswith} from '../utils/utils.js'
-import {t} from '../utils/locale.js'
+import {Either} from '../utils/fp.js'
+import {startswith} from '../utils/utils.js'
+import {t} from '../locale.js'
 
 
 export function svgToBase64(svg_text)
@@ -21,8 +22,8 @@ export function svgToBase64(svg_text)
         var vb = svg_document.viewBox.baseVal;
         viewBox = [vb.x, vb.y, vb.width, vb.height]
     }
-    var svg_raw =   new XMLSerializer().serializeToString(svg_document); 
-    var data_uri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg_raw)));
+    var raw_svg =   new XMLSerializer().serializeToString(svg_document); 
+    var data_uri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(raw_svg)));
     
     if(!viewBox && (svg_document.width.baseVal.value == 0 || svg_document.height.baseVal.value == 0 )){
         return Either.left(t('no_svg_dimensions'))
@@ -38,7 +39,7 @@ export function svgToBase64(svg_text)
         height = svg_document.height.baseVal.value;
     return Either.right({
         svg_document: svg_document,
-        svg_raw: svg_raw,
+        raw_svg: raw_svg,
         width: width,
         height: height,
         data_uri: data_uri

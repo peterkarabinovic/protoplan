@@ -1,17 +1,20 @@
-import {Store} from './redux.js'
-import Reducers from './reducers/reducers.js'
-import {Map} from './map/map.js'
-import {BaseImageView} from './modules/view-base-scale.js'
-import {BaseScaleEditor} from './modules/map-base-scale.js'
+import {combine, Store} from './utils/redux.js'
+import Map from './map/map.js'
+import BaseModule from './modules/base/index.js'
 
+var reducers = combine({
+    layers: combine({
+        base: BaseModule.reducer
+    }),
+    map: Map.reducer
+});
 
-var store = Store(Reducers);
+var store = Store(reducers);
 window.store = store;
 
 
 var map = Map('map', store);
-BaseImageView(store);
-BaseScaleEditor(map, store)
+BaseModule(store, map);
 
 
 

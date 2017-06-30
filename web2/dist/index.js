@@ -159,155 +159,6 @@ function handle(defaultState, handlers)
     }
 }
 
-function startswith(str, substr) { 
-    return str && str.indexOf(str) === 0;
-}
-
-function memorize(f) {
-	if (!f.cache) f.cache = {};
-	return function() {
-		var cacheId = [].slice.call(arguments).join('');
-		return f.cache[cacheId] ?
-				f.cache[cacheId] :
-				f.cache[cacheId] = f.apply(window, arguments);
-	};
-}
-
-
-
-/***
- *  Either monad
- */
-function Either(left, right){
-    var has_left = function() { return left ? true : false }; 
-    var has_right = function() { return right ? true : false };
-
-    return {
-        has_left: has_left,
-        has_right: has_right,
-        fold: function(left_fn, right_fn) {
-            has_left() ? left_fn(left) : right_fn(right);
-        },
-        right: function() { return right}
-    }
-}
-
-Either.right = function(value){
-    return Either(null, value)
-};
-
-Either.left = function(value){
-    return Either(value)
-};
-
-
-/*
- * Selfcheck - wrap callback function for check if it already called in stack above
- */
-
-
-
-/***
- * Immutable helper
- */
-var Immutable = (function(){
-    var i = {};
-    i.update = function(obj, path, value){
-        if(!_.isArray(path))
-            path = path.split('.');
-        obj = obj || {};
-        if(path.length == 1){
-           obj = _.clone(obj);
-           obj[path[0]]  = value;
-        }
-        else {
-            var prop = path[0];
-            var prop_val = obj[prop];
-            prop_val = i.update(prop_val, path.slice(1), value);
-            obj = _.clone(obj);
-            obj[prop] = prop_val;
-        }
-        return obj;
-    };
-    return i;
-})();
-
-var layers = handle(
-    {
-        base: null,
-        additional: null,
-        stands: null,
-        equipment: null
-    },
-    {
-        BASE_IMAGE_SET: function(state, action){
-            return _.extend({}, state, {base: action.payload});
-        },
-        BASE_IMAGE_SIZE_UPDATE: function(state, action){
-            var size_m = action.payload;
-            return _.extend({}, state, {base: _.extend(state.base, {size_m: size_m})});
-        },
-    }
-);
-
-var map$1 = handle(
-    {
-        drawing_mode: null,
-    },
-    {
-        DRAWING_MODE_SET: function(state, action){
-            var mode = action.payload;
-            return _.extend({}, state, {drawing_mode: mode});
-        }
-    }
-);
-
-
-var modules = combine(
-{
-    base: handle(
-        {
-            points: [],
-            length_px: null,
-            length_m: null,
-        },
-        {
-            DISTANCE_LINE_SET: function(state, action){
-                return _.extend({}, state, {points: action.payload.points,
-                                            length_m: action.payload.length_m,
-                                            length_px: action.payload.length_px});
-            }
-    })
-});
-
-var root = handle({},
-{
-    DISTANCE_SET: function(state, action){
-        var length_m = action.payload;
-        var ratio =  length_m / state.modules.base.length_m;
-        var size_m = state.layers.base.size_m;
-        size_m = {
-            x: size_m.x * ratio,
-            y: size_m.y * ratio
-        };
-        state = Immutable.update(state, 'layers.base.size_m', size_m);
-        state = Immutable.update(state, 'modules.base.length_m', length_m);
-        return state;
-    }
-});
-
-
-var Reducers = combine({
-    layers: layers,
-    map: map$1,
-    modules: modules
-}, root);
-
-
-// SELECTORS
-
-function getModuleBase(store) { return store.state.modules.base; }
-
 /**
  * Calculate map transformation 
  * @param {Size} map_size  - size of map's div
@@ -346,11 +197,51 @@ function maxZoom(img_size, min_width){
 }
 
 /**
- * Constructor of Envelope
- * @param {*} min_x 
- * @param {*} min_y 
- * @param {*} max_x 
- * @param {*} max_y 
+ * As LatLngBounds with its SouthNorthWestEast stuff mislead with planar metric space
+ * Envelope seems more convenient 
+ * @param {LatLngBounds} bounds 
+ */
+
+/**
+ *  Small functional programming stuff 
+ */
+
+
+
+function memorize(f) {
+	if (!f.cache) f.cache = {};
+	return function() {
+		var cacheId = [].slice.call(arguments).join('');
+		return f.cache[cacheId] ?
+				f.cache[cacheId] :
+				f.cache[cacheId] = f.apply(window, arguments);
+	};
+}
+
+
+
+/***
+ *  Either monad
+ */
+function Either(left, right){
+    return {
+        fold: function(left_fn, right_fn) {
+            left === void 0 ? right_fn(right) : left_fn(left);
+        }
+    }
+}
+
+Either.right = function(value){
+    return Either(undefined, value)
+};
+
+Either.left = function(value){
+    return Either(value)
+};
+
+
+/***
+ * Immutable 
  */
 
 function GridPanel(map){
@@ -440,9 +331,21 @@ function GridPanel(map){
 
 L.Browser.touch = false;
 
-function Map(el, store)
+var reducer = handle(
+    {
+        drawing_mode: null,
+    },
+    {
+        DRAWING_MODE_SET: function(state, action){
+            var mode = action.payload;
+            return _.extend({}, state, {drawing_mode: mode});
+        }
+    }
+);
+
+var Map = function(el, store)
 {
-    map$2 = L.map(el, 
+    map$1 = L.map(el, 
     {
         crs: L.CRS.Simple,
         zoomControl: false,
@@ -453,38 +356,39 @@ function Map(el, store)
             }
     });
 
-    gridPanel = GridPanel(map$2);
+    gridPanel = GridPanel(map$1);
 
     // State changes
     store.on('layers.base', function(e) { updateBaseLayer(e.new_val); });
     store.on('layers.base.size_m', function(e) { updateBaseLayerSize(e.new_val); });
-    return map$2;
-}
+    return map$1;
+};
 
+Map.reducer = reducer;
 
-var map$2  = null;
+var map$1  = null;
 var baseLayer = null;
 var gridPanel = null;
 
 function updateBaseLayer(img)
 {
     if(baseLayer) {
-        map$2.removeLayer(baseLayer);
+        map$1.removeLayer(baseLayer);
     }
     var bounds = updateBaseLayerSize(img.size_m);
-    baseLayer = L.imageOverlay(img.url, bounds).addTo(map$2);
+    baseLayer = L.imageOverlay(img.url, bounds).addTo(map$1);
 }
 
 function updateBaseLayerSize(size_m)
 {
-    var map_size = {x: map$2._container.offsetWidth, y: map$2._container.offsetHeight};
+    var map_size = {x: map$1._container.offsetWidth, y: map$1._container.offsetHeight};
     var trans =  transformation(map_size, size_m);
-    map$2.options.crs = L.extend({}, L.CRS.Simple, {transformation: trans });  
-    map$2.setMaxBounds([[-size_m.y, -size_m.x], [size_m.y*2, size_m.x*2]]);
-    map$2.setMaxZoom( maxZoom(size_m) );
+    map$1.options.crs = L.extend({}, L.CRS.Simple, {transformation: trans });  
+    map$1.setMaxBounds([[-size_m.y, -size_m.x], [size_m.y*2, size_m.x*2]]);
+    map$1.setMaxZoom( maxZoom(size_m) );
     var bounds =  L.latLngBounds([[0,0], [size_m.y, size_m.x]]);
-    if(_.isUndefined(map$2.getZoom()))
-        map$2.fitBounds(bounds);
+    if(_.isUndefined(map$1.getZoom()))
+        map$1.fitBounds(bounds);
     gridPanel(size_m);
     if(baseLayer)
         baseLayer.setBounds(bounds);
@@ -520,6 +424,15 @@ var translations =
 
 var DRAW_DISTANCE = 'draw-distance';
 
+function startswith(str, substr) { 
+    return str && str.indexOf(str) === 0;
+}
+
+
+/*
+ * Selfcheck - wrap callback function for check if it already called in stack above
+ */
+
 function svgToBase64(svg_text)
 {
     if(!svg_text || svg_text.length < 7) 
@@ -539,8 +452,8 @@ function svgToBase64(svg_text)
         var vb = svg_document.viewBox.baseVal;
         viewBox = [vb.x, vb.y, vb.width, vb.height];
     }
-    var svg_raw =   new XMLSerializer().serializeToString(svg_document); 
-    var data_uri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg_raw)));
+    var raw_svg =   new XMLSerializer().serializeToString(svg_document); 
+    var data_uri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(raw_svg)));
     
     if(!viewBox && (svg_document.width.baseVal.value == 0 || svg_document.height.baseVal.value == 0 )){
         return Either.left(t('no_svg_dimensions'))
@@ -556,15 +469,16 @@ function svgToBase64(svg_text)
         height = svg_document.height.baseVal.value;
     return Either.right({
         svg_document: svg_document,
-        svg_raw: svg_raw,
+        raw_svg: raw_svg,
         width: width,
         height: height,
         data_uri: data_uri
     })    
 }
 
-function BaseImageView(store) 
-{
+function baseLayer$1(store) { return store.state.layers.base }
+
+var uiView = function(store) {
     var vm = new Vue({
         el: '#base-layer',
         data: {
@@ -589,8 +503,10 @@ function BaseImageView(store)
                             function(e) { vm.error = e;} ,
                             function(e) {
                                 store('BASE_IMAGE_SET', {
+                                    raw_svg: e.raw_svg,
                                     url: e.data_uri,
-                                    size_m: {x: e.width, y: e.height}
+                                    size_m: {x: e.width, y: e.height},
+                                    size_px: {x: e.width, y: e.height}
                                 });
                             }
                         );
@@ -603,13 +519,13 @@ function BaseImageView(store)
             },
             recalculateScale: function(){
                 if(this.lineLength <= 0) return;
-                store('DISTANCE_SET', this.lineLength);
+                store('DISTANCE_LENGTH_SET', this.lineLength);
             },
             needDrawLine: function(){
                 return this.width && !this.lineLength;
             },
             needRecalculate: function(){
-                return this.lineLength > 0 && this.lineLength != Math.round(getModuleBase(store).length_m);
+                return this.lineLength > 0 && this.lineLength != Math.round(baseLayer$1(store).distance.length_m);
             }
         }, 
         computed: {
@@ -625,20 +541,20 @@ function BaseImageView(store)
         vm.height = Math.round(base.size_m.y);
     });
 
-    store.on('modules.base.length_m', function(e){
+    store.on('layers.base.distance.length_m', function(e){
         vm.lineLength = Math.round(e.new_val);
-    });
-}
+    });    
+};
 
-var DRAW_DISTANCE$1 = 'draw-distance';
+//export function DistanceLine
 
-function BaseScaleEditor(map, store){
+var uiMap = function(store, map){
 
     var line = null;
     var tooltip = null; 
     store.on('map.drawing_mode', function(e)
     {
-        if(e.new_val == DRAW_DISTANCE$1)
+        if(e.new_val == DRAW_DISTANCE)
         {
             line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'});   
             line.on('editable:editing', on_edit);
@@ -647,14 +563,14 @@ function BaseScaleEditor(map, store){
 
     store.on('layers.base.size_m', function(){
         if(!line) return
-        var points = getModuleBase(store).points;
+        var points = baseLayer$1(store).distance.points;
         var latLngs = points.map(function(it){
             return map.unproject(it,1);
         });
         line.disableEdit();
         line.setLatLngs(latLngs);
         line.enableEdit(map);
-        updateTooltip(getModuleBase(store).length_m);
+        updateTooltip(baseLayer$1(store).distance.length_m);
     });
 
     function on_edit(event)
@@ -670,7 +586,7 @@ function BaseScaleEditor(map, store){
             var length_px = points[0].distanceTo(points[1]);
             var length_m = Math.round(L.CRS.Simple.distance(latLngs[0], latLngs[1]));
             updateTooltip(length_m);
-            store('DISTANCE_LINE_SET', {length_px: length_px, length_m:length_m, points: points});
+            store('DISTANCE_SET', {length_px: length_px, length_m:length_m, points: points});
             store('DRAWING_MODE_SET', null);
         }
     }
@@ -685,14 +601,70 @@ function BaseScaleEditor(map, store){
     }
 
     
-}
+};
 
-var store = Store(Reducers);
+var BaseModule = function(store, map)
+{
+    uiView(store);
+    uiMap(store, map);
+};
+
+BaseModule.reducer = handle( 
+    {
+        size_m: null,
+        size_px: null,
+        url: null,
+        raw_svg: null,
+        distance: {
+            points: [],
+            length_px: null,
+            length_m: null
+        }
+    },
+    {
+        DISTANCE_SET: function(state, action){
+            return _.extend({}, state, 
+                { distance : {
+                    points: action.payload.points,
+                    length_m: action.payload.length_m,
+                    length_px: action.payload.length_px
+                }
+            });
+        },
+
+        BASE_IMAGE_SET: function(state, action){
+            return _.extend({}, state, action.payload);
+        },
+
+        DISTANCE_LENGTH_SET: function(state, action){
+            var length_m = action.payload;
+            var ratio =  length_m / state.distance.length_m;
+            var size_m = state.size_m;
+            size_m = {
+                x: size_m.x * ratio,
+                y: size_m.y * ratio
+            };
+            return _.extend({}, state, {
+                size_m: size_m,
+                distance: _.extend({}, state.distance, {length_m:length_m})
+            })
+        }
+
+    }
+);
+
+var reducers = combine({
+    layers: combine({
+        base: BaseModule.reducer
+    }),
+    map: Map.reducer
+});
+
+var store = Store(reducers);
 window.store = store;
 
 
 var map = Map('map', store);
-BaseImageView(store);
-BaseScaleEditor(map, store);
+BaseModule(store, map);
 
 }());

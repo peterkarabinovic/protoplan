@@ -1,9 +1,23 @@
 import * as math from './math.js'
 import {GridPanel} from './grid-panel.js'
 
+import {handle} from '../utils/redux.js'
+
 L.Browser.touch = false;
 
-export function Map(el, store)
+var reducer = handle(
+    {
+        drawing_mode: null,
+    },
+    {
+        DRAWING_MODE_SET: function(state, action){
+            var mode = action.payload;
+            return _.extend({}, state, {drawing_mode: mode});
+        }
+    }
+);
+
+var Map = function(el, store)
 {
     map = L.map(el, 
     {
@@ -23,6 +37,10 @@ export function Map(el, store)
     store.on('layers.base.size_m', function(e) { updateBaseLayerSize(e.new_val); });
     return map;
 }
+
+Map.reducer = reducer;
+
+export default Map;
 
 
 var map  = null;
