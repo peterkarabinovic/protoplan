@@ -1,6 +1,6 @@
-import {t} from '../locale.js'
+import {t} from '../utils/locale.js'
 import {getModuleBase} from '../reducers/reducers.js'
-import {DRAW_DISTANCE} from '../drawing/modes.js'
+import {DRAW_DISTANCE} from '../map/modes.js'
 import {svgToBase64} from '../svg/parser.js'
 
 export function BaseImageView(store) 

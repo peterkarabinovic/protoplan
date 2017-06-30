@@ -12,7 +12,7 @@ Q: Есть N режимов рисования на карте:
 4. рисовать note
 
 
-
+http://redux.js.org/docs/recipes/reducers/ReusingReducerLogic.html
 
 
 

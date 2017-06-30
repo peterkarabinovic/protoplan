@@ -55,7 +55,7 @@
                             "geometry": "Point",
                             "rotation": "0",
                         },
-                        "equipment": {
+                        "equipments": {
                             "equipment#1": {
                                 "geometry": "Point",
                                 "rotation": "0"
@@ -74,7 +74,7 @@
                     "uid#2": {...},
                 }
             },
-            "equipment": {
+            "equipments": {
                 "equipment#1": {
                     "id": "equipment#1",
                     "url": "string",

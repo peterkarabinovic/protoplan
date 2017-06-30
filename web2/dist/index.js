@@ -138,11 +138,13 @@ function combine(reducerMap, rootReducer)
         else if(_.isEmpty(state))
             state = {};
         
-        var new_state={};
+        var newState={};
+        var hasChanged = false;
         _.each(reducerMap, function(reducer, key){
-            new_state[key] = reducer(state[key], action);
+            newState[key] = reducer(state[key], action);
+            hasChanged = hasChanged || state[key] !== newState[key];
         });
-        return _.extend({}, state, new_state);
+        return hasChanged ? newState : state;
     }
 }
 
@@ -629,8 +631,6 @@ function BaseImageView(store)
 }
 
 var DRAW_DISTANCE$1 = 'draw-distance';
-
-//export function DistanceLine
 
 function BaseScaleEditor(map, store){
 

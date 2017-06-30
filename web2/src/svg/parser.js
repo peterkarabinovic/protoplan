@@ -1,5 +1,5 @@
-import {Either, startswith} from '../utils.js'
-import {t} from '../locale.js'
+import {Either, startswith} from '../utils/utils.js'
+import {t} from '../utils/locale.js'
 
 
 export function svgToBase64(svg_text)
