@@ -61,8 +61,9 @@ export function GridPanel(map){
     });
 
     var render = function() {
-        if(!map_size_m)
+        if(!map_size_m) {
             return;
+        }    
         var b = map.getBounds()
         scaleX.domain([b.getWest(), b.getEast()]);
         $axisX.call(axisX);

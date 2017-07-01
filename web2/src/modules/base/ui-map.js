@@ -1,6 +1,7 @@
 
 import {DRAW_DISTANCE} from '../../map/modes.js'
-import {baseLayer} from '../selectors.js'
+import {selectedBaseLayer} from '../../state.js'
+import {BASE_DISTANCE_SET, DRAWING_MODE_SET} from '../../actions.js'
 
 
 //export function DistanceLine
@@ -18,16 +19,25 @@ export default function(store, map){
         }
     });
 
-    store.on('layers.base.size_m', function(){
-        if(!line) return
-        var points = baseLayer(store).distance.points;
+    store.on('selectedBaseLayer.distance', function(e){
+        if(!e.new_val || !e.new_val.points) {
+            if(line) {
+                map.removeLayer(line);
+                line = null;
+            }
+        }
+    });
+
+    store.on('selectedBaseLayer.size_m', function(e){
+        if(!line || !e.new_val) return
+        var points = selectedBaseLayer(store).distance.points;
         var latLngs = points.map(function(it){
             return map.unproject(it,1);
         });
         line.disableEdit()
         line.setLatLngs(latLngs);
         line.enableEdit(map);
-        updateTooltip(baseLayer(store).distance.length_m)
+        updateTooltip(selectedBaseLayer(store).distance.length_m)
     });
 
     function on_edit(event)
@@ -43,8 +53,8 @@ export default function(store, map){
             var length_px = points[0].distanceTo(points[1]);
             var length_m = Math.round(L.CRS.Simple.distance(latLngs[0], latLngs[1]));
             updateTooltip(length_m)
-            store('DISTANCE_SET', {length_px: length_px, length_m:length_m, points: points});
-            store('DRAWING_MODE_SET', null);
+            store(BASE_DISTANCE_SET, {length_px: length_px, length_m:length_m, points: points});
+            store(DRAWING_MODE_SET, null);
         }
     }
 

@@ -156,3 +156,12 @@ export function handle(defaultState, handlers)
         return (handlers[action.type] || _.identity)(state, action);
     }
 }
+
+export function reduceReducers(reducers){
+    return function(state, action){
+        reducers.forEach(function(fn){
+            state = fn(state, action)
+        })
+        return state;
+    }
+}

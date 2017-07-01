@@ -33,8 +33,8 @@ var Map = function(el, store)
     gridPanel = GridPanel(map);
 
     // State changes
-    store.on('layers.base', function(e) { updateBaseLayer(e.new_val); });
-    store.on('layers.base.size_m', function(e) { updateBaseLayerSize(e.new_val); });
+    store.on('selectedBaseLayer', function(e) { updateBaseLayer(e.new_val); });
+    store.on('selectedBaseLayer.size_m', function(e) { updateBaseLayerSize(e.new_val); });
     return map;
 }
 
@@ -51,13 +51,18 @@ function updateBaseLayer(img)
 {
     if(baseLayer) {
         map.removeLayer(baseLayer);
+        baseLayer = null;
     }
-    var bounds = updateBaseLayerSize(img.size_m);
-    baseLayer = L.imageOverlay(img.url, bounds).addTo(map);
+    if(img) {
+        var bounds = updateBaseLayerSize(img.size_m);
+        baseLayer = L.imageOverlay(img.url, bounds).addTo(map);
+        map.fitBounds(bounds);
+    }
 }
 
 function updateBaseLayerSize(size_m)
 {
+    if(!size_m) return;
     var map_size = {x: map._container.offsetWidth, y: map._container.offsetHeight};
     var trans =  math.transformation(map_size, size_m);
     map.options.crs = L.extend({}, L.CRS.Simple, {transformation: trans });  

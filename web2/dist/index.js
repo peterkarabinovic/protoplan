@@ -129,24 +129,7 @@ function _match(path, mask_path){
  *  Reducer helpers
  */
 
-function combine(reducerMap, rootReducer)
-{
-    return function(state, action){
-        
-        if(rootReducer)
-            state = rootReducer(state, action);
-        else if(_.isEmpty(state))
-            state = {};
-        
-        var newState={};
-        var hasChanged = false;
-        _.each(reducerMap, function(reducer, key){
-            newState[key] = reducer(state[key], action);
-            hasChanged = hasChanged || state[key] !== newState[key];
-        });
-        return hasChanged ? newState : state;
-    }
-}
+
 
 function handle(defaultState, handlers)
 {
@@ -159,48 +142,100 @@ function handle(defaultState, handlers)
     }
 }
 
-/**
- * Calculate map transformation 
- * @param {Size} map_size  - size of map's div
- * @param {Size} img_size  - size of images in custom unit (meters)
+function reduceReducers(reducers){
+    return function(state, action){
+        reducers.forEach(function(fn){
+            state = fn(state, action);
+        });
+        return state;
+    }
+}
+
+function str() {
+    return "".concat.apply("",arguments);
+}
+
+function startswith(str, substr) { 
+    return str && str.indexOf(str) === 0;
+}
+
+
+/*
+ * Selfcheck - wrap callback function for check if it already called in stack above
  */
-function transformation(map_size, img_size){
-   
-    var x_ratio = map_size.x / img_size.x;
-    var y_ratio = map_size.y / img_size.y;
-    if(x_ratio <= y_ratio){
-        var a = x_ratio;
-        var b = 0;
-        var c = x_ratio;
-        var d = (map_size.y - (x_ratio * img_size.y)) / 2;
-    }
-    else { 
-        var a = y_ratio;
-        var b = (map_size.x - (y_ratio * img_size.x)) / 2;
-        var c = y_ratio;
-        var d = 0;
-    }
-    return new L.Transformation(a,b,c,d);        
+
+function initComponents()
+{
+
+    Vue.component('folding', {
+        props: ['title', 'open'],
+
+        template: str('<div style="cursor: pointer;">',
+                    '<span @click="on_click" style="margin-left: -1.2em" class="w3-text-grey">',
+                    '<i  style="margin-right: 0.4em" :class="icon"></i>',
+                    '{{title}}</span>',
+                    '<div v-show="is_open"><slot></slot></div>',
+                  '</div>'),
+
+        data: function(){
+            return {
+                is_open: this.open !== 'false'
+            }
+        },
+        computed: {
+            icon: function(){
+                return ['w3-xlarge fa fa-caret-right', ' w3-xlarge fa fa-caret-down'][+this.is_open];
+            }
+        },
+        methods: {
+            on_click: function(){
+                this.is_open = !this.is_open;
+            }
+        }
+    });
+
 }
 
 /**
- * Calculate max zoom
- * @param {Size} img_size - size of images in custom unit (meters)
- * @param {int} min_width - length of min visible width (default 10)
+ * Init state
  */
-function maxZoom(img_size, min_width){
-    min_width = min_width || 10;
-    var max_width = Math.max(img_size.y, img_size.x);
-    // var maxZoom = Math.log2( max_width / (1 * min_width) )   -- IE 11 not supported log2
-    var maxZoom = Math.log( max_width / (1 * min_width) )  / Math.log(2);
-    return Math.round(maxZoom);
+var initState = {
+    pavilions: {
+
+    },
+    map: {
+        drawing_mode: undefined,
+    },
+    selectedPavilion: undefined,
+    selectedBaseLayer: undefined,
+    edit_feature: undefined,
+    entities: {
+        base: {}, // base layers,
+        overlays: {}, // additinal lauers
+        stands: {},
+        stand_types: {},
+        stand_categories: {},
+        equipments: {} 
+    },
+    ui: {
+        error: ''
+    }
+};
+
+var baseById = _.partial('base');
+
+function selectedPavilion(store){
+    return store.state.selectedPavilion;
 }
 
-/**
- * As LatLngBounds with its SouthNorthWestEast stuff mislead with planar metric space
- * Envelope seems more convenient 
- * @param {LatLngBounds} bounds 
- */
+function baseLayer(store) {
+    var pavi = selectedPavilion(store);
+    return  pavi && pavi.base &&  baseById(store, pavi.base) || {};
+}
+
+function selectedBaseLayer(store) {
+    return store.state.selectedBaseLayer  || {};
+}
 
 /**
  *  Small functional programming stuff 
@@ -242,6 +277,273 @@ Either.left = function(value){
 
 /***
  * Immutable 
+ */
+var Immutable = (function(){
+    var i = {};
+
+    function update(obj, path, value, opt){
+        if(!_.isArray(path))
+            path = path.split('.');
+        if(_.isUndefined(obj))
+            obj = {};
+        if(path.length == 1){
+           obj = _.clone(obj);
+           if(opt == 'extend')
+                obj[path[0]] = _.extend({}, obj[path[0]], value);
+           else if(opt == 'set')
+                obj[path[0]]  = value;
+           else 
+                delete obj[path[0]];
+        }
+        else {
+            var prop = path[0];
+            var prop_val = obj[prop];
+            prop_val = update(prop_val, path.slice(1), value, opt);
+            obj = _.clone(obj);
+            obj[prop] = prop_val;
+        }
+        return obj;        
+    }
+
+    i.set = function(obj, path, value){
+        return update(obj, path, value, 'set');
+    };
+
+    i.extend = function(obj, path, value){
+        return update(obj, path, value, 'extend');
+    };
+
+    i.remove = function(obj, path){
+        return update(obj, path, null, 'remove');
+    };
+    return i;
+})();
+
+var INIT = 'INIT';
+
+var PAVILION_ADD = 'PAVILION_ADD';
+var PAVILION_DELETE = 'PAVILION_DELETE';
+var PAVILION_DELETED = 'PAVILION_DELETED';
+var PAVILION_ADDED = 'PAVILION_ADDED';
+var PAVILION_SELECT = 'PAVILION_SELECT';
+var PAVILIONS_LOADED = 'PAVILIONS_LOADED';
+
+
+var BASE_LAYER_SET = 'BASE_LAYER_SET';
+var BASE_LAYER_SAVE = 'BASE_LAYER_SAVE';
+var BASE_LAYER_SAVED = 'BASE_LAYER_SAVED';
+var BASE_DISTANCE_SET = 'BASE_DISTANCE_SET';
+var BASE_DISTANCE_LENGTH_SET = 'BASE_DISTANCE_LENGTH_SET';
+
+
+var DRAWING_MODE_SET = 'DRAWING_MODE_SET';
+
+
+
+var ERROR_SET = 'ERROR_SET';
+
+var pavilionReducer = function(state, action)
+{
+    switch(action.type)
+    {
+        case PAVILIONS_LOADED:
+            return Immutable.set(state, 'pavilions', action.payload);
+
+        case PAVILION_DELETED:
+            var pavi_id = action.payload;
+            var pavi = state.pavilions[pavi_id];
+            if(pavi) {
+                state = Immutable.remove(state, 'pavilions.'+pavi.id);
+                if(pavi.base)
+                    state = Immutable.remove(state, 'entities.base.'+pavi.base);
+            }
+            if(state.selectedPavilion && state.selectedPavilion.id == pavi_id)
+                state = Immutable.set(state, 'selectedPavilion');
+            return state;
+
+        case PAVILION_ADDED:
+            var pavi = action.payload;
+            state = Immutable.set(state, 'pavilions.'+pavi.id, pavi);
+            state = Immutable.set(state, 'selectedPavilion', pavi);
+            return state;
+
+        case PAVILION_SELECT:
+            var pavi = action.payload;
+            state = Immutable.set(state, 'selectedPavilion', pavi);
+            if(pavi) {
+                var base = state.entities.base[pavi.base];
+                state = Immutable.set(state, 'selectedBaseLayer', base);
+            }
+            return state;
+            
+
+    }
+    return state;
+};
+
+
+var baseReducer = function(state, action)
+{
+    switch(action.type)
+    {
+        case BASE_LAYER_SET: 
+            var base = action.payload;
+            if(state.selectedBaseLayer)
+                base = _.extend({}, state.selectedBaseLayer, base);
+            else
+                base = _.extend({}, base, {id:0});            
+            return Immutable.set(state, 'selectedBaseLayer', base);
+        
+        case BASE_DISTANCE_LENGTH_SET:
+            var length_m = action.payload;
+            var ratio =  length_m / state.selectedBaseLayer.distance.length_m;
+            var size_m = state.selectedBaseLayer.size_m;
+            size_m = {
+                x: size_m.x * ratio,
+                y: size_m.y * ratio
+            };
+            state = Immutable.set(state, 'selectedBaseLayer.size_m', size_m );
+            return Immutable.set(state, 'selectedBaseLayer.distance.length_m', length_m);             
+        
+        case BASE_DISTANCE_SET: 
+            var distance = action.payload;
+            return Immutable.set(state, 'selectedBaseLayer.distance', distance);
+
+        case BASE_LAYER_SAVED:
+            var pavi_id = action.payload.pavi_id;
+            var base = action.payload.base;
+            var pavi = state.pavilions[pavi_id];
+            if(pavi){
+                state = Immutable.set(state, 'pavilions.'+pavi_id+'.base', base.id);
+                state = Immutable.set(state, 'entities.base.'+base.id, base);
+                if(state.selectedPavilion && pavi_id == state.selectedPavilion.id){
+                    state = Immutable.extend(state, 'selectedBaseLayer', base);
+                }
+            }
+            else {
+                state = Immutable.remove(state, 'entities.base.'+base.id);
+            }
+            
+            return state;
+
+    }
+    return state;
+};
+
+
+var mapReducer = function(state, action)
+{
+    switch(action.type){
+        case DRAWING_MODE_SET:
+            var mode = action.payload;
+            return Immutable.set(state, 'map.drawing_mode', mode);
+
+    }
+    return state;
+};
+var reducers = reduceReducers([pavilionReducer, baseReducer, mapReducer]);
+
+function RequestsMiddleware(store){
+    return function(next){
+        return function(action)
+        {
+            switch(action.type)
+            {
+                case INIT:
+                    d3.json('/pavilions/')
+                      .get(function(pavilions){
+                            store(PAVILIONS_LOADED, pavilions);
+                      }); 
+                    break;
+
+                case PAVILION_ADD:
+                    var pavi = action.payload;
+                    d3.request('/pavilions/0')
+                           .mimeType("application/json")
+                           .on("error", function(error) { store(ERROR_SET, error); })
+                           .on("load", function(xhr) { 
+                               var res = JSON.parse(xhr.responseText);
+                               pavi = _.extend({}, pavi, res);
+                               store(PAVILION_ADDED, pavi);
+                            })
+                           .send('POST', JSON.stringify(pavi));
+                    break;
+
+                case PAVILION_DELETE:
+                    var id = action.payload.id;
+                    d3.request('/pavilions/'+id+'|delete')
+                      .post(function(er, xhr){
+                            if(er) store(ERROR_SET, er);
+                            else store(PAVILION_DELETED, id);
+                      });
+                    break;
+
+                case BASE_LAYER_SAVE:
+                    var pavi_id = action.payload.pavi_id;
+                    var base_layer = _.clone(action.payload.base);
+                    delete base_layer['distance'];
+                    delete base_layer['raw_svg'];
+                    d3.request('/pavilions/'+pavi_id+'/base/0')
+                        .mimeType("application/json")
+                        .send('POST', JSON.stringify(base_layer), function(er, xhr){
+                            if(er) store(ERROR_SET, er);
+                            else {
+                                var res = JSON.parse(xhr.responseText);
+                                base_layer = _.extend({}, base_layer, res);
+                                store(BASE_LAYER_SAVED, {pavi_id:pavi_id, base: base_layer});
+                            }
+                        });
+
+                    
+            }
+            next(action);
+        }
+    }
+}
+
+/**
+ * Calculate map transformation 
+ * @param {Size} map_size  - size of map's div
+ * @param {Size} img_size  - size of images in custom unit (meters)
+ */
+function transformation(map_size, img_size){
+   
+    var x_ratio = map_size.x / img_size.x;
+    var y_ratio = map_size.y / img_size.y;
+    if(x_ratio <= y_ratio){
+        var a = x_ratio;
+        var b = 0;
+        var c = x_ratio;
+        var d = (map_size.y - (x_ratio * img_size.y)) / 2;
+    }
+    else { 
+        var a = y_ratio;
+        var b = (map_size.x - (y_ratio * img_size.x)) / 2;
+        var c = y_ratio;
+        var d = 0;
+    }
+    return new L.Transformation(a,b,c,d);        
+}
+
+/**
+ * Calculate max zoom
+ * @param {Size} img_size - size of images in custom unit (meters)
+ * @param {int} min_width - length of min visible width (default 10)
+ */
+function maxZoom(img_size, min_width){
+    min_width = min_width || 10;
+    var max_width = Math.max(img_size.y, img_size.x);
+    // var maxZoom = Math.log2( max_width / (1 * min_width) )   -- IE 11 not supported log2
+    var maxZoom = Math.log( max_width / (1 * min_width) )  / Math.log(2);
+    return Math.round(maxZoom);
+}
+
+/**
+ * Constructor of Envelope
+ * @param {*} min_x 
+ * @param {*} min_y 
+ * @param {*} max_x 
+ * @param {*} max_y 
  */
 
 function GridPanel(map){
@@ -305,8 +607,9 @@ function GridPanel(map){
     });
 
     var render = function() {
-        if(!map_size_m)
+        if(!map_size_m) {
             return;
+        }    
         var b = map.getBounds();
         scaleX.domain([b.getWest(), b.getEast()]);
         $axisX.call(axisX);
@@ -359,28 +662,33 @@ var Map = function(el, store)
     gridPanel = GridPanel(map$1);
 
     // State changes
-    store.on('layers.base', function(e) { updateBaseLayer(e.new_val); });
-    store.on('layers.base.size_m', function(e) { updateBaseLayerSize(e.new_val); });
+    store.on('selectedBaseLayer', function(e) { updateBaseLayer(e.new_val); });
+    store.on('selectedBaseLayer.size_m', function(e) { updateBaseLayerSize(e.new_val); });
     return map$1;
 };
 
 Map.reducer = reducer;
 
 var map$1  = null;
-var baseLayer = null;
+var baseLayer$1 = null;
 var gridPanel = null;
 
 function updateBaseLayer(img)
 {
-    if(baseLayer) {
-        map$1.removeLayer(baseLayer);
+    if(baseLayer$1) {
+        map$1.removeLayer(baseLayer$1);
+        baseLayer$1 = null;
     }
-    var bounds = updateBaseLayerSize(img.size_m);
-    baseLayer = L.imageOverlay(img.url, bounds).addTo(map$1);
+    if(img) {
+        var bounds = updateBaseLayerSize(img.size_m);
+        baseLayer$1 = L.imageOverlay(img.url, bounds).addTo(map$1);
+        map$1.fitBounds(bounds);
+    }
 }
 
 function updateBaseLayerSize(size_m)
 {
+    if(!size_m) return;
     var map_size = {x: map$1._container.offsetWidth, y: map$1._container.offsetHeight};
     var trans =  transformation(map_size, size_m);
     map$1.options.crs = L.extend({}, L.CRS.Simple, {transformation: trans });  
@@ -390,8 +698,8 @@ function updateBaseLayerSize(size_m)
     if(_.isUndefined(map$1.getZoom()))
         map$1.fitBounds(bounds);
     gridPanel(size_m);
-    if(baseLayer)
-        baseLayer.setBounds(bounds);
+    if(baseLayer$1)
+        baseLayer$1.setBounds(bounds);
     return bounds;
 }
 
@@ -423,15 +731,6 @@ var translations =
 };
 
 var DRAW_DISTANCE = 'draw-distance';
-
-function startswith(str, substr) { 
-    return str && str.indexOf(str) === 0;
-}
-
-
-/*
- * Selfcheck - wrap callback function for check if it already called in stack above
- */
 
 function svgToBase64(svg_text)
 {
@@ -476,11 +775,10 @@ function svgToBase64(svg_text)
     })    
 }
 
-function baseLayer$1(store) { return store.state.layers.base }
-
 var uiView = function(store) {
     var vm = new Vue({
         el: '#base-layer',
+        template: '#base-layer-template',
         data: {
             width: null, height: null,
             lineLength: null,
@@ -502,7 +800,7 @@ var uiView = function(store) {
                         svgToBase64(reader.result).fold(
                             function(e) { vm.error = e;} ,
                             function(e) {
-                                store('BASE_IMAGE_SET', {
+                                store(BASE_LAYER_SET, {
                                     raw_svg: e.raw_svg,
                                     url: e.data_uri,
                                     size_m: {x: e.width, y: e.height},
@@ -515,17 +813,29 @@ var uiView = function(store) {
                 }
             },
             draw_line: function(){
-                store('DRAWING_MODE_SET', DRAW_DISTANCE);
+                store(DRAWING_MODE_SET, DRAW_DISTANCE);
             },
             recalculateScale: function(){
                 if(this.lineLength <= 0) return;
-                store('DISTANCE_LENGTH_SET', this.lineLength);
+                store(BASE_DISTANCE_LENGTH_SET, this.lineLength);
             },
             needDrawLine: function(){
                 return this.width && !this.lineLength;
             },
             needRecalculate: function(){
-                return this.lineLength > 0 && this.lineLength != Math.round(baseLayer$1(store).distance.length_m);
+                var bl = selectedBaseLayer(store);
+                return this.lineLength > 0 && this.lineLength != Math.round(bl.distance.length_m);
+            },
+            needSave: function(){
+                var bl = baseLayer(store),
+                    el = selectedBaseLayer(store);
+                return !bl || !_.isEqual(bl.size_m, el.size_m) || !_.isEqual(bl.url, el.url);
+
+            },
+            save: function(){
+                var el = selectedBaseLayer(store);
+                var pavi = selectedPavilion(store);
+                store(BASE_LAYER_SAVE, {base: el, pavi_id: pavi.id});
             }
         }, 
         computed: {
@@ -535,18 +845,26 @@ var uiView = function(store) {
         }
     });
 
-    store.on('layers.base', function(e){
+    function updateWidthHeight(e){
         var base = e.new_val;
-        vm.width = Math.round(base.size_m.x);
-        vm.height = Math.round(base.size_m.y);
-    });
+        if(base) { 
+            vm.width = Math.round(base.size_m.x);
+            vm.height = Math.round(base.size_m.y);
+        }
+        else {
+            vm.width = vm.height = null;
+        }
+    }
 
-    store.on('layers.base.distance.length_m', function(e){
-        vm.lineLength = Math.round(e.new_val);
-    });    
+    function updateLength_m(e){
+        vm.lineLength = e.new_val;
+    }
+
+    store.on('selectedBaseLayer', updateWidthHeight);
+    store.on('selectedBaseLayer.distance.length_m', updateLength_m);    
+
+    return vm;
 };
-
-//export function DistanceLine
 
 var uiMap = function(store, map){
 
@@ -561,16 +879,25 @@ var uiMap = function(store, map){
         }
     });
 
-    store.on('layers.base.size_m', function(){
-        if(!line) return
-        var points = baseLayer$1(store).distance.points;
+    store.on('selectedBaseLayer.distance', function(e){
+        if(!e.new_val || !e.new_val.points) {
+            if(line) {
+                map.removeLayer(line);
+                line = null;
+            }
+        }
+    });
+
+    store.on('selectedBaseLayer.size_m', function(e){
+        if(!line || !e.new_val) return
+        var points = selectedBaseLayer(store).distance.points;
         var latLngs = points.map(function(it){
             return map.unproject(it,1);
         });
         line.disableEdit();
         line.setLatLngs(latLngs);
         line.enableEdit(map);
-        updateTooltip(baseLayer$1(store).distance.length_m);
+        updateTooltip(selectedBaseLayer(store).distance.length_m);
     });
 
     function on_edit(event)
@@ -586,8 +913,8 @@ var uiMap = function(store, map){
             var length_px = points[0].distanceTo(points[1]);
             var length_m = Math.round(L.CRS.Simple.distance(latLngs[0], latLngs[1]));
             updateTooltip(length_m);
-            store('DISTANCE_SET', {length_px: length_px, length_m:length_m, points: points});
-            store('DRAWING_MODE_SET', null);
+            store(BASE_DISTANCE_SET, {length_px: length_px, length_m:length_m, points: points});
+            store(DRAWING_MODE_SET, null);
         }
     }
 
@@ -632,7 +959,7 @@ BaseModule.reducer = handle(
             });
         },
 
-        BASE_IMAGE_SET: function(state, action){
+        BASE_LAYER_SET: function(state, action){
             return _.extend({}, state, action.payload);
         },
 
@@ -653,18 +980,73 @@ BaseModule.reducer = handle(
     }
 );
 
-var reducers = combine({
-    layers: combine({
-        base: BaseModule.reducer
-    }),
-    map: Map.reducer
-});
+var PavilionModule = function (store) 
+{
+    var vm = new Vue({
+        el: "#pavilion",
+        template: '#pavilion-template',
+        data: {
+            pavilions: _.values(store.state.pavilions),
+            selectedPavilion: _.clone(store.state.selectedPavilion || {})
+        },
+        methods: {
+            addPavilion: function(){
+                var name = prompt("Название:").trim();
+                if(name.length) 
+                    store(PAVILION_ADD, {name: name, id:0});
+            },
+            deletePavilion: function(pavi){
+                if(confirm('Удалить павильон "'+pavi.name+'"?'))
+                    store(PAVILION_DELETE, pavi);
+            },
+            selectPavilion: function(pavi){
+                store(PAVILION_SELECT, pavi);
+            },
+            isSelected: function(pavi){
+                return _.isEqual(pavi,  this.selectedPavilion);
+            }
 
-var store = Store(reducers);
+        }        
+    });
+
+    store.on('pavilions', function(e){
+        vm.pavilions = _.values(e.new_val);
+    });
+
+    store.on('selectedPavilion', function(e){
+        vm.selectedPavilion = e.new_val;
+    });
+
+
+    var vm2 = new Vue({
+        el: '#pavilion-layers',
+        data: { selectedPavilion: store.state.selectedPavilion}
+    });
+
+    store.on('selectedPavilion', function(e){
+        vm2.selectedPavilion = e.new_val;
+    });
+};
+
+initComponents();
+
+
+// var reducers = combine({
+//     layers: combine({
+//         base: BaseModule.reducer
+//     }),
+//     map: Map.reducer
+// });
+
+var store = Store(reducers, [RequestsMiddleware]);
+store.state = initState;
 window.store = store;
 
 
 var map = Map('map', store);
+PavilionModule(store);
 BaseModule(store, map);
+
+store("INIT");
 
 }());

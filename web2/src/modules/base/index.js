@@ -32,7 +32,7 @@ BaseModule.reducer = handle(
             });
         },
 
-        BASE_IMAGE_SET: function(state, action){
+        BASE_LAYER_SET: function(state, action){
             return _.extend({}, state, action.payload);
         },
 

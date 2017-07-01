@@ -41,22 +41,41 @@ Either.left = function(value){
  */
 export var Immutable = (function(){
     var i = {};
-    i.update = function(obj, path, value){
+
+    function update(obj, path, value, opt){
         if(!_.isArray(path))
             path = path.split('.');
-        obj = obj || {};
+        if(_.isUndefined(obj))
+            obj = {};
         if(path.length == 1){
            obj = _.clone(obj);
-           obj[path[0]]  = value;
+           if(opt == 'extend')
+                obj[path[0]] = _.extend({}, obj[path[0]], value);
+           else if(opt == 'set')
+                obj[path[0]]  = value;
+           else 
+                delete obj[path[0]];
         }
         else {
             var prop = path[0];
             var prop_val = obj[prop];
-            prop_val = i.update(prop_val, path.slice(1), value);
+            prop_val = update(prop_val, path.slice(1), value, opt);
             obj = _.clone(obj);
             obj[prop] = prop_val;
         }
-        return obj;
+        return obj;        
+    }
+
+    i.set = function(obj, path, value){
+        return update(obj, path, value, 'set');
+    };
+
+    i.extend = function(obj, path, value){
+        return update(obj, path, value, 'extend');
+    };
+
+    i.remove = function(obj, path){
+        return update(obj, path, null, 'remove');
     }
     return i;
 })();

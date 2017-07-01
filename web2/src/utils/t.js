@@ -1,4 +1,4 @@
-var _ = require('../libs/underscore')
+var _ = require('../../libs/underscore')
 var Immutable = (function(){
     var i = {};
     i.update = function(obj, path, value){
@@ -22,7 +22,7 @@ var Immutable = (function(){
 })();
 
 var obj1 = { p1: { p2: { p3: 123 } } };
-var obj2 = Immutable.update(obj1, 'p1.p2.p4', 1);
+var obj2 = Immutable.set(obj1, 'p1.p2.p4', 1);
 
 console.log(obj1);
 console.log(obj2);
