@@ -152,6 +152,10 @@ def update_base(pavi_id, base_id):
     pavilion_update(pavi_id, {"base": base['id']})
     return flask.jsonify({"id": base['id']})
 
+@app.route('/bases/')
+def bases():
+    with base_layers() as bases:
+        return flask.jsonify(bases)
 
 
 

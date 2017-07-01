@@ -5,6 +5,7 @@ import {PAVILIONS_LOADED,
         PAVILION_ADDED,
         BASE_LAYER_SAVE, 
         BASE_LAYER_SAVED, 
+        BASES_LOADED,
         ERROR_SET, 
         INIT} from '../actions.js'
 
@@ -19,6 +20,12 @@ export default function RequestsMiddleware(store){
                       .get(function(pavilions){
                             store(PAVILIONS_LOADED, pavilions);
                       }); 
+
+                    d3.json('/bases/')
+                      .get(function(bases){
+                            store(BASES_LOADED, bases);
+                      });
+
                     break;
 
                 case PAVILION_ADD:

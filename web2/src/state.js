@@ -15,7 +15,7 @@ export default {
     selectedBaseLayer: undefined,
     edit_feature: undefined,
     entities: {
-        base: {}, // base layers,
+        bases: {}, // base layers,
         overlays: {}, // additinal lauers
         stands: {},
         stand_types: {},
@@ -33,7 +33,7 @@ function entity(type, store, id)
     return e && e[id] || {};
 }
 
-export var baseById = _.partial('base');
+export var baseById = _.partial(entity, 'bases');
 
 export function selectedPavilion(store){
     return store.state.selectedPavilion;

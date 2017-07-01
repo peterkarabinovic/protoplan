@@ -210,7 +210,7 @@ var initState = {
     selectedBaseLayer: undefined,
     edit_feature: undefined,
     entities: {
-        base: {}, // base layers,
+        bases: {}, // base layers,
         overlays: {}, // additinal lauers
         stands: {},
         stand_types: {},
@@ -222,7 +222,13 @@ var initState = {
     }
 };
 
-var baseById = _.partial('base');
+function entity(type, store, id)
+{
+    var e = store.state.entities[type];
+    return e && e[id] || {};
+}
+
+var baseById = _.partial(entity, 'bases');
 
 function selectedPavilion(store){
     return store.state.selectedPavilion;
@@ -332,6 +338,7 @@ var PAVILIONS_LOADED = 'PAVILIONS_LOADED';
 var BASE_LAYER_SET = 'BASE_LAYER_SET';
 var BASE_LAYER_SAVE = 'BASE_LAYER_SAVE';
 var BASE_LAYER_SAVED = 'BASE_LAYER_SAVED';
+var BASES_LOADED = 'BASES_LOADED';
 var BASE_DISTANCE_SET = 'BASE_DISTANCE_SET';
 var BASE_DISTANCE_LENGTH_SET = 'BASE_DISTANCE_LENGTH_SET';
 
@@ -355,7 +362,7 @@ var pavilionReducer = function(state, action)
             if(pavi) {
                 state = Immutable.remove(state, 'pavilions.'+pavi.id);
                 if(pavi.base)
-                    state = Immutable.remove(state, 'entities.base.'+pavi.base);
+                    state = Immutable.remove(state, 'entities.bases.'+pavi.base);
             }
             if(state.selectedPavilion && state.selectedPavilion.id == pavi_id)
                 state = Immutable.set(state, 'selectedPavilion');
@@ -371,7 +378,7 @@ var pavilionReducer = function(state, action)
             var pavi = action.payload;
             state = Immutable.set(state, 'selectedPavilion', pavi);
             if(pavi) {
-                var base = state.entities.base[pavi.base];
+                var base = state.entities.bases[pavi.base];
                 state = Immutable.set(state, 'selectedBaseLayer', base);
             }
             return state;
@@ -386,6 +393,9 @@ var baseReducer = function(state, action)
 {
     switch(action.type)
     {
+        case BASES_LOADED:
+            return Immutable.set(state, 'entities.bases', action.payload);
+
         case BASE_LAYER_SET: 
             var base = action.payload;
             if(state.selectedBaseLayer)
@@ -415,13 +425,13 @@ var baseReducer = function(state, action)
             var pavi = state.pavilions[pavi_id];
             if(pavi){
                 state = Immutable.set(state, 'pavilions.'+pavi_id+'.base', base.id);
-                state = Immutable.set(state, 'entities.base.'+base.id, base);
+                state = Immutable.set(state, 'entities.bases.'+base.id, base);
                 if(state.selectedPavilion && pavi_id == state.selectedPavilion.id){
                     state = Immutable.extend(state, 'selectedBaseLayer', base);
                 }
             }
             else {
-                state = Immutable.remove(state, 'entities.base.'+base.id);
+                state = Immutable.remove(state, 'entities.bases.'+base.id);
             }
             
             return state;
@@ -454,6 +464,12 @@ function RequestsMiddleware(store){
                       .get(function(pavilions){
                             store(PAVILIONS_LOADED, pavilions);
                       }); 
+
+                    d3.json('/bases/')
+                      .get(function(bases){
+                            store(BASES_LOADED, bases);
+                      });
+
                     break;
 
                 case PAVILION_ADD:

@@ -16,7 +16,7 @@ var pavilionReducer = function(state, action)
             if(pavi) {
                 state = Immutable.remove(state, 'pavilions.'+pavi.id);
                 if(pavi.base)
-                    state = Immutable.remove(state, 'entities.base.'+pavi.base);
+                    state = Immutable.remove(state, 'entities.bases.'+pavi.base);
             }
             if(state.selectedPavilion && state.selectedPavilion.id == pavi_id)
                 state = Immutable.set(state, 'selectedPavilion');
@@ -32,7 +32,7 @@ var pavilionReducer = function(state, action)
             var pavi = action.payload;
             state = Immutable.set(state, 'selectedPavilion', pavi);
             if(pavi) {
-                var base = state.entities.base[pavi.base]
+                var base = state.entities.bases[pavi.base]
                 state = Immutable.set(state, 'selectedBaseLayer', base);
             }
             return state;
@@ -47,6 +47,9 @@ var baseReducer = function(state, action)
 {
     switch(action.type)
     {
+        case a.BASES_LOADED:
+            return Immutable.set(state, 'entities.bases', action.payload);
+
         case a.BASE_LAYER_SET: 
             var base = action.payload;
             if(state.selectedBaseLayer)
@@ -76,13 +79,13 @@ var baseReducer = function(state, action)
             var pavi = state.pavilions[pavi_id];
             if(pavi){
                 state = Immutable.set(state, 'pavilions.'+pavi_id+'.base', base.id)
-                state = Immutable.set(state, 'entities.base.'+base.id, base);
+                state = Immutable.set(state, 'entities.bases.'+base.id, base);
                 if(state.selectedPavilion && pavi_id == state.selectedPavilion.id){
                     state = Immutable.extend(state, 'selectedBaseLayer', base)
                 }
             }
             else {
-                state = Immutable.remove(state, 'entities.base.'+base.id);
+                state = Immutable.remove(state, 'entities.bases.'+base.id);
             }
             
             return state;
