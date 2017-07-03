@@ -2,156 +2,290 @@
 'use strict';
 
 /**
- * 
- * @param {function} reducers - reduce state function 
- * @param {Array} middleware - optional array of middleware
- * @param {Object} initState - optional init state
+ *  Small functional programming stuff 
  */
-function Store(reducers, middleware)
-{
-    middleware = middleware || [];
 
-    var s = function(action_type, payload) {
-        return s.dispatch({ type: action_type, payload: payload});
-    };
-    s.state = {};
 
-    var listeners = {}, exactly_listeners = {};
-    s.on = _.partial(_on, listeners);
-    s.off = _.partial(_off, listeners);
-    s.dispatch = function(action){
-        var old_state = s.state;
-        s.state = reducers(s.state, action);
-        find_and_fire(s.state, old_state, _.clone(listeners), []);
-        return s.state;
-    };
 
-    middleware.forEach(function(m){
-        s.dispatch = m(s)(s.dispatch);
+function memorize(f) {
+	if (!f.cache) f.cache = {};
+	return function() {
+		var cacheId = [].slice.call(arguments).join('');
+		return f.cache[cacheId] ?
+				f.cache[cacheId] :
+				f.cache[cacheId] = f.apply(window, arguments);
+	};
+}
+
+
+
+/***
+ *  Either monad
+ */
+
+function GridPanel(map){
+
+    var map_size = map._container.getBoundingClientRect();
+    var margin = {left: 50, right: 0, top: 5, bottom: 30};
+    var map_size_m = null;
+
+    var format_meters = function(d) { return d + ' м'};
+
+    var $graphPanel = d3.select('body')
+        .append('svg')
+            .style('position', 'absolute')
+            .style('top', (map_size.top - margin.top) + 'px')
+            .style('left', (map_size.left - margin.left - 1) + 'px')
+            .style('height', (map_size.height + margin.top + margin.bottom) + 'px')
+            .style('width', (map_size.width + margin.left + margin.right) + 'px')
+            .style('pointer-events', 'none')
+            .style('z-index', "2001");
+
+    // Axis X
+    var $axisX = $graphPanel.append('g')
+                    .attr('class', 'x axis')
+                    .attr("transform", "translate("+ margin.left+"," + (margin.top + map_size.height) + ")");
+    var scaleX = d3.scaleLinear().range([0, map_size.width]);
+    var axisX = d3.axisBottom(scaleX).ticks(10).tickFormat(format_meters);
+
+    // Axis Y
+    var $axisY = $graphPanel.append('g')
+                    .attr('class', 'y axis')
+                    .attr("transform", "translate("+ (margin.left) +"," + margin.top + ")");
+    var scaleY = d3.scaleLinear().range([0, map_size.height ]);
+    var axisY = d3.axisLeft(scaleY).ticks(10).tickFormat(format_meters);
+
+    // Grid
+    var $gridX = $graphPanel.append('g')
+                    .attr('class', 'grid')
+                    .attr("transform", "translate(" + margin.left + "," + (margin.top + map_size.height) + ")");
+    var gridAxisX = d3.axisBottom(scaleX).ticks(40)
+                                   .tickSize(-map_size.height, 0, 0)
+                                   .tickFormat('');
+
+    var $gridY = $graphPanel.append('g')
+                    .attr('class', 'grid')
+                    .attr("transform", "translate("+ margin.left + "," + margin.top + ")");
+
+    var gridAxisY = d3.axisRight(scaleY)
+                                    .ticks(40)
+                                   .tickSize(map_size.width, 0, 0)
+                                   .tickFormat('');
+
+    var get_grid_ticks = memorize(function(){
+        var domainX = scaleX.domain();
+        var domainY = scaleY.domain();     
+        var x_step = Math.round(Math.abs(scaleX.invert(20) - scaleX.invert(0)));
+        x_step = Math.max(0.5, x_step);
+        return [
+            Math.abs( (domainX[1] - domainX[0]) / x_step),
+            Math.abs( (domainY[1] - domainY[0]) / x_step)
+        ]        
     });
 
+    var render = function() {
+        if(!map_size_m) {
+            return;
+        }    
+        var b = map.getBounds();
+        scaleX.domain([b.getWest(), b.getEast()]);
+        $axisX.call(axisX);
 
-    return s;
+        scaleY.domain([map_size_m.y-b.getSouth(), map_size_m.y-b.getNorth() ]);
+        $axisY.call(axisY);
+
+        var ticks = get_grid_ticks(map.getZoom());
+        gridAxisX.ticks(ticks[0]);
+        gridAxisY.ticks(ticks[1]);
+        $gridX.call(gridAxisX);
+        $gridY.call(gridAxisY);
+    }; 
+
+    map.on('move', render);
+
+    return function(size_m){
+        map_size_m = size_m;
+        render();
+    }
 }
 
 /**
- * Recursive run by properties search diff and fire events 
- * @param {*} new_obj 
- * @param {*} old_obj 
- * @param {*} listeners 
- * @param {*} path 
+ * Calculate map transformation 
+ * @param {Size} map_size  - size of map's div
+ * @param {Size} img_size  - size of images in custom unit (meters)
  */
-function find_and_fire(new_obj, old_obj, listeners, path)
-{
-    if( _.isEmpty(listeners) )
-        return
+function transformation(map_size, img_size){
+   
+    var x_ratio = map_size.x / img_size.x;
+    var y_ratio = map_size.y / img_size.y;
+    if(x_ratio <= y_ratio){
+        var a = x_ratio;
+        var b = 0;
+        var c = x_ratio;
+        var d = (map_size.y - (x_ratio * img_size.y)) / 2;
+    }
+    else { 
+        var a = y_ratio;
+        var b = (map_size.x - (y_ratio * img_size.x)) / 2;
+        var c = y_ratio;
+        var d = 0;
+    }
+    return new L.Transformation(a,b,c,d);        
+}
 
-    new_obj = new_obj || {};
-    old_obj = old_obj || {};
-       
-    var props = diffs(new_obj, old_obj);    
-    var max_level = +_.max(_.keys(listeners));
-    props.forEach(function(prop){
-        var o1 = new_obj[prop];
-        var o2 = old_obj[prop];
-        var p = path.concat([prop]);
-        var ll = listeners[p.length];
-        if(ll) 
-        {
-            var event = {new_val: o1, old_val: o2, path: p};
-            ll = _.reject(ll, function(it){
-                if(_match(p, it.path)) {
-                    it.fn(event);
-                    return true;
-                }
-                return false;
-            });
-            if(!ll.length) {
-                delete listeners[p.length];
-            }
-            else {
-                listeners[p.length] = ll;
+/**
+ * Calculate max zoom
+ * @param {Size} img_size - size of images in custom unit (meters)
+ * @param {int} min_width - length of min visible width (default 10)
+ */
+function maxZoom(img_size, min_width){
+    min_width = min_width || 10;
+    var max_width = Math.max(img_size.y, img_size.x);
+    // var maxZoom = Math.log2( max_width / (1 * min_width) )   -- IE 11 not supported log2
+    var maxZoom = Math.log( max_width / (1 * min_width) )  / Math.log(2);
+    return Math.round(maxZoom);
+}
+
+/**
+ * Constructor of Envelope
+ * @param {*} min_x 
+ * @param {*} min_y 
+ * @param {*} max_x 
+ * @param {*} max_y 
+ */
+
+L.Browser.touch = false;
+
+var map = L.map('map', {
+    crs: L.CRS.Simple,
+    zoomControl: false,
+    attributionControl: false,
+    editable: true,
+        editOptions: {
+            // skipMiddleMarkers: true
+        }
+});
+var gridPanel = GridPanel(map);
+function updateBaseLayerSize(size_m)
+{
+    if(!size_m) return;
+    var map_size = {x: map._container.offsetWidth, y: map._container.offsetHeight};
+    var trans =  transformation(map_size, size_m);
+    map.options.crs = L.extend({}, L.CRS.Simple, {transformation: trans });  
+    map.setMaxBounds([[-size_m.y, -size_m.x], [size_m.y*2, size_m.x*2]]);
+    map.setMaxZoom( maxZoom(size_m) );
+    var bounds =  L.latLngBounds([[0,0], [size_m.y, size_m.x]]);
+    if(_.isUndefined(map.getZoom()))
+        map.fitBounds(bounds);
+    gridPanel(size_m);
+    return bounds;
+}
+
+updateBaseLayerSize({x:800, y:600});
+
+function View()
+{
+    return new Vue({
+        el: '#form',
+        data: {
+            selection: null,
+        },
+        methods: {
+            select: function(sel){ 
+                this.selection = sel; 
+            },
+            cssClass: function(p){
+                return p == this.selection ? 'w3-text-red'  : '';
             }
         }
-        if(max_level > p.length)
-            find_and_fire(o1, o2, listeners, p);
     });
 }
 
-
-/**
- * find the properties that is not equals
- * @param {Object} obj1  
- * @param {Object} obj2 
- */
-function diffs(new_obj, old_obj)
+function Draw(view)
 {
-    if(!_.isObject(new_obj) || !_.isObject(old_obj))
-        return [];
-    var keys = _.uniq( Object.keys(new_obj).concat( Object.keys(old_obj) ) );
-    return keys.reduce(function(diffs, key){
-        return _.isEqual(new_obj[key], old_obj[key]) ? diffs : diffs.concat(key);
-    },[]);
+    var drawMode = null;
+    var groupLayer = L.layerGroup().addTo(map);
+    var modes = {
+        line: drawLine(groupLayer),
+        rect: drawRect(groupLayer),
+        note: drawNote(groupLayer)
+    };
+
+    view.$watch('selection', function(sel)
+    {
+        if(drawMode){
+            drawMode.exit();
+        }
+        drawMode = modes[sel];
+        if(drawMode)
+            drawMode.enter();
+    });
 }
 
-function _on(listeners, path, fn) {
-    path = path.split('.');
-    listeners[path.length] = listeners[path.length] || [];
-    listeners[path.length].push( {path:path, fn:fn} );
-}
+function drawLine(groupLayer)
+{
+    var line = null;
 
-function _off(listeners, path, fn) {
-    path = path.split('.');
-    var ln = path.length;
-    var ll = listeners[ln];
-    if(ll){
-        ll = _.reject(ll, function(it){ return _.isEqual(it.path, path) &&  it.fn == fn; });
-        if(ll.length)
-            listeners[ln] = ll;
-        else
-            delete listeners[ln];
+    function enter(){
+        line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'});
+        line.on('editable:drawing:commit', on_commit);
+
     }
-}
 
-function _match(path, mask_path){
-    path = _.clone(path);
-    for(var i in mask_path) {
-        if(mask_path[i] === '*')
-            path[i] = '*';
-    }
-    return _.isEqual(path, mask_path);
-}
-
-
-/**
- *  Reducer helpers
- */
-
-var old_state = {
-    p1: 1
-};
-
-var new_state = {
-    p1: 1,
-    p2: {
-        p3: 4,
-        p4: {
-            p5: 5
+    function exit(){
+        if(line) {
+            line.disableEdit();
+            map.removeLayer(line);
+            line.off('editable:drawing:commit', on_commit);
+            line = null;
         }
     }
-};
 
-var store = Store(function(){ return new_state});
-store.state = old_state;
+    function on_commit(event){
+        line.disableEdit();
+        map.removeLayer(line);
+        line.setStyle({weight:4, color: 'green'});
+        groupLayer.addLayer(line);
+        line.off('editable:drawing:commit', on_commit);
+        line = null;
+    }
 
-var fn = e => console.log("*.*.p5", e);
-store.on("*.*.p5",  fn);
-store.on("p2.p3", e => console.log("p2.p3", e) );
-store.on("p2.*", e => console.log("p2.*", e) );
-store.on("p2", e => console.log("p2", e) );
 
-store.off("*.*.p5",  fn);
+    return {enter:enter, exit: exit};
+}
 
-store('kino');
+function drawRect(groupLayer){
+    var rect = null;
+    
+    function enter(){
+        rect = map.editTools.startRectangle(undefined, {weight:2, color: 'red', dashArray:'5,10'});
+        rect.on('editable:drawing:commit', on_commit);
+    }
+    function exit(){
+
+    }
+    function on_commit(event){
+        rect.disableEdit();
+        map.removeLayer(rect);
+        rect.setStyle({weight:2, color: 'green'});
+        groupLayer.addLayer(rect);
+        rect.off('editable:drawing:commit', on_commit);
+        rect = null;
+    }
+    return {enter:enter, exit: exit};
+}
+
+function drawNote(groupLayer){
+    function enter(){
+
+    }
+    function exit(){
+
+    }
+    return {enter:enter, exit: exit};
+}
+
+
+Draw(View());
 
 }());
