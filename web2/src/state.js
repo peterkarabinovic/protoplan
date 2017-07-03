@@ -13,10 +13,11 @@ export default {
     },
     selectedPavilion: undefined,
     selectedBaseLayer: undefined,
-    edit_feature: undefined,
+    selectedOverlayLayer: undefined,
+    selectedOverlayFeature: undefined,
     entities: {
         bases: {}, // base layers,
-        overlays: {}, // additinal lauers
+        overlays: {}, // additinal layers
         stands: {},
         stand_types: {},
         stand_categories: {},

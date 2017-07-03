@@ -7,7 +7,8 @@ import {BASE_LAYER_SET,
         DRAWING_MODE_SET, BASE_DISTANCE_LENGTH_SET} from '../../actions.js'
 
 
-export default function(store) {
+
+function uiView(store) {
     var vm = new Vue({
         el: '#base-layer',
         template: '#base-layer-template',
@@ -97,3 +98,11 @@ export default function(store) {
 
     return vm;
 } 
+
+import uiMap from './ui-map.js'        
+
+export default function(store, map)
+{
+    uiView(store);
+    uiMap(store, map);
+};

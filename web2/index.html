@@ -8,7 +8,6 @@
         <link href="css/w3-theme-blue-grey.css" rel="stylesheet">
         <link href="css/leaflet.css" rel="stylesheet">
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
         <style>
             /* Layout */
             html, body { height: 100%; }            
@@ -73,6 +72,9 @@
                     <folding title="Базовый слой" class="w3-margin-top">
                         <div id='base-layer'></div>
                     </folding>
+                    <folding title="Дополнительный слой">
+                        <div id='overlays-layer'></div>
+                    </folding>
                 </div>
             </div>
 
@@ -89,7 +91,7 @@
                     <table class='w3-table w3-striped'>
                         <tr v-for='p in pavilions' :class="{'w3-light-grey': isSelected(p)}">
                             <td @click='selectPavilion(p)' class='pointer'>{{p.name}}</td>
-                            <td @click='deletePavilion(p)'><i class='fa fa-remove'></i></td>
+                            <td @click='deletePavilion(p)'><i class='material-icons pointer'>delete</i></td>
                         </tr>
                     </table>
                 </folding>
@@ -120,6 +122,23 @@
                 <button id="line" v-show="needDrawLine()" 
                         @click="draw_line"
                         class="w3-button w3-black w3-border">Задать длину</button>
+            </div>
+         </script>
+
+         <script type="text/x-template" id="overlays-layer-template">
+            <div>
+                <div class="w3-section" :class="cssClass('line')" @click='select("line")'>
+                    <i class="material-icons pointer" >timeline</i>
+                    Линия
+                </div>
+                <div class="w3-section" :class="cssClass('rect')" @click='select("rect")'>
+                    <i class="material-icons pointer">receipt</i>
+                    Ковер
+                </div>
+                <div class="w3-section" :class="cssClass('note')" @click='select("note")'>
+                    <i class="material-icons pointer">note</i>
+                    Комментарий
+                </div>
             </div>
          </script>
 

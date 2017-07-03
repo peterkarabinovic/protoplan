@@ -172,7 +172,7 @@ function initComponents()
 
         template: str('<div style="cursor: pointer;">',
                     '<span @click="on_click" style="margin-left: -1.2em" class="w3-text-grey">',
-                    '<i  style="margin-right: 0.4em" :class="icon"></i>',
+                    '<i  style="margin-right: 0.4em" class="material-icons">{{icon}}</i>',
                     '{{title}}</span>',
                     '<div v-show="is_open"><slot></slot></div>',
                   '</div>'),
@@ -184,7 +184,7 @@ function initComponents()
         },
         computed: {
             icon: function(){
-                return ['w3-xlarge fa fa-caret-right', ' w3-xlarge fa fa-caret-down'][+this.is_open];
+                return ['chevron_right', 'expand_more'][+this.is_open];
             }
         },
         methods: {
@@ -208,10 +208,11 @@ var initState = {
     },
     selectedPavilion: undefined,
     selectedBaseLayer: undefined,
-    edit_feature: undefined,
+    selectedOverlayLayer: undefined,
+    selectedOverlayFeature: undefined,
     entities: {
         bases: {}, // base layers,
-        overlays: {}, // additinal lauers
+        overlays: {}, // additinal layers
         stands: {},
         stand_types: {},
         stand_categories: {},
@@ -671,7 +672,7 @@ var Map = function(el, store)
         attributionControl: false,
         editable: true,
             editOptions: {
-                skipMiddleMarkers: true
+                skipMiddleMarkers: false
             }
     });
 
@@ -719,6 +720,54 @@ function updateBaseLayerSize(size_m)
     return bounds;
 }
 
+var PavilionModule = function (store) 
+{
+    var vm = new Vue({
+        el: "#pavilion",
+        template: '#pavilion-template',
+        data: {
+            pavilions: _.values(store.state.pavilions),
+            selectedPavilion: _.clone(store.state.selectedPavilion || {})
+        },
+        methods: {
+            addPavilion: function(){
+                var name = prompt("Название:").trim();
+                if(name.length) 
+                    store(PAVILION_ADD, {name: name, id:0});
+            },
+            deletePavilion: function(pavi){
+                if(confirm('Удалить павильон "'+pavi.name+'"?'))
+                    store(PAVILION_DELETE, pavi);
+            },
+            selectPavilion: function(pavi){
+                store(PAVILION_SELECT, pavi);
+            },
+            isSelected: function(pavi){
+                return _.isEqual(pavi,  this.selectedPavilion);
+            }
+
+        }        
+    });
+
+    store.on('pavilions', function(e){
+        vm.pavilions = _.values(e.new_val);
+    });
+
+    store.on('selectedPavilion', function(e){
+        vm.selectedPavilion = e.new_val;
+    });
+
+
+    var vm2 = new Vue({
+        el: '#pavilion-layers',
+        data: { selectedPavilion: store.state.selectedPavilion}
+    });
+
+    store.on('selectedPavilion', function(e){
+        vm2.selectedPavilion = e.new_val;
+    });
+};
+
 var cur_locale = 'ru';
 
 function t(s, o, loc){
@@ -747,6 +796,9 @@ var translations =
 };
 
 var DRAW_DISTANCE = 'draw-distance';
+var DRAW_WALL = 'draw-wall';
+var DRAW_RECT = 'draw-rect';
+var DRAW_NOTE = 'draw-note';
 
 function svgToBase64(svg_text)
 {
@@ -791,7 +843,77 @@ function svgToBase64(svg_text)
     })    
 }
 
-var uiView = function(store) {
+//export function DistanceLine
+
+var uiMap = function(store, map){
+
+    var line = null;
+    var tooltip = null; 
+    store.on('map.drawing_mode', function(e)
+    {
+        if(e.new_val == DRAW_DISTANCE)
+        {
+            L.setOptions(map.editTools, {skipMiddleMarkers: true});
+            line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'});   
+            line.on('editable:editing', on_edit);
+        }
+        else {
+            L.setOptions(map.editTools, {skipMiddleMarkers: false});            
+        }
+    });
+
+    store.on('selectedBaseLayer.distance', function(e){
+        if(!e.new_val || !e.new_val.points) {
+            if(line) {
+                map.removeLayer(line);
+                line = null;
+            }
+        }
+    });
+
+    store.on('selectedBaseLayer.size_m', function(e){
+        if(!line || !e.new_val) return
+        var points = selectedBaseLayer(store).distance.points;
+        var latLngs = points.map(function(it){
+            return map.unproject(it,1);
+        });
+        line.disableEdit();
+        line.setLatLngs(latLngs);
+        line.enableEdit(map);
+        updateTooltip(selectedBaseLayer(store).distance.length_m);
+    });
+
+    function on_edit(event)
+    {
+        var line = event.layer;
+        if(line.getLatLngs().length == 2) 
+        {
+            var latLngs = line.getLatLngs();
+            map.editTools.stopDrawing();
+            var points = latLngs.map(function(it){
+                return map.project(it,1);
+            });
+            var length_px = points[0].distanceTo(points[1]);
+            var length_m = Math.round(L.CRS.Simple.distance(latLngs[0], latLngs[1]));
+            updateTooltip(length_m);
+            store(BASE_DISTANCE_SET, {length_px: length_px, length_m:length_m, points: points});
+            store(DRAWING_MODE_SET, null);
+        }
+    }
+
+    function updateTooltip(length_m){
+        var content = length_m + ' m';
+        if(line.getTooltip())
+            line.getTooltip().setLatLng(line.getCenter()).setContent(content);
+        else
+            line.bindTooltip(content, {permanent:true, interactive:true}); 
+                
+    }
+
+    
+};
+
+function uiView(store) {
     var vm = new Vue({
         el: '#base-layer',
         template: '#base-layer-template',
@@ -880,71 +1002,7 @@ var uiView = function(store) {
     store.on('selectedBaseLayer.distance.length_m', updateLength_m);    
 
     return vm;
-};
-
-var uiMap = function(store, map){
-
-    var line = null;
-    var tooltip = null; 
-    store.on('map.drawing_mode', function(e)
-    {
-        if(e.new_val == DRAW_DISTANCE)
-        {
-            line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'});   
-            line.on('editable:editing', on_edit);
-        }
-    });
-
-    store.on('selectedBaseLayer.distance', function(e){
-        if(!e.new_val || !e.new_val.points) {
-            if(line) {
-                map.removeLayer(line);
-                line = null;
-            }
-        }
-    });
-
-    store.on('selectedBaseLayer.size_m', function(e){
-        if(!line || !e.new_val) return
-        var points = selectedBaseLayer(store).distance.points;
-        var latLngs = points.map(function(it){
-            return map.unproject(it,1);
-        });
-        line.disableEdit();
-        line.setLatLngs(latLngs);
-        line.enableEdit(map);
-        updateTooltip(selectedBaseLayer(store).distance.length_m);
-    });
-
-    function on_edit(event)
-    {
-        var line = event.layer;
-        if(line.getLatLngs().length == 2) 
-        {
-            var latLngs = line.getLatLngs();
-            map.editTools.stopDrawing();
-            var points = latLngs.map(function(it){
-                return map.project(it,1);
-            });
-            var length_px = points[0].distanceTo(points[1]);
-            var length_m = Math.round(L.CRS.Simple.distance(latLngs[0], latLngs[1]));
-            updateTooltip(length_m);
-            store(BASE_DISTANCE_SET, {length_px: length_px, length_m:length_m, points: points});
-            store(DRAWING_MODE_SET, null);
-        }
-    }
-
-    function updateTooltip(length_m){
-        var content = length_m + ' m';
-        if(line.getTooltip())
-            line.getTooltip().setLatLng(line.getCenter()).setContent(content);
-        else
-            line.bindTooltip(content, {permanent:true, interactive:true}); 
-                
-    }
-
-    
-};
+} 
 
 var BaseModule = function(store, map)
 {
@@ -952,107 +1010,42 @@ var BaseModule = function(store, map)
     uiMap(store, map);
 };
 
-BaseModule.reducer = handle( 
-    {
-        size_m: null,
-        size_px: null,
-        url: null,
-        raw_svg: null,
-        distance: {
-            points: [],
-            length_px: null,
-            length_m: null
-        }
-    },
-    {
-        DISTANCE_SET: function(state, action){
-            return _.extend({}, state, 
-                { distance : {
-                    points: action.payload.points,
-                    length_m: action.payload.length_m,
-                    length_px: action.payload.length_px
-                }
-            });
-        },
-
-        BASE_LAYER_SET: function(state, action){
-            return _.extend({}, state, action.payload);
-        },
-
-        DISTANCE_LENGTH_SET: function(state, action){
-            var length_m = action.payload;
-            var ratio =  length_m / state.distance.length_m;
-            var size_m = state.size_m;
-            size_m = {
-                x: size_m.x * ratio,
-                y: size_m.y * ratio
-            };
-            return _.extend({}, state, {
-                size_m: size_m,
-                distance: _.extend({}, state.distance, {length_m:length_m})
-            })
-        }
-
-    }
-);
-
-var PavilionModule = function (store) 
+function uiView$1(store)
 {
+    var SEL = {
+        "line": DRAW_WALL,
+        "rect": DRAW_RECT,
+        "note": DRAW_NOTE
+    };
+
+
     var vm = new Vue({
-        el: "#pavilion",
-        template: '#pavilion-template',
+        el:"#overlays-layer",
+        template: '#overlays-layer-template',
         data: {
-            pavilions: _.values(store.state.pavilions),
-            selectedPavilion: _.clone(store.state.selectedPavilion || {})
+            sel: null,
         },
         methods: {
-            addPavilion: function(){
-                var name = prompt("Название:").trim();
-                if(name.length) 
-                    store(PAVILION_ADD, {name: name, id:0});
+            select: function(sel){ 
+                store(DRAWING_MODE_SET, SEL[sel]);
             },
-            deletePavilion: function(pavi){
-                if(confirm('Удалить павильон "'+pavi.name+'"?'))
-                    store(PAVILION_DELETE, pavi);
-            },
-            selectPavilion: function(pavi){
-                store(PAVILION_SELECT, pavi);
-            },
-            isSelected: function(pavi){
-                return _.isEqual(pavi,  this.selectedPavilion);
+            cssClass: function(p){
+                return p == this.sel ? 'w3-text-red'  : 'w3-text-grey';
             }
-
-        }        
+        }
     });
 
-    store.on('pavilions', function(e){
-        vm.pavilions = _.values(e.new_val);
+    store.on('map.drawing_mode', function(e){
+        vm.sel = _.findKey(SEL, function(it) { return it == e.new_val});
     });
+}
 
-    store.on('selectedPavilion', function(e){
-        vm.selectedPavilion = e.new_val;
-    });
-
-
-    var vm2 = new Vue({
-        el: '#pavilion-layers',
-        data: { selectedPavilion: store.state.selectedPavilion}
-    });
-
-    store.on('selectedPavilion', function(e){
-        vm2.selectedPavilion = e.new_val;
-    });
+var OverlaysModule = function(store, map){
+    uiView$1(store);
 };
 
 initComponents();
 
-
-// var reducers = combine({
-//     layers: combine({
-//         base: BaseModule.reducer
-//     }),
-//     map: Map.reducer
-// });
 
 var store = Store(reducers, [RequestsMiddleware]);
 store.state = initState;
@@ -1062,6 +1055,7 @@ window.store = store;
 var map = Map('map', store);
 PavilionModule(store);
 BaseModule(store, map);
+OverlaysModule(store, map);
 
 store("INIT");
 

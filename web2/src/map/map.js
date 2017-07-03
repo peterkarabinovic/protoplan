@@ -26,7 +26,7 @@ var Map = function(el, store)
         attributionControl: false,
         editable: true,
             editOptions: {
-                skipMiddleMarkers: true
+                skipMiddleMarkers: false
             }
     });
 

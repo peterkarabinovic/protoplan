@@ -14,8 +14,12 @@ export default function(store, map){
     {
         if(e.new_val == DRAW_DISTANCE)
         {
+            L.setOptions(map.editTools, {skipMiddleMarkers: true});
             line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'})   
             line.on('editable:editing', on_edit)
+        }
+        else {
+            L.setOptions(map.editTools, {skipMiddleMarkers: false});            
         }
     });
 
