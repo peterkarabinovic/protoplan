@@ -5,18 +5,6 @@ import {handle} from '../utils/redux.js'
 
 L.Browser.touch = false;
 
-var reducer = handle(
-    {
-        drawing_mode: null,
-    },
-    {
-        DRAWING_MODE_SET: function(state, action){
-            var mode = action.payload;
-            return _.extend({}, state, {drawing_mode: mode});
-        }
-    }
-);
-
 var Map = function(el, store)
 {
     map = L.map(el, 
@@ -24,10 +12,7 @@ var Map = function(el, store)
         crs: L.CRS.Simple,
         zoomControl: false,
         attributionControl: false,
-        editable: true,
-            editOptions: {
-                skipMiddleMarkers: false
-            }
+        editable: true
     });
 
     gridPanel = GridPanel(map);
@@ -38,7 +23,6 @@ var Map = function(el, store)
     return map;
 }
 
-Map.reducer = reducer;
 
 export default Map;
 
@@ -53,7 +37,7 @@ function updateBaseLayer(img)
         map.removeLayer(baseLayer);
         baseLayer = null;
     }
-    if(img) {
+    if(img && img.url) {
         var bounds = updateBaseLayerSize(img.size_m);
         baseLayer = L.imageOverlay(img.url, bounds).addTo(map);
         map.fitBounds(bounds);

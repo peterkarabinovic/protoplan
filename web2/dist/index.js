@@ -42,7 +42,8 @@ function Store(reducers, middleware)
     s.dispatch = function(action){
         var old_state = s.state;
         s.state = reducers(s.state, action);
-        find_and_fire(s.state, old_state, _.clone(listeners), []);
+        if(s.state !== old_state)
+            find_and_fire(s.state, old_state, _.clone(listeners), []);
         return s.state;
     };
 
@@ -131,16 +132,7 @@ function _match(path, mask_path){
 
 
 
-function handle(defaultState, handlers)
-{
-    defaultState = defaultState || {};
-    return function(state, action){
-        if(_.isEmpty(state))
-            state = _.clone(defaultState);
-        
-        return (handlers[action.type] || _.identity)(state, action);
-    }
-}
+
 
 function reduceReducers(reducers){
     return function(state, action){
@@ -163,6 +155,18 @@ function startswith(str, substr) {
 /*
  * Selfcheck - wrap callback function for check if it already called in stack above
  */
+
+function Selfcheck(){
+    var me = false;
+    return function(callback){
+        return function(){
+            if(me) return; 
+            me = true;
+            try{var res = callback.apply(this, arguments); } finally {me = false;}
+            return res;
+        } 
+    }
+}
 
 function initComponents()
 {
@@ -204,12 +208,12 @@ var initState = {
 
     },
     map: {
-        drawing_mode: undefined,
+        drawingMode: undefined,
     },
     selectedPavilion: undefined,
     selectedBaseLayer: undefined,
     selectedOverlayLayer: undefined,
-    selectedOverlayFeature: undefined,
+    selectedOverlayFeat: undefined,
     entities: {
         bases: {}, // base layers,
         overlays: {}, // additinal layers
@@ -230,6 +234,7 @@ function entity(type, store, id)
 }
 
 var baseById = _.partial(entity, 'bases');
+var overlayById = _.partial(entity, 'overlays');
 
 function selectedPavilion(store){
     return store.state.selectedPavilion;
@@ -239,6 +244,9 @@ function baseLayer(store) {
     var pavi = selectedPavilion(store);
     return  pavi && pavi.base &&  baseById(store, pavi.base) || {};
 }
+
+
+
 
 function selectedBaseLayer(store) {
     return store.state.selectedBaseLayer  || {};
@@ -323,6 +331,23 @@ var Immutable = (function(){
     i.remove = function(obj, path){
         return update(obj, path, null, 'remove');
     };
+
+    i.get = function(obj, path){
+        if(!_.isArray(path))
+            path = path.split('.');
+        if(_.isUndefined(obj))
+            return obj;
+
+        if(path.length == 1){
+            return obj[path[0]];
+        }
+        else {
+            var prop = path[0];
+            var prop_val = obj[prop];
+            return i.get(prop_val, path.slice(1));
+        }
+
+    };
     return i;
 })();
 
@@ -346,6 +371,11 @@ var BASE_DISTANCE_LENGTH_SET = 'BASE_DISTANCE_LENGTH_SET';
 
 var DRAWING_MODE_SET = 'DRAWING_MODE_SET';
 
+var OVERLAY_FEAT_ADD = 'OVERLAY_FEAT_ADD';
+var OVERLAY_FEAT_UPDATE = 'OVERLAY_FEAT_UPDATE';
+var OVERLAY_FEAT_DELETE = 'OVERLAY_FEAT_DELETE';
+var OVERLAY_FEAT_SELECT = 'OVERLAY_FEAT_SELECT';
+var OVERLAY_SAVE = 'OVERLAY_SAVE';
 
 
 var ERROR_SET = 'ERROR_SET';
@@ -362,24 +392,26 @@ var pavilionReducer = function(state, action)
             var pavi = state.pavilions[pavi_id];
             if(pavi) {
                 state = Immutable.remove(state, 'pavilions.'+pavi.id);
-                if(pavi.base)
-                    state = Immutable.remove(state, 'entities.bases.'+pavi.base);
+                state = Immutable.remove(state, 'entities.bases.'+pavi.id);
             }
-            if(state.selectedPavilion && state.selectedPavilion.id == pavi_id)
+            if(state.selectedPavilion && state.selectedPavilion.id == pavi_id) {
                 state = Immutable.set(state, 'selectedPavilion');
+                state = Immutable.set(state, 'selectedBaseLayer');
+            }
             return state;
 
         case PAVILION_ADDED:
             var pavi = action.payload;
             state = Immutable.set(state, 'pavilions.'+pavi.id, pavi);
             state = Immutable.set(state, 'selectedPavilion', pavi);
+            state = Immutable.set(state, 'selectedBaseLayer', {id:pavi.id});
             return state;
 
         case PAVILION_SELECT:
             var pavi = action.payload;
             state = Immutable.set(state, 'selectedPavilion', pavi);
             if(pavi) {
-                var base = state.entities.bases[pavi.base];
+                var base = state.entities.bases[pavi.id] || {id: pavi.id};
                 state = Immutable.set(state, 'selectedBaseLayer', base);
             }
             return state;
@@ -399,11 +431,7 @@ var baseReducer = function(state, action)
 
         case BASE_LAYER_SET: 
             var base = action.payload;
-            if(state.selectedBaseLayer)
-                base = _.extend({}, state.selectedBaseLayer, base);
-            else
-                base = _.extend({}, base, {id:0});            
-            return Immutable.set(state, 'selectedBaseLayer', base);
+            return Immutable.extend(state, 'selectedBaseLayer', base);
         
         case BASE_DISTANCE_LENGTH_SET:
             var length_m = action.payload;
@@ -421,22 +449,51 @@ var baseReducer = function(state, action)
             return Immutable.set(state, 'selectedBaseLayer.distance', distance);
 
         case BASE_LAYER_SAVED:
-            var pavi_id = action.payload.pavi_id;
-            var base = action.payload.base;
-            var pavi = state.pavilions[pavi_id];
-            if(pavi){
-                state = Immutable.set(state, 'pavilions.'+pavi_id+'.base', base.id);
+            var base = action.payload;
+            if(state.pavilions[base.id]) {
                 state = Immutable.set(state, 'entities.bases.'+base.id, base);
-                if(state.selectedPavilion && pavi_id == state.selectedPavilion.id){
+                if(state.selectedPavilion && base.id == state.selectedPavilion.id)
                     state = Immutable.extend(state, 'selectedBaseLayer', base);
-                }
             }
             else {
                 state = Immutable.remove(state, 'entities.bases.'+base.id);
             }
-            
             return state;
+    }
+    return state;
+};
 
+var overlayReducer = function(state, action){
+    switch(action.type){
+        case OVERLAY_FEAT_ADD: 
+            var type = action.payload.type;
+            var feat = action.payload.feat;
+            feat = Immutable.set(feat, 'id', generateId(state, 'selectedOverlayLayer.'+type));
+            state = Immutable.set(state, 'selectedOverlayFeat', feat);
+            return Immutable.set(state, 'selectedOverlayLayer.'+type+'.'+feat.id, feat);
+
+        case OVERLAY_FEAT_UPDATE: 
+            var type = action.payload.type;
+            var feat = action.payload.feat;
+            return Immutable.set(state, 'selectedOverlayLayer.'+type+'.'+feat.id, feat);
+
+        case OVERLAY_FEAT_DELETE: 
+            var type = action.payload.type;
+            var feat = action.payload.feat;
+            return Immutable.remove(state, 'selectedOverlayLayer.'+type+'.'+feat.id);
+
+        case OVERLAY_FEAT_SELECT:
+            return Immutable.set(state, 'selectedOverlayFeat', action.payload);
+
+                    
+        case OVERLAY_SAVE:
+            var overlay = state.selectedOverlayLayer;
+            var pavi_id = state.selectedPavilion.id;
+            if(!overlay.id) {
+                overlay = Immutable.set(overlay, 'id', pavi_id);
+            }
+            state = Immutable.set(state, 'selectedOverlayLayer', overlay);
+            return Immutable.extend(state, 'entities.overlays', {id: overlay} );
     }
     return state;
 };
@@ -447,12 +504,18 @@ var mapReducer = function(state, action)
     switch(action.type){
         case DRAWING_MODE_SET:
             var mode = action.payload;
-            return Immutable.set(state, 'map.drawing_mode', mode);
+            return Immutable.set(state, 'map.drawingMode', mode);
 
     }
     return state;
 };
-var reducers = reduceReducers([pavilionReducer, baseReducer, mapReducer]);
+var reducers = reduceReducers([pavilionReducer, baseReducer, overlayReducer, mapReducer]);
+
+
+function generateId(state, path){
+    var ids = _.keys( Immutable.get(state, path) || {} );
+    return ids.length ? _.max(ids) + 1 : 1;
+}
 
 function RequestsMiddleware(store){
     return function(next){
@@ -496,18 +559,17 @@ function RequestsMiddleware(store){
                     break;
 
                 case BASE_LAYER_SAVE:
-                    var pavi_id = action.payload.pavi_id;
                     var base_layer = _.clone(action.payload.base);
                     delete base_layer['distance'];
                     delete base_layer['raw_svg'];
-                    d3.request('/pavilions/'+pavi_id+'/base/0')
+                    d3.request('/pavilions/'+base_layer.id+'/base/')
                         .mimeType("application/json")
                         .send('POST', JSON.stringify(base_layer), function(er, xhr){
                             if(er) store(ERROR_SET, er);
                             else {
                                 var res = JSON.parse(xhr.responseText);
                                 base_layer = _.extend({}, base_layer, res);
-                                store(BASE_LAYER_SAVED, {pavi_id:pavi_id, base: base_layer});
+                                store(BASE_LAYER_SAVED, base_layer);
                             }
                         });
 
@@ -651,18 +713,6 @@ function GridPanel(map){
 
 L.Browser.touch = false;
 
-var reducer = handle(
-    {
-        drawing_mode: null,
-    },
-    {
-        DRAWING_MODE_SET: function(state, action){
-            var mode = action.payload;
-            return _.extend({}, state, {drawing_mode: mode});
-        }
-    }
-);
-
 var Map = function(el, store)
 {
     map$1 = L.map(el, 
@@ -670,10 +720,7 @@ var Map = function(el, store)
         crs: L.CRS.Simple,
         zoomControl: false,
         attributionControl: false,
-        editable: true,
-            editOptions: {
-                skipMiddleMarkers: false
-            }
+        editable: true
     });
 
     gridPanel = GridPanel(map$1);
@@ -684,7 +731,6 @@ var Map = function(el, store)
     return map$1;
 };
 
-Map.reducer = reducer;
 
 var map$1  = null;
 var baseLayer$1 = null;
@@ -696,7 +742,7 @@ function updateBaseLayer(img)
         map$1.removeLayer(baseLayer$1);
         baseLayer$1 = null;
     }
-    if(img) {
+    if(img && img.url) {
         var bounds = updateBaseLayerSize(img.size_m);
         baseLayer$1 = L.imageOverlay(img.url, bounds).addTo(map$1);
         map$1.fitBounds(bounds);
@@ -843,13 +889,11 @@ function svgToBase64(svg_text)
     })    
 }
 
-//export function DistanceLine
-
 var uiMap = function(store, map){
 
     var line = null;
     var tooltip = null; 
-    store.on('map.drawing_mode', function(e)
+    store.on('map.drawingMode', function(e)
     {
         if(e.new_val == DRAW_DISTANCE)
         {
@@ -1010,6 +1054,202 @@ var BaseModule = function(store, map)
     uiMap(store, map);
 };
 
+/**
+ * Function for conversions feature and types into styles and objects of leaflets
+ */
+
+/**
+ * 
+ */
+
+var latLng = L.latLng;
+var polyline = L.polyline;
+var polygon = L.polygon;
+
+function toPolyline(line)
+{
+    var poly = polyline(toLatLngs(line.points), lineStyle(line));
+    poly.id = line.id;
+    poly.style = line.style;
+    return poly;
+}
+
+function toLine(polyline){
+    return {
+        points: toPoints(polyline.getLatLngs()),
+        id: polyline.id,
+        style: polyline.style
+    }
+}
+
+function toRect(carpet){
+    var poly = polygon(toLatLngs(carpet.points), rectStyle(carpet));
+    poly.id = line.id;
+    poly.style = line.style;
+    return poly;
+}
+
+function toCarpet(polygon){
+    return toLine(polygon);
+}
+
+
+function toLatLngs(points) {
+    return points.map(function(p){ return  latLng(p[1], p[0])});
+}
+
+function toPoints(latLngs){
+    return latLngs.map(function(ll){ return [ll.lng, ll.lat] });
+}
+
+
+function lineStyle(line){
+    return {weight:2, color: 'red'}
+}
+
+function rectStyle(rect){
+    return {weight:2, color: 'red'}
+}
+
+var Evented = L.Evented;
+var extend = L.extend;
+
+function editFeat(type) 
+{
+    var feat = null;
+    var map = null;
+    function enter(m) {
+        map = m;
+        feat = (type == 'lines') ? map.editTools.startPolyline(undefined) : map.editTools.startRectangle(undefined);
+        feat.once('editable:drawing:commit', onCommit);
+    }
+
+    function exit(){
+        if(feat) {
+            feat.disableEdit();
+            map.removeLayer(feat);
+            feat = null;
+        }
+    }
+
+    var e = extend( new Evented(), {enter:enter, exit:exit} );
+
+    function onCommit(){
+        var f = feat;
+        exit();
+        e.fire("new-feat", {feat:f, cat:type});
+    }
+
+    return e;
+}
+
+function editNote() {
+    function enter() {
+
+    }
+
+    function exit(){
+
+    }
+    return extend( new Evented(), {enter:enter, exit:exit} );
+}
+
+var m2e = {};
+m2e[DRAW_WALL] = editFeat('lines');
+m2e[DRAW_RECT] = editFeat('rects');
+m2e[DRAW_NOTE] = editNote();
+
+var mode2editor = m2e;
+
+/**
+ * 
+ *  overlay state 
+ * {
+ *      lines: {
+ *          "id1": { points: [], style: {} },
+ *          "id2": { points: [], style: {} },
+ *      },
+ *      rects: {
+ *          "id1": { points: [], style: {} },
+ *          "id2": { points: [], style: {} },
+ *      },
+ *      notes: {
+ *          "id1": { topleft: [], rotate: number, text: string, style: {} },
+ *          "id2": { topleft: [], rotate: number, text: string, style: {} }
+ *      }
+ * }
+ * 
+ *  
+ */
+
+var selfcheck = Selfcheck();
+
+function uiMap$1(store, map)
+{
+    var lineGroup = L.featureGroup().addTo(map);
+    var rectGroup = L.featureGroup().addTo(map);
+    var noteGroup = L.featureGroup().addTo(map);
+    var selectedFeature = null;
+    var editor = null;
+
+
+    lineGroup.on('click', _.partial(onFeatureClick, 'lines'));
+    rectGroup.on('click', _.partial(onFeatureClick, 'rects'));
+    noteGroup.on('click', _.partial(onFeatureClick, 'notes'));
+
+    function onSelectOverlay(e){
+        lineGroup.clearLayers();
+        rectGroup.clearLayers();
+        noteGroup.clearLayers();
+        if(e.new_val) {
+            var overlay = e.new_val;
+            _.each(overlay.lines || {}, function(line){
+                lineGroup.addLayers( toPolyline(line) );
+            });
+            _.each(overlay.rects || {}, function(rect){
+                lineGroup.addLayers( toRect(rect) );
+            });
+        }
+    }
+
+    function onNewFeature(e){
+        var obj = null;
+        switch(e.cat){
+            case 'lines':
+                obj = toLine(e.feat);
+                lineGroup.addLayer(e.feat);
+                break;
+            case 'rects':
+                obj = toCarpet(e.feat);
+                rectGroup.addLayer(e.feat);
+                break;
+            case 'notes':
+                noteGroup.addLayer(e.feat);
+                break;
+        }
+        store(OVERLAY_FEAT_ADD, {type: e.cat, feat: obj});
+        store(DRAWING_MODE_SET,null);
+    }
+
+    function onFeatureClick(cat, e)
+    {
+        if(selectedFeature == e.layer)
+            return;
+        if(selectedFeature) 
+            selectedFeature.disableEdit();
+        selectedFeature = e.layer;
+        selectedFeature.enableEdit(map);
+    }
+
+    _.values(mode2editor).forEach(function(it) { it.on('new-feat', selfcheck(onNewFeature)); });
+    store.on('selectedOverlayLayer', selfcheck(onSelectOverlay));
+    store.on('map.drawingMode', function(e){
+        if(editor) editor.exit();
+        editor = mode2editor[e.new_val];
+        if(editor) editor.enter(map);
+    });
+}
+
 function uiView$1(store)
 {
     var SEL = {
@@ -1035,13 +1275,14 @@ function uiView$1(store)
         }
     });
 
-    store.on('map.drawing_mode', function(e){
+    store.on('map.drawingMode', function(e){
         vm.sel = _.findKey(SEL, function(it) { return it == e.new_val});
     });
 }
 
 var OverlaysModule = function(store, map){
     uiView$1(store);
+    uiMap$1(store, map);
 };
 
 initComponents();

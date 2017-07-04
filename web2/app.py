@@ -37,7 +37,7 @@ def pavilion_update(id, pavi):
     with pavilions() as pavis:
         if id == 0 or id == '0':
             pavilion = {}
-            id = str(int(max(pavis.keys())) + 1) if pavis else 1
+            id = str(int(max(pavis.keys())) + 1) if pavis else '1'
         else:
             pavilion = pavis.get(id, {})
         pavilion = dict(pavilion, **pavi)
@@ -72,6 +72,7 @@ def base_layers_by_id(id):
 def base_layers_delete(id):
     if id is None:
         return
+    id = str(id)
     with base_layers() as layers:
         layers = {k: v for k, v in layers.items() if k != id }
         with codecs.open(base_json, 'w', 'utf-8') as json_file:
@@ -81,7 +82,7 @@ def base_layers_update(id, new_base):
     with base_layers() as layers:
         if id == 0 or id == '0':
             base = {}
-            id = str(int(max(layers.keys())) + 1) if layers else 1
+            id = str(int(max(layers.keys())) + 1) if layers else '1'
         else:
             base = layers.get(id, {})
         base = dict(base, **new_base)
@@ -136,20 +137,18 @@ def update_pavilion(id):
 
 @app.route('/pavilions/<id>|delete', methods=['POST'])
 def delete_pavilion(id):
-    pavi = pavilion_by_id(id)
-    base_layers_delete(pavi.get('base'))
+    base_layers_delete(id)
     pavilion_delete(id)
     return "ok"
 
 
-@app.route('/pavilions/<pavi_id>/base/<base_id>', methods=['POST'])
-def update_base(pavi_id, base_id):
+@app.route('/pavilions/<id>/base/', methods=['POST'])
+def update_base(id):
     base = json.loads(request.data)
-    pavi = pavilion_by_id(pavi_id)
+    pavi = pavilion_by_id(id)
     if not pavi:
-        return "Pavilion not found {}".format(pavi_id), 404
-    base = base_layers_update(base_id, base)
-    pavilion_update(pavi_id, {"base": base['id']})
+        return "Pavilion not found {}".format(id), 404
+    base = base_layers_update(id, base)
     return flask.jsonify({"id": base['id']})
 
 @app.route('/bases/')

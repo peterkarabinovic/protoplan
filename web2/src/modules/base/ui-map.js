@@ -10,7 +10,7 @@ export default function(store, map){
 
     var line = null;
     var tooltip = null; 
-    store.on('map.drawing_mode', function(e)
+    store.on('map.drawingMode', function(e)
     {
         if(e.new_val == DRAW_DISTANCE)
         {

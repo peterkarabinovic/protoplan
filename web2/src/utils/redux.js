@@ -40,7 +40,8 @@ export function Store(reducers, middleware)
     s.dispatch = function(action){
         var old_state = s.state;
         s.state = reducers(s.state, action);
-        find_and_fire(s.state, old_state, _.clone(listeners), [])
+        if(s.state !== old_state)
+            find_and_fire(s.state, old_state, _.clone(listeners), [])
         return s.state;
     }
 

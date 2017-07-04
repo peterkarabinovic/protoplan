@@ -51,18 +51,17 @@ export default function RequestsMiddleware(store){
                     break;
 
                 case BASE_LAYER_SAVE:
-                    var pavi_id = action.payload.pavi_id;
                     var base_layer = _.clone(action.payload.base);
                     delete base_layer['distance'];
                     delete base_layer['raw_svg'];
-                    d3.request('/pavilions/'+pavi_id+'/base/0')
+                    d3.request('/pavilions/'+base_layer.id+'/base/')
                         .mimeType("application/json")
                         .send('POST', JSON.stringify(base_layer), function(er, xhr){
                             if(er) store(ERROR_SET, er)
                             else {
                                 var res = JSON.parse(xhr.responseText);
                                 base_layer = _.extend({}, base_layer, res);
-                                store(BASE_LAYER_SAVED, {pavi_id:pavi_id, base: base_layer})
+                                store(BASE_LAYER_SAVED, base_layer)
                             }
                         })
 

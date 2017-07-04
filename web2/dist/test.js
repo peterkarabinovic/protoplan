@@ -23,6 +23,11 @@ function memorize(f) {
  *  Either monad
  */
 
+
+/***
+ * Immutable 
+ */
+
 function GridPanel(map){
 
     var map_size = map._container.getBoundingClientRect();

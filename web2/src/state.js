@@ -9,12 +9,12 @@ export default {
 
     },
     map: {
-        drawing_mode: undefined,
+        drawingMode: undefined,
     },
     selectedPavilion: undefined,
     selectedBaseLayer: undefined,
     selectedOverlayLayer: undefined,
-    selectedOverlayFeature: undefined,
+    selectedOverlayFeat: undefined,
     entities: {
         bases: {}, // base layers,
         overlays: {}, // additinal layers
@@ -35,6 +35,7 @@ function entity(type, store, id)
 }
 
 export var baseById = _.partial(entity, 'bases');
+export var overlayById = _.partial(entity, 'overlays');
 
 export function selectedPavilion(store){
     return store.state.selectedPavilion;
@@ -44,6 +45,12 @@ export function baseLayer(store) {
     var pavi = selectedPavilion(store);
     return  pavi && pavi.base &&  baseById(store, pavi.base) || {};
 }
+
+export function overlayLayer(store) {
+    var pavi = selectedPavilion(store);
+    return  pavi && pavi.overlay &&  overlayById(store, pavi.overlay) || {};
+}
+
 
 export function selectedBaseLayer(store) {
     return store.state.selectedBaseLayer  || {};

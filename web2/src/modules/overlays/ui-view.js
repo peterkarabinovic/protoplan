@@ -1,5 +1,6 @@
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
+import uiMap from './ui-map.js'
 
 
 function uiView(store)
@@ -27,11 +28,12 @@ function uiView(store)
         }
     })
 
-    store.on('map.drawing_mode', function(e){
+    store.on('map.drawingMode', function(e){
         vm.sel = _.findKey(SEL, function(it) { return it == e.new_val});
     });
 }
 
 export default function(store, map){
     uiView(store);
+    uiMap(store, map);
 }

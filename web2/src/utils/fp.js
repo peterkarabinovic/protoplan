@@ -77,5 +77,22 @@ export var Immutable = (function(){
     i.remove = function(obj, path){
         return update(obj, path, null, 'remove');
     }
+
+    i.get = function(obj, path){
+        if(!_.isArray(path))
+            path = path.split('.');
+        if(_.isUndefined(obj))
+            return obj;
+
+        if(path.length == 1){
+            return obj[path[0]];
+        }
+        else {
+            var prop = path[0];
+            var prop_val = obj[prop];
+            return i.get(prop_val, path.slice(1));
+        }
+
+    }
     return i;
 })();
