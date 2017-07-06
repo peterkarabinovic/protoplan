@@ -5,6 +5,14 @@ styles for overlay:
 2. carpet N
 3. note N
 
+
+## Map
+
+### map
+in: map.size_m
+
+рассчитывает transformation и рисует грид
+
 ## Base
 
 ### base-view
@@ -17,15 +25,18 @@ in: selectedBase
 
 
 ### base-map-distance
-in/out: selectedBase
+in/out: selectedBase.distance
 
 
 ## Overlay
 
 ### overlay-view
 in: selectedOVerlay, config.json, overlay-ui: {selectedWallStyle, selectedCarpetStyle, selectedNoteSyle}
+
 out: map.drawMap
+
 включает режимы рисования - wall, caret, note
+
 выбирает-устанавливает styles for wall, carpet, note
 
 ### overlay-map-view

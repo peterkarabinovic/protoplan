@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title></title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="css/w3.css" rel="stylesheet">
+        <link href="css/w3-theme-blue-grey.css" rel="stylesheet">
+        <link href="css/leaflet.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+        <style>
+            #map {
+                position: absolute;
+                top: 14px; left: 54px; width: 800px; height: 600px;
+            }
+            #form{
+                position: absolute;
+                top: 654px; left: 54px; width: 800px;
+            }
+            .axis line, .grid line { 
+                fill: none;
+                stroke: grey;
+                stroke-width: 1;
+                stroke-opacity: 0.3;
+                shape-rendering: crispEdges;
+            }   
+            .pointer{
+                cursor: pointer;
+            }
+            .active, .text-danger{
+                color: red;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="map">
+            
+        </div>
+        <div id='form'>
+            <div class="w3-row">
+                <i class="material-icons pointer" :class="cssClass('line')" @click='select("line")'>timeline</i>
+                <i class="material-icons pointer" :class="cssClass('rect')" @click='select("rect")'>receipt</i>
+                <i class="material-icons pointer" :class="cssClass('note')" @click='select("note")'>note</i>
+            </div>   
+
+        </div>
+        <script src='libs/underscore.js'></script>
+        <script src='libs/leaflet.js'></script>
+        <script src='libs/Leaflet.Editable.js'></script>
+        <script src='libs/d3.js'></script>
+        <script src='libs/vue.js'></script>
+        <script src='dist/test.js'></script>
+        
+    </body>
+</html>

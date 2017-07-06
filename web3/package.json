@@ -1,0 +1,20 @@
+{
+  "name": "web",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build-libs": "uglifyjs -c \"evaluate=false\" --warm -m -o dist/libs.js libs/underscore.js libs/d3.js libs/leaflet.js libs/vue.js libs/Leaflet.Editable.js libs/canvas-layer.js",
+    "build": "npm run build-libs && rollup src/index.js -w -f iife -o dist/index.js ",
+    "dev": "rollup src/index.js -w -f iife -o dist/index.js",
+    "test": "rollup src/test.js -w -f iife -o dist/test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "rollup": "^0.43.0",
+    "rollup-watch": "^4.0.0",
+    "uglify-js": "^3.0.20"
+  }
+}
