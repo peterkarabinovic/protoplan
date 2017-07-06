@@ -31,7 +31,7 @@ export default {
                 carpet: 1,
                 note: 1
             },
-            feat: null
+            feat: undefined
         }
     }
 }
@@ -68,6 +68,9 @@ export function selectedOverlay(store) {
     return store.state.selectedBase  || {};
 }
 
+export function selectedOverlayId(store) {
+    return (selectedOverlay(store).id || -1).toString();
+}
 
 
 export function wallType(store) {

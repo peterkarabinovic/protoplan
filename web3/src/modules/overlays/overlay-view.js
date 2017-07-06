@@ -3,6 +3,10 @@ import * as a from '../../actions.js'
 import uiMap from './ui-map.js'
 import {wallType, carpetType, noteType} from '../../state.js' 
 
+import OverlayMapView from './overlay-map-view.js'
+import OverlaySelectTools from './overlay-select-tools.js'
+import OverlayDrawing from './overlay-drawing.js'
+
 
 function OverlayView(config, store)
 {
@@ -50,5 +54,7 @@ function OverlayView(config, store)
 
 export default function(config, store, map){
     OverlayView(config, store);
-    uiMap(store, map);
+    var omv = OverlayMapView(config, store, map);
+    OverlaySelectTools(config, store, map, omv);
+    OverlayDrawing(store, map);
 }

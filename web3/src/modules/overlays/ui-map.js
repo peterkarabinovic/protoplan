@@ -2,7 +2,7 @@
 import {Selfcheck} from './../../utils/utils.js'
 import * as m from '../../map/modes.js'
 import * as p from './primitives.js'
-import * as a from '../../actions.js'
+    import * as a from '../../actions.js'
 import {mode2editor} from './editors.js'
 /**
  * 

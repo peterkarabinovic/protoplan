@@ -51,13 +51,12 @@ in: selectedOverlay, config.json, ui.overlay.feat
 рисует overlay и feat
 
 ### overlay-select-tools
-in: lineGroup, rectGroup, noteGroup, ui.overlay.feat
+in: overlayMapView, ui.overlay.feat
 выбирает обьект и выводит toolbar
 
 ### overlay-edit
 in: selectedOverlay, map.drawMap
-out: selectedOverlayFeat
-создает новый Feature и устанавливает как selected
+создает новый Feature 
 
 ## Equipments
 

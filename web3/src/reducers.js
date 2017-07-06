@@ -1,5 +1,6 @@
 import {Immutable} from './utils/fp.js'
 import {reduceReducers} from './utils/redux.js'
+import {str} from './utils/utils.js'
 import * as a from './actions.js'
 
 
@@ -108,7 +109,7 @@ var overlayReducer = function(state, action){
             var cat = action.payload.cat;
             var feat = action.payload.feat;
             feat = Immutable.set(feat, 'id', generateId(state, 'selectedOverlay.'+cat))
-            state = Immutable.set(state, 'ui.overlay.feat', feat);
+            state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat));
             return Immutable.set(state, 'selectedOverlay.'+cat+'.'+feat.id, feat);
 
         case a.OVERLAY_FEAT_UPDATE: 
@@ -117,12 +118,15 @@ var overlayReducer = function(state, action){
             return Immutable.set(state, 'selectedOverlay.'+type+'.'+feat.id, feat);
 
         case a.OVERLAY_FEAT_DELETE: 
-            var type = action.payload.type;
-            var feat = action.payload.feat;
-            return Immutable.remove(state, 'selectedOverlay.'+type+'.'+feat.id);
+            var feat_id = state.ui.overlay.feat,
+                p = feat_id.split('.'),
+                cat = p[0],
+                id = +p[1];
+            state = Immutable.remove(state, 'selectedOverlay.'+cat+'.'+id);
+            return Immutable.remove(state, 'ui.overlay.feat');
 
         case a.OVERLAY_FEAT_SELECT:
-            return Immutable.set(state, 'ui.overlay.selectedFeat', action.payload);
+            return Immutable.set(state, 'ui.overlay.feat', action.payload);
 
                     
         case a.OVERLAY_SAVE:
