@@ -15,7 +15,7 @@ export function initComponents()
 
         data: function(){
             return {
-                is_open: this.open !== 'false'
+                is_open: this.open == 'true'
             }
         },
         computed: {

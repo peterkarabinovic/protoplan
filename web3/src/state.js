@@ -13,9 +13,8 @@ export default {
         size_m: undefined
     },
     selectedPavilion: undefined,
-    selectedBaseLayer: undefined,
-    selectedOverlayLayer: undefined,
-    selectedOverlayFeat: undefined,
+    selectedBase: undefined,
+    selectedOverlay: undefined,
     entities: {
         bases: {}, // base layers,
         overlays: {}, // additinal layers
@@ -25,7 +24,15 @@ export default {
         equipments: {} 
     },
     ui: {
-        error: ''
+        error: '',
+        overlay: {
+            types: {
+                wall: 1,
+                carpet: 1,
+                note: 1
+            },
+            feat: null
+        }
     }
 }
 
@@ -53,6 +60,22 @@ export function overlayLayer(store) {
 }
 
 
-export function selectedBaseLayer(store) {
-    return store.state.selectedBaseLayer  || {};
+export function selectedBase(store) {
+    return store.state.selectedBase  || {};
+}
+
+export function selectedOverlay(store) {
+    return store.state.selectedBase  || {};
+}
+
+
+
+export function wallType(store) {
+    return store.state.ui.overlay.type.wall;
+}
+export function carpetType(store) {
+    return store.state.ui.overlay.type.carpet;
+}
+export function noteType(store) {
+    return store.state.ui.overlay.type.note;
 }

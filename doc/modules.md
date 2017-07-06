@@ -16,7 +16,11 @@ in: map.size_m
 ## Base
 
 ### base-view
-in/out: selectedBase
+in: selectedBase
+
+out: map.drawMode,
+     selectedBase
+
 form for edit width/heigth, distance length and choose file
 
 ### base-map-view
@@ -25,13 +29,15 @@ in: selectedBase
 
 
 ### base-map-distance
-in/out: selectedBase.distance
+in: map.drawMode, selectedBase.size_m
+out: selectedBase.distance
+рисует линию и обновляет ее tooltip
 
 
 ## Overlay
 
 ### overlay-view
-in: selectedOVerlay, config.json, overlay-ui: {selectedWallStyle, selectedCarpetStyle, selectedNoteSyle}
+in: selectedOVerlay, config.json, ui.overlay: {wallStyle, carpetStyle, noteSyle}
 
 out: map.drawMap
 
@@ -39,14 +45,14 @@ out: map.drawMap
 
 выбирает-устанавливает styles for wall, carpet, note
 
-### overlay-map-view
-in: selectedOverlay, config.json
-out: selectedOverlayFeat
-рисует и выбирает feature 
 
-### overlay-tools
-in: selectedOverlay, selectedOverlayFeat
-выводит toolbar для выбранного объекта
+### overlay-map-view
+in: selectedOverlay, config.json, ui.overlay.feat
+рисует overlay и feat
+
+### overlay-select-tools
+in: lineGroup, rectGroup, noteGroup, ui.overlay.feat
+выбирает обьект и выводит toolbar
 
 ### overlay-edit
 in: selectedOverlay, map.drawMap

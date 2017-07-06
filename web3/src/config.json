@@ -1,0 +1,30 @@
+export default
+{
+    "overlay": {
+        "types": {
+            "wall": {
+                "1": {
+                    "name": "Тонкая стена",
+                    "style": {"weight":2, "color": "green"}
+                },
+                "2": {
+                    "name": "Толстая стена",
+                    "style": {"weight":8, "color": "green"}
+                }
+            },
+            "carpet": {
+                "1": {
+                    "name": "Ковер персидский",
+                    "style": {"stroke":false, "fillOpacity": "0.5", "fillColor": "#a25203" }
+                },
+                "2": {
+                    "name": "Ковер модерн",
+                    "style": {"stroke":false, "fillOpacity": "0.5", "fillColor": "grey  " }
+                }
+            },
+            "note": {
+
+            }
+        }
+    }
+}

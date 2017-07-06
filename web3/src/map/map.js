@@ -5,7 +5,7 @@ import {handle} from '../utils/redux.js'
 
 L.Browser.touch = false;
 
-var Map = function(el, store)
+export default function(el, store)
 {
     map = L.map(el, 
     {
@@ -18,33 +18,14 @@ var Map = function(el, store)
     gridPanel = GridPanel(map);
 
     // State changes
-    store.on('selectedBaseLayer', function(e) { updateBaseLayer(e.new_val); });
-    store.on('selectedBaseLayer.size_m', function(e) { updateBaseLayerSize(e.new_val); });
+    store.on('map.size_m', function(e) { updateMapSize(e.new_val); });
     return map;
 }
 
-
-export default Map;
-
-
 var map  = null;
-var baseLayer = null;
 var gridPanel = null;
 
-function updateBaseLayer(img)
-{
-    if(baseLayer) {
-        map.removeLayer(baseLayer);
-        baseLayer = null;
-    }
-    if(img && img.url) {
-        var bounds = updateBaseLayerSize(img.size_m);
-        baseLayer = L.imageOverlay(img.url, bounds).addTo(map);
-        map.fitBounds(bounds);
-    }
-}
-
-function updateBaseLayerSize(size_m)
+function updateMapSize(size_m)
 {
     if(!size_m) return;
     var map_size = {x: map._container.offsetWidth, y: map._container.offsetHeight};
@@ -56,7 +37,6 @@ function updateBaseLayerSize(size_m)
     if(_.isUndefined(map.getZoom()))
         map.fitBounds(bounds);
     gridPanel(size_m);
-    if(baseLayer)
-        baseLayer.setBounds(bounds);
     return bounds;
 }
+

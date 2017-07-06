@@ -9,16 +9,16 @@ import {mode2editor} from './editors.js'
  *  overlay state 
  * {
  *      lines: {
- *          "id1": { points: [], style: {} },
- *          "id2": { points: [], style: {} },
+ *          "id1": { points: [], type: {} },
+ *          "id2": { points: [], type: {} },
  *      },
  *      rects: {
- *          "id1": { points: [], style: {} },
- *          "id2": { points: [], style: {} },
+ *          "id1": { points: [], type: {} },
+ *          "id2": { points: [], type: {} },
  *      },
  *      notes: {
- *          "id1": { topleft: [], rotate: number, text: string, style: {} },
- *          "id2": { topleft: [], rotate: number, text: string, style: {} }
+ *          "id1": { topleft: [], rotate: number, text: string, type: {} },
+ *          "id2": { topleft: [], rotate: number, text: string, type: {} }
  *      }
  * }
  * 
@@ -70,7 +70,7 @@ export default function uiMap(store, map)
                 noteGroup.addLayer(e.feat);
                 break;
         }
-        store(a.OVERLAY_FEAT_ADD, {type: e.cat, feat: obj});
+        store(a.OVERLAY_FEAT_ADD, {cat: e.cat, feat: obj});
         store(a.DRAWING_MODE_SET,null);
     }
 
@@ -85,7 +85,7 @@ export default function uiMap(store, map)
     }
 
     _.values(mode2editor).forEach(function(it) { it.on('new-feat', selfcheck(onNewFeature)); })
-    store.on('selectedOverlayLayer', selfcheck(onSelectOverlay));
+    store.on('selectedOverlay', selfcheck(onSelectOverlay));
     store.on('map.drawingMode', function(e){
         if(editor) editor.exit();
         editor = mode2editor[e.new_val];

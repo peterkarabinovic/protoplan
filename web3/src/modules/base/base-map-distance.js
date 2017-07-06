@@ -1,10 +1,9 @@
 
 import {DRAW_DISTANCE} from '../../map/modes.js'
-import {selectedBaseLayer} from '../../state.js'
+import {selectedBase} from '../../state.js'
 import {BASE_DISTANCE_SET, DRAWING_MODE_SET} from '../../actions.js'
 
 
-//export function DistanceLine
 
 export default function(store, map){
 
@@ -23,7 +22,7 @@ export default function(store, map){
         }
     });
 
-    store.on('selectedBaseLayer.distance', function(e){
+    store.on('selectedBase.distance', function(e){
         if(!e.new_val || !e.new_val.points) {
             if(line) {
                 map.removeLayer(line);
@@ -32,16 +31,16 @@ export default function(store, map){
         }
     });
 
-    store.on('selectedBaseLayer.size_m', function(e){
+    store.on('selectedBase.size_m', function(e){
         if(!line || !e.new_val) return
-        var points = selectedBaseLayer(store).distance.points;
+        var points = selectedBase(store).distance.points;
         var latLngs = points.map(function(it){
             return map.unproject(it,1);
         });
         line.disableEdit()
         line.setLatLngs(latLngs);
         line.enableEdit(map);
-        updateTooltip(selectedBaseLayer(store).distance.length_m)
+        updateTooltip(selectedBase(store).distance.length_m)
     });
 
     function on_edit(event)

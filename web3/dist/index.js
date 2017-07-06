@@ -1,6 +1,36 @@
 (function () {
 'use strict';
 
+var config = {
+    "overlay": {
+        "types": {
+            "wall": {
+                "1": {
+                    "name": "Тонкая стена",
+                    "style": {"weight":2, "color": "green"}
+                },
+                "2": {
+                    "name": "Толстая стена",
+                    "style": {"weight":8, "color": "green"}
+                }
+            },
+            "carpet": {
+                "1": {
+                    "name": "Ковер персидский",
+                    "style": {"stroke":false, "fillOpacity": "0.5", "fillColor": "#a25203" }
+                },
+                "2": {
+                    "name": "Ковер модерн",
+                    "style": {"stroke":false, "fillOpacity": "0.5", "fillColor": "grey  " }
+                }
+            },
+            "note": {
+
+            }
+        }
+    }
+};
+
 /**
  * 
  * @param {function} reducers - reduce state function 
@@ -43,7 +73,7 @@ function Store(reducers, middleware)
         var old_state = s.state;
         s.state = reducers(s.state, action);
         if(s.state !== old_state)
-            find_and_fire(s.state, old_state, _.clone(listeners), []);
+            find_and_fire([], s.state, old_state, listeners);
         return s.state;
     };
 
@@ -62,30 +92,68 @@ function Store(reducers, middleware)
  * @param {*} listeners 
  * @param {*} path 
  */
-function find_and_fire(new_obj, old_obj, listeners, path)
-{
-    if( _.isEmpty(listeners) )
-        return
+// function find_and_fire(path, new_obj, old_obj, listeners)
+// {
+//     if( _.isEmpty(listeners) )
+//         return
 
-    new_obj = new_obj || {};
-    old_obj = old_obj || {};
+//     new_obj = new_obj || {};
+//     old_obj = old_obj || {};
        
-    var props = diffs(new_obj, old_obj);    
-    var max_level = +_.max(_.keys(listeners));
-    props.forEach(function(prop){
-        var o1 = new_obj[prop];
-        var o2 = old_obj[prop];
-        var p = path.concat([prop]);
-        listeners = reject_array_prop(listeners, p.length, function(it){
-            if(_match(p, it.path)) {
-                it.fn({new_val: o1, old_val: o2, path: p});
-                return !_.contains(it.path, '*');
-            }
-            return false;
-        });
-        if(max_level > p.length)
-            find_and_fire(o1, o2, listeners, p);
-    });
+//     var props = diffs(new_obj, old_obj);    
+//     var max_level = +_.max(_.keys(listeners));
+//     props.forEach(function(prop){
+//         var o1 = new_obj[prop];
+//         var o2 = old_obj[prop];
+//         var p = path.concat([prop]);
+//         listeners = reject_array_prop(listeners, p.length, function(it){
+//             if(_match(p, it.path)) {
+//                 it.fn({new_val: o1, old_val: o2, path: p});
+//                 return !_.contains(it.path, '*');
+//             }
+//             return false;
+//         });
+//         if(max_level > p.length)
+//             find_and_fire(p, o1, o2, listeners);
+//     });
+// }
+
+
+function find_and_fire(path, new_obj, old_obj, listeners)
+{
+    var visits = [ [path, new_obj, old_obj] ];
+    var listeners_copy = null;
+
+    while(visits.length) 
+    {
+        var v = visits.shift(),
+            path = v[0],
+            new_obj = v[1] || {},
+            old_obj = v[2] || {};
+
+        var props = diffs(new_obj, old_obj);
+        if(props.length) { 
+            listeners_copy = listeners_copy || _.clone(listeners);   
+            var max_level = +_.max(_.keys(listeners_copy));
+            props.forEach(function(prop){
+                var o1 = new_obj[prop];
+                var o2 = old_obj[prop];
+                var p = path.concat([prop]);
+                listeners_copy = reject_array_prop(listeners_copy, p.length, function(it){
+                    if(_match(p, it.path)) {
+                        it.fn({new_val: o1, old_val: o2, path: p});
+                        return !_.contains(it.path, '*');
+                    }
+                    return false;
+                });
+                if(max_level > p.length)
+                    visits.push([p, o1, o2]);
+            });
+        }
+        if(_.isEmpty(listeners_copy))
+            return;
+    }
+       
 }
 
 function reject_array_prop(obj, prop, reject_fn){
@@ -183,7 +251,7 @@ function initComponents()
 
         data: function(){
             return {
-                is_open: this.open !== 'false'
+                is_open: this.open == 'true'
             }
         },
         computed: {
@@ -209,11 +277,11 @@ var initState = {
     },
     map: {
         drawingMode: undefined,
+        size_m: undefined
     },
     selectedPavilion: undefined,
-    selectedBaseLayer: undefined,
-    selectedOverlayLayer: undefined,
-    selectedOverlayFeat: undefined,
+    selectedBase: undefined,
+    selectedOverlay: undefined,
     entities: {
         bases: {}, // base layers,
         overlays: {}, // additinal layers
@@ -223,7 +291,15 @@ var initState = {
         equipments: {} 
     },
     ui: {
-        error: ''
+        error: '',
+        overlay: {
+            types: {
+                wall: 1,
+                carpet: 1,
+                note: 1
+            },
+            feat: null
+        }
     }
 };
 
@@ -248,8 +324,22 @@ function baseLayer(store) {
 
 
 
-function selectedBaseLayer(store) {
-    return store.state.selectedBaseLayer  || {};
+function selectedBase(store) {
+    return store.state.selectedBase  || {};
+}
+
+
+
+
+
+function wallType(store) {
+    return store.state.ui.overlay.type.wall;
+}
+function carpetType(store) {
+    return store.state.ui.overlay.type.carpet;
+}
+function noteType(store) {
+    return store.state.ui.overlay.type.note;
 }
 
 /**
@@ -380,6 +470,17 @@ var OVERLAY_SAVE = 'OVERLAY_SAVE';
 
 var ERROR_SET = 'ERROR_SET';
 
+var mapReducer = function(state, action)
+{
+    switch(action.type){
+        case DRAWING_MODE_SET:
+            var mode = action.payload;
+            return Immutable.set(state, 'map.drawingMode', mode);
+
+    }
+    return state;
+};
+
 var pavilionReducer = function(state, action)
 {
     switch(action.type)
@@ -396,7 +497,7 @@ var pavilionReducer = function(state, action)
             }
             if(state.selectedPavilion && state.selectedPavilion.id == pavi_id) {
                 state = Immutable.set(state, 'selectedPavilion');
-                state = Immutable.set(state, 'selectedBaseLayer');
+                state = Immutable.set(state, 'selectedBase');
             }
             return state;
 
@@ -404,7 +505,7 @@ var pavilionReducer = function(state, action)
             var pavi = action.payload;
             state = Immutable.set(state, 'pavilions.'+pavi.id, pavi);
             state = Immutable.set(state, 'selectedPavilion', pavi);
-            state = Immutable.set(state, 'selectedBaseLayer', {id:pavi.id});
+            state = Immutable.set(state, 'selectedBase', {id:pavi.id});
             return state;
 
         case PAVILION_SELECT:
@@ -412,7 +513,10 @@ var pavilionReducer = function(state, action)
             state = Immutable.set(state, 'selectedPavilion', pavi);
             if(pavi) {
                 var base = state.entities.bases[pavi.id] || {id: pavi.id};
-                state = Immutable.set(state, 'selectedBaseLayer', base);
+                state = Immutable.set(state, 'selectedBase', base);
+                state = Immutable.set(state, 'map.size_m', base.size_m);
+                var overlay = state.entities.overlays[pavi.id] || {id:pavi.id};
+                state = Immutable.set(state, 'selectedOverlay', base);
             }
             return state;
             
@@ -431,29 +535,31 @@ var baseReducer = function(state, action)
 
         case BASE_LAYER_SET: 
             var base = action.payload;
-            return Immutable.extend(state, 'selectedBaseLayer', base);
+            state = Immutable.extend(state, 'selectedBase', base);
+            return Immutable.set(state, 'map.size_m', base.size_m);
         
         case BASE_DISTANCE_LENGTH_SET:
             var length_m = action.payload;
-            var ratio =  length_m / state.selectedBaseLayer.distance.length_m;
-            var size_m = state.selectedBaseLayer.size_m;
+            var ratio =  length_m / state.selectedBase.distance.length_m;
+            var size_m = state.selectedBase.size_m;
             size_m = {
                 x: size_m.x * ratio,
                 y: size_m.y * ratio
             };
-            state = Immutable.set(state, 'selectedBaseLayer.size_m', size_m );
-            return Immutable.set(state, 'selectedBaseLayer.distance.length_m', length_m);             
+            state = Immutable.set(state, 'map.size_m', size_m);
+            state = Immutable.set(state, 'selectedBase.size_m', size_m );
+            return Immutable.set(state, 'selectedBase.distance.length_m', length_m);             
         
         case BASE_DISTANCE_SET: 
             var distance = action.payload;
-            return Immutable.set(state, 'selectedBaseLayer.distance', distance);
+            return Immutable.set(state, 'selectedBase.distance', distance);
 
         case BASE_LAYER_SAVED:
             var base = action.payload;
             if(state.pavilions[base.id]) {
                 state = Immutable.set(state, 'entities.bases.'+base.id, base);
                 if(state.selectedPavilion && base.id == state.selectedPavilion.id)
-                    state = Immutable.extend(state, 'selectedBaseLayer', base);
+                    state = Immutable.extend(state, 'selectedBase', base);
             }
             else {
                 state = Immutable.remove(state, 'entities.bases.'+base.id);
@@ -466,50 +572,41 @@ var baseReducer = function(state, action)
 var overlayReducer = function(state, action){
     switch(action.type){
         case OVERLAY_FEAT_ADD: 
-            var type = action.payload.type;
+            var cat = action.payload.cat;
             var feat = action.payload.feat;
-            feat = Immutable.set(feat, 'id', generateId(state, 'selectedOverlayLayer.'+type));
-            state = Immutable.set(state, 'selectedOverlayFeat', feat);
-            return Immutable.set(state, 'selectedOverlayLayer.'+type+'.'+feat.id, feat);
+            feat = Immutable.set(feat, 'id', generateId(state, 'selectedOverlay.'+cat));
+            state = Immutable.set(state, 'ui.overlay.feat', feat);
+            return Immutable.set(state, 'selectedOverlay.'+cat+'.'+feat.id, feat);
 
         case OVERLAY_FEAT_UPDATE: 
             var type = action.payload.type;
             var feat = action.payload.feat;
-            return Immutable.set(state, 'selectedOverlayLayer.'+type+'.'+feat.id, feat);
+            return Immutable.set(state, 'selectedOverlay.'+type+'.'+feat.id, feat);
 
         case OVERLAY_FEAT_DELETE: 
             var type = action.payload.type;
             var feat = action.payload.feat;
-            return Immutable.remove(state, 'selectedOverlayLayer.'+type+'.'+feat.id);
+            return Immutable.remove(state, 'selectedOverlay.'+type+'.'+feat.id);
 
         case OVERLAY_FEAT_SELECT:
-            return Immutable.set(state, 'selectedOverlayFeat', action.payload);
+            return Immutable.set(state, 'ui.overlay.selectedFeat', action.payload);
 
                     
         case OVERLAY_SAVE:
-            var overlay = state.selectedOverlayLayer;
+            var overlay = state.selectedOverlay;
             var pavi_id = state.selectedPavilion.id;
             if(!overlay.id) {
                 overlay = Immutable.set(overlay, 'id', pavi_id);
             }
-            state = Immutable.set(state, 'selectedOverlayLayer', overlay);
+            state = Immutable.set(state, 'selectedOverlay', overlay);
             return Immutable.extend(state, 'entities.overlays', {id: overlay} );
     }
     return state;
 };
 
 
-var mapReducer = function(state, action)
-{
-    switch(action.type){
-        case DRAWING_MODE_SET:
-            var mode = action.payload;
-            return Immutable.set(state, 'map.drawingMode', mode);
 
-    }
-    return state;
-};
-var reducers = reduceReducers([pavilionReducer, baseReducer, overlayReducer, mapReducer]);
+var reducers = reduceReducers([mapReducer, pavilionReducer, baseReducer, overlayReducer]);
 
 
 function generateId(state, path){
@@ -726,30 +823,14 @@ var Map = function(el, store)
     gridPanel = GridPanel(map$1);
 
     // State changes
-    store.on('selectedBaseLayer', function(e) { updateBaseLayer(e.new_val); });
-    store.on('selectedBaseLayer.size_m', function(e) { updateBaseLayerSize(e.new_val); });
+    store.on('map.size_m', function(e) { updateMapSize(e.new_val); });
     return map$1;
 };
 
-
 var map$1  = null;
-var baseLayer$1 = null;
 var gridPanel = null;
 
-function updateBaseLayer(img)
-{
-    if(baseLayer$1) {
-        map$1.removeLayer(baseLayer$1);
-        baseLayer$1 = null;
-    }
-    if(img && img.url) {
-        var bounds = updateBaseLayerSize(img.size_m);
-        baseLayer$1 = L.imageOverlay(img.url, bounds).addTo(map$1);
-        map$1.fitBounds(bounds);
-    }
-}
-
-function updateBaseLayerSize(size_m)
+function updateMapSize(size_m)
 {
     if(!size_m) return;
     var map_size = {x: map$1._container.offsetWidth, y: map$1._container.offsetHeight};
@@ -761,8 +842,6 @@ function updateBaseLayerSize(size_m)
     if(_.isUndefined(map$1.getZoom()))
         map$1.fitBounds(bounds);
     gridPanel(size_m);
-    if(baseLayer$1)
-        baseLayer$1.setBounds(bounds);
     return bounds;
 }
 
@@ -889,7 +968,34 @@ function svgToBase64(svg_text)
     })    
 }
 
-var uiMap = function(store, map){
+var BaseMapView = function (store, map)
+{
+    var baseLayer$$1 = null;
+
+    store.on('selectedBase.url', function(e){
+        var url = e.new_val;        
+        if(baseLayer$$1) {
+            map.removeLayer(baseLayer$$1);
+            baseLayer$$1 = null;
+        }
+        if(url) {
+            var size_m = selectedBase(store).size_m;
+            var bounds =  L.latLngBounds([[0,0], [size_m.y, size_m.x]]);
+            baseLayer$$1 = L.imageOverlay(url, bounds).addTo(map);
+            map.fitBounds(bounds);
+        }
+    });
+
+    store.on('selectedBase.size_m', function(e){
+        var size_m = e.new_val;
+        if(baseLayer$$1 && size_m) {
+            var bounds =  L.latLngBounds([[0,0], [size_m.y, size_m.x]]);
+            baseLayer$$1.setBounds(bounds);    
+        }
+    });
+};
+
+var BaseMapDistance = function(store, map){
 
     var line = null;
     var tooltip = null; 
@@ -906,7 +1012,7 @@ var uiMap = function(store, map){
         }
     });
 
-    store.on('selectedBaseLayer.distance', function(e){
+    store.on('selectedBase.distance', function(e){
         if(!e.new_val || !e.new_val.points) {
             if(line) {
                 map.removeLayer(line);
@@ -915,16 +1021,16 @@ var uiMap = function(store, map){
         }
     });
 
-    store.on('selectedBaseLayer.size_m', function(e){
+    store.on('selectedBase.size_m', function(e){
         if(!line || !e.new_val) return
-        var points = selectedBaseLayer(store).distance.points;
+        var points = selectedBase(store).distance.points;
         var latLngs = points.map(function(it){
             return map.unproject(it,1);
         });
         line.disableEdit();
         line.setLatLngs(latLngs);
         line.enableEdit(map);
-        updateTooltip(selectedBaseLayer(store).distance.length_m);
+        updateTooltip(selectedBase(store).distance.length_m);
     });
 
     function on_edit(event)
@@ -957,7 +1063,7 @@ var uiMap = function(store, map){
     
 };
 
-function uiView(store) {
+function BaseView(store) {
     var vm = new Vue({
         el: '#base-layer',
         template: '#base-layer-template',
@@ -1005,19 +1111,18 @@ function uiView(store) {
                 return this.width && !this.lineLength;
             },
             needRecalculate: function(){
-                var bl = selectedBaseLayer(store);
+                var bl = selectedBase(store);
                 return this.lineLength > 0 && this.lineLength != Math.round(bl.distance.length_m);
             },
             needSave: function(){
                 var bl = baseLayer(store),
-                    el = selectedBaseLayer(store);
+                    el = selectedBase(store);
                 return !bl || !_.isEqual(bl.size_m, el.size_m) || !_.isEqual(bl.url, el.url);
 
             },
             save: function(){
-                var el = selectedBaseLayer(store);
-                var pavi = selectedPavilion(store);
-                store(BASE_LAYER_SAVE, {base: el, pavi_id: pavi.id});
+                var el = selectedBase(store);
+                store(BASE_LAYER_SAVE, {base: el});
             }
         }, 
         computed: {
@@ -1029,7 +1134,7 @@ function uiView(store) {
 
     function updateWidthHeight(e){
         var base = e.new_val;
-        if(base) { 
+        if(base && base.size_m) { 
             vm.width = Math.round(base.size_m.x);
             vm.height = Math.round(base.size_m.y);
         }
@@ -1042,16 +1147,17 @@ function uiView(store) {
         vm.lineLength = e.new_val;
     }
 
-    store.on('selectedBaseLayer', updateWidthHeight);
-    store.on('selectedBaseLayer.distance.length_m', updateLength_m);    
+    store.on('selectedBase', updateWidthHeight);
+    store.on('selectedBase.distance.length_m', updateLength_m);    
 
     return vm;
 } 
 
 var BaseModule = function(store, map)
 {
-    uiView(store);
-    uiMap(store, map);
+    BaseView(store);
+    BaseMapView(store, map);
+    BaseMapDistance(store, map);
 };
 
 /**
@@ -1161,30 +1267,9 @@ m2e[DRAW_NOTE] = editNote();
 
 var mode2editor = m2e;
 
-/**
- * 
- *  overlay state 
- * {
- *      lines: {
- *          "id1": { points: [], style: {} },
- *          "id2": { points: [], style: {} },
- *      },
- *      rects: {
- *          "id1": { points: [], style: {} },
- *          "id2": { points: [], style: {} },
- *      },
- *      notes: {
- *          "id1": { topleft: [], rotate: number, text: string, style: {} },
- *          "id2": { topleft: [], rotate: number, text: string, style: {} }
- *      }
- * }
- * 
- *  
- */
-
 var selfcheck = Selfcheck();
 
-function uiMap$1(store, map)
+function uiMap(store, map)
 {
     var lineGroup = L.featureGroup().addTo(map);
     var rectGroup = L.featureGroup().addTo(map);
@@ -1227,7 +1312,7 @@ function uiMap$1(store, map)
                 noteGroup.addLayer(e.feat);
                 break;
         }
-        store(OVERLAY_FEAT_ADD, {type: e.cat, feat: obj});
+        store(OVERLAY_FEAT_ADD, {cat: e.cat, feat: obj});
         store(DRAWING_MODE_SET,null);
     }
 
@@ -1242,7 +1327,7 @@ function uiMap$1(store, map)
     }
 
     _.values(mode2editor).forEach(function(it) { it.on('new-feat', selfcheck(onNewFeature)); });
-    store.on('selectedOverlayLayer', selfcheck(onSelectOverlay));
+    store.on('selectedOverlay', selfcheck(onSelectOverlay));
     store.on('map.drawingMode', function(e){
         if(editor) editor.exit();
         editor = mode2editor[e.new_val];
@@ -1250,9 +1335,9 @@ function uiMap$1(store, map)
     });
 }
 
-function uiView$1(store)
+function OverlayView(config, store)
 {
-    var SEL = {
+    var MODES = {
         "line": DRAW_WALL,
         "rect": DRAW_RECT,
         "note": DRAW_NOTE
@@ -1263,26 +1348,40 @@ function uiView$1(store)
         el:"#overlays-layer",
         template: '#overlays-layer-template',
         data: {
-            sel: null,
+            mode: null,
+             
+            wallTypes: config.overlay.types.wall,
+            carpetTypes: config.overlay.types.carpet,
+            noteTypes: config.overlay.types.note,
+
+            selWallType: wallType(store),
+            selCarpetType: carpetType(store),
+            selNoteType: noteType(store)
         },
         methods: {
             select: function(sel){ 
-                store(DRAWING_MODE_SET, SEL[sel]);
+                store(DRAWING_MODE_SET, MODES[mode]);
             },
             cssClass: function(p){
-                return p == this.sel ? 'w3-text-red'  : 'w3-text-grey';
+                return p == this.mode ? 'w3-text-red'  : 'w3-text-grey';
             }
         }
     });
 
     store.on('map.drawingMode', function(e){
-        vm.sel = _.findKey(SEL, function(it) { return it == e.new_val});
+        vm.mode = _.findKey(MODES, function(it) { return it == e.new_val});
+    });
+
+    store.on('ui.overlay', function(e){
+        vm.selWallType = wallType(store);
+        vm.selCarpetType = carpetType(store);
+        vm.selNoteType = noteType(store);
     });
 }
 
-var OverlaysModule = function(store, map){
-    uiView$1(store);
-    uiMap$1(store, map);
+var OverlaysModule = function(config, store, map){
+    OverlayView(config, store);
+    uiMap(store, map);
 };
 
 initComponents();
@@ -1296,7 +1395,7 @@ window.store = store;
 var map = Map('map', store);
 PavilionModule(store);
 BaseModule(store, map);
-OverlaysModule(store, map);
+OverlaysModule(config, store, map);
 
 store("INIT");
 

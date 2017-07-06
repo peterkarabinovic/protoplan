@@ -3,6 +3,17 @@ import {reduceReducers} from './utils/redux.js'
 import * as a from './actions.js'
 
 
+var mapReducer = function(state, action)
+{
+    switch(action.type){
+        case a.DRAWING_MODE_SET:
+            var mode = action.payload;
+            return Immutable.set(state, 'map.drawingMode', mode);
+
+    }
+    return state;
+}
+
 var pavilionReducer = function(state, action)
 {
     switch(action.type)
@@ -19,7 +30,7 @@ var pavilionReducer = function(state, action)
             }
             if(state.selectedPavilion && state.selectedPavilion.id == pavi_id) {
                 state = Immutable.set(state, 'selectedPavilion');
-                state = Immutable.set(state, 'selectedBaseLayer');
+                state = Immutable.set(state, 'selectedBase');
             }
             return state;
 
@@ -27,7 +38,7 @@ var pavilionReducer = function(state, action)
             var pavi = action.payload;
             state = Immutable.set(state, 'pavilions.'+pavi.id, pavi);
             state = Immutable.set(state, 'selectedPavilion', pavi);
-            state = Immutable.set(state, 'selectedBaseLayer', {id:pavi.id});
+            state = Immutable.set(state, 'selectedBase', {id:pavi.id});
             return state;
 
         case a.PAVILION_SELECT:
@@ -35,7 +46,10 @@ var pavilionReducer = function(state, action)
             state = Immutable.set(state, 'selectedPavilion', pavi);
             if(pavi) {
                 var base = state.entities.bases[pavi.id] || {id: pavi.id}
-                state = Immutable.set(state, 'selectedBaseLayer', base);
+                state = Immutable.set(state, 'selectedBase', base);
+                state = Immutable.set(state, 'map.size_m', base.size_m);
+                var overlay = state.entities.overlays[pavi.id] || {id:pavi.id};
+                state = Immutable.set(state, 'selectedOverlay', base);
             }
             return state;
             
@@ -54,29 +68,31 @@ var baseReducer = function(state, action)
 
         case a.BASE_LAYER_SET: 
             var base = action.payload;
-            return Immutable.extend(state, 'selectedBaseLayer', base);
+            state = Immutable.extend(state, 'selectedBase', base);
+            return Immutable.set(state, 'map.size_m', base.size_m);
         
         case a.BASE_DISTANCE_LENGTH_SET:
             var length_m = action.payload;
-            var ratio =  length_m / state.selectedBaseLayer.distance.length_m;
-            var size_m = state.selectedBaseLayer.size_m;
+            var ratio =  length_m / state.selectedBase.distance.length_m;
+            var size_m = state.selectedBase.size_m;
             size_m = {
                 x: size_m.x * ratio,
                 y: size_m.y * ratio
             };
-            state = Immutable.set(state, 'selectedBaseLayer.size_m', size_m );
-            return Immutable.set(state, 'selectedBaseLayer.distance.length_m', length_m);             
+            state = Immutable.set(state, 'map.size_m', size_m);
+            state = Immutable.set(state, 'selectedBase.size_m', size_m );
+            return Immutable.set(state, 'selectedBase.distance.length_m', length_m);             
         
         case a.BASE_DISTANCE_SET: 
             var distance = action.payload;
-            return Immutable.set(state, 'selectedBaseLayer.distance', distance);
+            return Immutable.set(state, 'selectedBase.distance', distance);
 
         case a.BASE_LAYER_SAVED:
             var base = action.payload;
             if(state.pavilions[base.id]) {
                 state = Immutable.set(state, 'entities.bases.'+base.id, base);
                 if(state.selectedPavilion && base.id == state.selectedPavilion.id)
-                    state = Immutable.extend(state, 'selectedBaseLayer', base)
+                    state = Immutable.extend(state, 'selectedBase', base)
             }
             else {
                 state = Immutable.remove(state, 'entities.bases.'+base.id);
@@ -89,50 +105,41 @@ var baseReducer = function(state, action)
 var overlayReducer = function(state, action){
     switch(action.type){
         case a.OVERLAY_FEAT_ADD: 
-            var type = action.payload.type;
+            var cat = action.payload.cat;
             var feat = action.payload.feat;
-            feat = Immutable.set(feat, 'id', generateId(state, 'selectedOverlayLayer.'+type))
-            state = Immutable.set(state, 'selectedOverlayFeat', feat);
-            return Immutable.set(state, 'selectedOverlayLayer.'+type+'.'+feat.id, feat);
+            feat = Immutable.set(feat, 'id', generateId(state, 'selectedOverlay.'+cat))
+            state = Immutable.set(state, 'ui.overlay.feat', feat);
+            return Immutable.set(state, 'selectedOverlay.'+cat+'.'+feat.id, feat);
 
         case a.OVERLAY_FEAT_UPDATE: 
             var type = action.payload.type;
             var feat = action.payload.feat;
-            return Immutable.set(state, 'selectedOverlayLayer.'+type+'.'+feat.id, feat);
+            return Immutable.set(state, 'selectedOverlay.'+type+'.'+feat.id, feat);
 
         case a.OVERLAY_FEAT_DELETE: 
             var type = action.payload.type;
             var feat = action.payload.feat;
-            return Immutable.remove(state, 'selectedOverlayLayer.'+type+'.'+feat.id);
+            return Immutable.remove(state, 'selectedOverlay.'+type+'.'+feat.id);
 
         case a.OVERLAY_FEAT_SELECT:
-            return Immutable.set(state, 'selectedOverlayFeat', action.payload);
+            return Immutable.set(state, 'ui.overlay.selectedFeat', action.payload);
 
                     
         case a.OVERLAY_SAVE:
-            var overlay = state.selectedOverlayLayer;
+            var overlay = state.selectedOverlay;
             var pavi_id = state.selectedPavilion.id;
             if(!overlay.id) {
                 overlay = Immutable.set(overlay, 'id', pavi_id)
             }
-            state = Immutable.set(state, 'selectedOverlayLayer', overlay);
+            state = Immutable.set(state, 'selectedOverlay', overlay);
             return Immutable.extend(state, 'entities.overlays', {id: overlay} );
     }
     return state;
 }
 
 
-var mapReducer = function(state, action)
-{
-    switch(action.type){
-        case a.DRAWING_MODE_SET:
-            var mode = action.payload;
-            return Immutable.set(state, 'map.drawingMode', mode);
 
-    }
-    return state;
-}
-export default reduceReducers([pavilionReducer, baseReducer, overlayReducer, mapReducer])
+export default reduceReducers([mapReducer, pavilionReducer, baseReducer, overlayReducer])
 
 
 function generateId(state, path){
