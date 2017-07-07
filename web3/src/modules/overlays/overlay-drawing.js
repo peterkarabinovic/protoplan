@@ -12,7 +12,7 @@ export default function(store, map)
 
     store.on('map.drawingMode', function(e){
         if(editor) editor.exit();
-        editor = mode2editor[e.new_val];
+        editor = m2e[e.new_val];
         if(editor) {
             editor.enter();
             store(a.OVERLAY_FEAT_SELECT);
@@ -36,10 +36,11 @@ function editFeat(cat, store, map)
     }
 
     function onCommit(){
-        store(a.OVERLAY_FEAT_ADD, { points: toPoints(layers.getLatLngs()) });
+        var feat =  { points: toPoints(layer.getLatLngs())};
+        store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: cat});
         store(a.DRAWING_MODE_SET);
     }
-    return e;
+    return {enter:enter, exit:exit};
 }
 
 function editNote() {
@@ -62,5 +63,6 @@ function editNote() {
 // }
 
 function toPoints(latLngs){
+    latLngs = _.flatten(latLngs);
     return latLngs.map(function(ll){ return [ll.lng, ll.lat] });
 }

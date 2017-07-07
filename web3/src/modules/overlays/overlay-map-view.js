@@ -9,7 +9,7 @@ import {str} from '../../utils/utils.js'
  *          "id1": { points: [], type: {} },
  *          "id2": { points: [], type: {} },
  *      },
- *      carpets: {
+ *      rects: {
  *          "id1": { points: [], type: {} },
  *          "id2": { points: [], type: {} },
  *      },
@@ -25,18 +25,18 @@ import {str} from '../../utils/utils.js'
 export default function(config, store, map)
 {
     var lineGroup = L.featureGroup().addTo(map);
-    var carpetGroup = L.featureGroup().addTo(map);
+    var rectGroup = L.featureGroup().addTo(map);
     var noteGroup = L.featureGroup().addTo(map);
 
     var cat2group = {
         lines: {group: lineGroup, toLayer: toPolyline},
-        carpets: {group: carpetGroup, toLayer: toRect},
+        rects: {group: rectGroup, toLayer: toPolygon},
         notes: {group: noteGroup, toLayer: toNote}
     }
 
     var cat2layers = {
         lines: {},
-        carpets: {},
+        rects: {},
         notes: {},
     }
 
@@ -45,26 +45,27 @@ export default function(config, store, map)
         var group = cat2group[cat].group;
         var toLayer = cat2group[cat].toLayer; 
         var overlay_id = selectedOverlayId(store);
-        var the_layers = cat2layers[cat];
+        var the_layers = _.clone(cat2layers[cat]);
         _.mapObject(features, function(feat, id){
             var layer_id = str(overlay_id, '.', id);
             if(the_layers[layer_id]) {
                 delete the_layers[layer_id];
             }
             else {
-                var style = config.overlay.types[cat][feat.type];
+                var style = config.overlay.types[cat][feat.type].style;
                 var layer = toLayer(layer_id, feat, style) 
                 group.addLayer(layer);
                 cat2layers[cat][layer_id] = layer;
             }
         });
-        _.values(the_layers).forEach(function(l){
-            group.removeLayer(l);
-        })
+        _.mapObject(the_layers, function(layer, id){
+            group.removeLayer(layer);
+            delete cat2layers[cat][id];
+        });
     }
 
     store.on('selectedOverlay.lines', _.partial(updateGroup, 'lines') );
-    store.on('selectedOverlay.carpets', _.partial(updateGroup, 'carpets') );
+    store.on('selectedOverlay.rects', _.partial(updateGroup, 'rects') );
     store.on('selectedOverlay.notes', _.partial(updateGroup, 'notes') );
 
     return {cat2group: cat2group, cat2layers:cat2layers};
@@ -77,8 +78,8 @@ function toPolyline(id, line, style)
     return poly;
 }
 
-function toRect(id, carpet, style){
-    var poly = polygon(toLatLngs(carpet.points), style);
+function toPolygon(id, rect, style){
+    var poly = L.polygon(toLatLngs(rect.points), style);
     poly.id = id;
     return poly;
 }
@@ -88,5 +89,5 @@ function toNote(id, note, style){
 
 
 function toLatLngs(points) {
-    return points.map(function(p){ return  latLng(p[1], p[0])});
+    return points.map(function(p){ return  L.latLng(p[1], p[0])});
 }

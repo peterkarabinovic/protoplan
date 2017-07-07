@@ -1,7 +1,6 @@
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
-import uiMap from './ui-map.js'
-import {wallType, carpetType, noteType} from '../../state.js' 
+import {lineType, rectType, noteType} from '../../state.js' 
 
 import OverlayMapView from './overlay-map-view.js'
 import OverlaySelectTools from './overlay-select-tools.js'
@@ -23,16 +22,16 @@ function OverlayView(config, store)
         data: {
             mode: null,
              
-            wallTypes: config.overlay.types.wall,
-            carpetTypes: config.overlay.types.carpet,
-            noteTypes: config.overlay.types.note,
+            lineTypes: config.overlay.types.lines,
+            rectTypes: config.overlay.types.rects,
+            noteTypes: config.overlay.types.notes,
 
-            selWallType: wallType(store),
-            selCarpetType: carpetType(store),
+            selLineType: lineType(store),
+            selRectType: rectType(store),
             selNoteType: noteType(store)
         },
         methods: {
-            select: function(sel){ 
+            select: function(mode){ 
                 store(a.DRAWING_MODE_SET, MODES[mode])
             },
             cssClass: function(p){
@@ -46,8 +45,8 @@ function OverlayView(config, store)
     });
 
     store.on('ui.overlay', function(e){
-        vm.selWallType = wallType(store);
-        vm.selCarpetType = carpetType(store);
+        vm.selLineType = lineType(store);
+        vm.selRectType = rectType(store);
         vm.selNoteType = noteType(store);
     });
 }

@@ -4,17 +4,17 @@
 var config = {
     "overlay": {
         "types": {
-            "wall": {
+            "lines": {
                 "1": {
                     "name": "Тонкая стена",
-                    "style": {"weight":2, "color": "green"}
+                    "style": {"weight":5, "color": "green"}
                 },
                 "2": {
                     "name": "Толстая стена",
-                    "style": {"weight":8, "color": "green"}
+                    "style": {"weight":10, "color": "green"}
                 }
             },
-            "carpet": {
+            "rects": {
                 "1": {
                     "name": "Ковер персидский",
                     "style": {"stroke":false, "fillOpacity": "0.5", "fillColor": "#a25203" }
@@ -24,7 +24,7 @@ var config = {
                     "style": {"stroke":false, "fillOpacity": "0.5", "fillColor": "grey  " }
                 }
             },
-            "note": {
+            "notes": {
 
             }
         }
@@ -224,18 +224,6 @@ function startswith(str, substr) {
  * Selfcheck - wrap callback function for check if it already called in stack above
  */
 
-function Selfcheck(){
-    var me = false;
-    return function(callback){
-        return function(){
-            if(me) return; 
-            me = true;
-            try{var res = callback.apply(this, arguments); } finally {me = false;}
-            return res;
-        } 
-    }
-}
-
 function initComponents()
 {
 
@@ -294,11 +282,11 @@ var initState = {
         error: '',
         overlay: {
             types: {
-                wall: 1,
-                carpet: 1,
-                note: 1
+                lines: 1,
+                rects: 1,
+                notes: 1
             },
-            feat: null
+            feat: undefined
         }
     }
 };
@@ -328,19 +316,23 @@ function selectedBase(store) {
     return store.state.selectedBase  || {};
 }
 
-
-
-
-
-
-function wallType(store) {
-    return store.state.ui.overlay.type.wall;
+function selectedOverlay(store) {
+    return store.state.selectedBase  || {};
 }
-function carpetType(store) {
-    return store.state.ui.overlay.type.carpet;
+
+function selectedOverlayId(store) {
+    return (selectedOverlay(store).id || -1).toString();
+}
+
+
+function lineType(store) {
+    return store.state.ui.overlay.types.lines;
+}
+function rectType(store) {
+    return store.state.ui.overlay.types.rects;
 }
 function noteType(store) {
-    return store.state.ui.overlay.type.note;
+    return store.state.ui.overlay.types.notes;
 }
 
 /**
@@ -575,8 +567,11 @@ var overlayReducer = function(state, action){
         case OVERLAY_FEAT_ADD: 
             var cat = action.payload.cat;
             var feat = action.payload.feat;
-            feat = Immutable.set(feat, 'id', generateId(state, 'selectedOverlay.'+cat));
-            state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat));
+            feat = _.extend({}, feat, {
+                id: generateId(state, 'selectedOverlay.'+cat),
+                type: state.ui.overlay.types[cat]
+            });
+            state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat.id));
             return Immutable.set(state, 'selectedOverlay.'+cat+'.'+feat.id, feat);
 
         case OVERLAY_FEAT_UPDATE: 
@@ -590,7 +585,7 @@ var overlayReducer = function(state, action){
                 cat = p[0],
                 id = +p[1];
             state = Immutable.remove(state, 'selectedOverlay.'+cat+'.'+id);
-            return Immutable.set(state, 'ui.overlay.feat', null);
+            return Immutable.remove(state, 'ui.overlay.feat');
 
         case OVERLAY_FEAT_SELECT:
             return Immutable.set(state, 'ui.overlay.feat', action.payload);
@@ -1164,93 +1159,168 @@ var BaseModule = function(store, map)
     BaseMapDistance(store, map);
 };
 
-/**
- * Function for conversions feature and types into styles and objects of leaflets
- */
-
-/**
- * 
- */
-
-var latLng = L.latLng;
-var polyline = L.polyline;
-var polygon = L.polygon;
-
-function toPolyline(line)
+var OverlayMapView = function(config, store, map)
 {
-    var poly = polyline(toLatLngs(line.points), lineStyle(line));
-    poly.id = line.id;
-    poly.style = line.style;
-    return poly;
-}
+    var lineGroup = L.featureGroup().addTo(map);
+    var rectGroup = L.featureGroup().addTo(map);
+    var noteGroup = L.featureGroup().addTo(map);
 
-function toLine(polyline){
-    return {
-        points: toPoints(polyline.getLatLngs()),
-        id: polyline.id,
-        style: polyline.style
+    var cat2group = {
+        lines: {group: lineGroup, toLayer: toPolyline},
+        rects: {group: rectGroup, toLayer: toPolygon},
+        notes: {group: noteGroup, toLayer: toNote}
+    };
+
+    var cat2layers = {
+        lines: {},
+        rects: {},
+        notes: {},
+    };
+
+    function updateGroup(cat, e){
+        var features = e.new_val || [];
+        var group = cat2group[cat].group;
+        var toLayer = cat2group[cat].toLayer; 
+        var overlay_id = selectedOverlayId(store);
+        var the_layers = _.clone(cat2layers[cat]);
+        _.mapObject(features, function(feat, id){
+            var layer_id = str(overlay_id, '.', id);
+            if(the_layers[layer_id]) {
+                delete the_layers[layer_id];
+            }
+            else {
+                var style = config.overlay.types[cat][feat.type].style;
+                var layer = toLayer(layer_id, feat, style); 
+                group.addLayer(layer);
+                cat2layers[cat][layer_id] = layer;
+            }
+        });
+        _.mapObject(the_layers, function(layer, id){
+            group.removeLayer(layer);
+            delete cat2layers[cat][id];
+        });
     }
-}
 
-function toRect(carpet){
-    var poly = polygon(toLatLngs(carpet.points), rectStyle(carpet));
-    poly.id = line.id;
-    poly.style = line.style;
+    store.on('selectedOverlay.lines', _.partial(updateGroup, 'lines') );
+    store.on('selectedOverlay.rects', _.partial(updateGroup, 'rects') );
+    store.on('selectedOverlay.notes', _.partial(updateGroup, 'notes') );
+
+    return {cat2group: cat2group, cat2layers:cat2layers};
+};
+
+function toPolyline(id, line, style)
+{
+    var poly = L.polyline(toLatLngs(line.points), style);
+    poly.id = id;
     return poly;
 }
 
-function toCarpet(polygon){
-    return toLine(polygon);
+function toPolygon(id, rect, style){
+    var poly = L.polygon(toLatLngs(rect.points), style);
+    poly.id = id;
+    return poly;
+}
+
+function toNote(id, note, style){
 }
 
 
 function toLatLngs(points) {
-    return points.map(function(p){ return  latLng(p[1], p[0])});
+    return points.map(function(p){ return  L.latLng(p[1], p[0])});
 }
 
-function toPoints(latLngs){
-    return latLngs.map(function(ll){ return [ll.lng, ll.lat] });
-}
-
-
-function lineStyle(line){
-    return {weight:2, color: 'red'}
-}
-
-function rectStyle(rect){
-    return {weight:2, color: 'red'}
-}
-
-var Evented = L.Evented;
-var extend = L.extend;
-
-function editFeat(type) 
+var OverlaySelectTools = function(config, store, map, overlayMapView)
 {
-    var feat = null;
-    var map = null;
-    function enter(m) {
-        map = m;
-        feat = (type == 'lines') ? map.editTools.startPolyline(undefined) : map.editTools.startRectangle(undefined);
-        feat.once('editable:drawing:commit', onCommit);
+    var tooltipContent = document.getElementById('overlay-tooltip-template').text;
+    var tooltip = L.tooltip({permanent:true}).setContent(tooltipContent);
+
+    var selectedLayer = null;
+    var cat2group = overlayMapView.cat2group;
+    var cat2layers = overlayMapView.cat2layers;
+
+    function onFeatureClick(cat, e){
+        var layer_id = e.layer.id.split('.'),
+            feat_id = str(cat,'.',layer_id[1]);
+        store(OVERLAY_FEAT_SELECT, feat_id);
     }
 
-    function exit(){
-        if(feat) {
-            feat.disableEdit();
-            map.removeLayer(feat);
-            feat = null;
+    _.mapObject(cat2group, function(val, cat){
+        val.group.on('click', _.partial(onFeatureClick, cat));
+    });
+
+    function onDeleteFeat(){
+        store(OVERLAY_FEAT_DELETE);
+    }
+
+    function updateSelectedLayer(e){
+        if(selectedLayer) {
+            selectedLayer.disableEdit();
+            selectedLayer = null;
+            L.DomEvent.off(tooltip.getElement(), 'click', onDeleteFeat);
+            map.removeLayer(tooltip);
+        }
+        var feat_path = e.new_val;
+        if(feat_path){
+            var p = feat_path.split('.'),
+                cat = p[0],
+                id = p[1];
+            var overlay_id = selectedOverlayId(store);
+            var layer_id = str(overlay_id, '.', id);
+            selectedLayer = cat2layers[cat][layer_id];
+            if(selectedLayer) {
+                selectedLayer.enableEdit(map);      
+                tooltip.setLatLng(selectedLayer.getCenter());
+                map.addLayer(tooltip);
+                L.DomEvent.on(tooltip.getElement(), 'click', onDeleteFeat);
+            }
         }
     }
 
-    var e = extend( new Evented(), {enter:enter, exit:exit} );
+    store.on('ui.overlay.feat', updateSelectedLayer);
 
-    function onCommit(){
-        var f = feat;
-        exit();
-        e.fire("new-feat", {feat:f, cat:type});
+    
+};
+
+var OverlayDrawing = function(store, map)
+{
+    var editor = null;
+    var m2e = {};
+    m2e[DRAW_WALL] = editFeat('lines', store, map);
+    m2e[DRAW_RECT] = editFeat('rects', store, map);
+    m2e[DRAW_NOTE] = editNote(store, map);
+
+
+    store.on('map.drawingMode', function(e){
+        if(editor) editor.exit();
+        editor = m2e[e.new_val];
+        if(editor) {
+            editor.enter();
+            store(OVERLAY_FEAT_SELECT);
+        }
+    });
+};
+
+
+function editFeat(cat, store, map) 
+{
+    var layer = null;
+    function enter(m) {
+        layer = (cat == 'lines') ? map.editTools.startPolyline(undefined) : map.editTools.startRectangle(undefined);
+        layer.once('editable:drawing:commit', onCommit);
     }
 
-    return e;
+    function exit()
+    {
+        layer.disableEdit();
+        map.removeLayer(layer);
+    }
+
+    function onCommit(){
+        var feat =  { points: toPoints(layer.getLatLngs())};
+        store(OVERLAY_FEAT_ADD, {feat: feat, cat: cat});
+        store(DRAWING_MODE_SET);
+    }
+    return {enter:enter, exit:exit};
 }
 
 function editNote() {
@@ -1261,82 +1331,20 @@ function editNote() {
     function exit(){
 
     }
-    return extend( new Evented(), {enter:enter, exit:exit} );
+    return {enter:enter, exit:exit};
 }
 
-var m2e = {};
-m2e[DRAW_WALL] = editFeat('lines');
-m2e[DRAW_RECT] = editFeat('rects');
-m2e[DRAW_NOTE] = editNote();
+// function toWall(polyline){
+//     return {
+//         points: toPoints(polyline.getLatLngs()),
+//         id: polyline.id,
+//         style: polyline.style
+//     }
+// }
 
-var mode2editor = m2e;
-
-var selfcheck = Selfcheck();
-
-function uiMap(store, map)
-{
-    var lineGroup = L.featureGroup().addTo(map);
-    var rectGroup = L.featureGroup().addTo(map);
-    var noteGroup = L.featureGroup().addTo(map);
-    var selectedFeature = null;
-    var editor = null;
-
-
-    lineGroup.on('click', _.partial(onFeatureClick, 'lines'));
-    rectGroup.on('click', _.partial(onFeatureClick, 'rects'));
-    noteGroup.on('click', _.partial(onFeatureClick, 'notes'));
-
-    function onSelectOverlay(e){
-        lineGroup.clearLayers();
-        rectGroup.clearLayers();
-        noteGroup.clearLayers();
-        if(e.new_val) {
-            var overlay = e.new_val;
-            _.each(overlay.lines || {}, function(line){
-                lineGroup.addLayers( toPolyline(line) );
-            });
-            _.each(overlay.rects || {}, function(rect){
-                lineGroup.addLayers( toRect(rect) );
-            });
-        }
-    }
-
-    function onNewFeature(e){
-        var obj = null;
-        switch(e.cat){
-            case 'lines':
-                obj = toLine(e.feat);
-                lineGroup.addLayer(e.feat);
-                break;
-            case 'rects':
-                obj = toCarpet(e.feat);
-                rectGroup.addLayer(e.feat);
-                break;
-            case 'notes':
-                noteGroup.addLayer(e.feat);
-                break;
-        }
-        store(OVERLAY_FEAT_ADD, {cat: e.cat, feat: obj});
-        store(DRAWING_MODE_SET,null);
-    }
-
-    function onFeatureClick(cat, e)
-    {
-        if(selectedFeature == e.layer)
-            return;
-        if(selectedFeature) 
-            selectedFeature.disableEdit();
-        selectedFeature = e.layer;
-        selectedFeature.enableEdit(map);
-    }
-
-    _.values(mode2editor).forEach(function(it) { it.on('new-feat', selfcheck(onNewFeature)); });
-    store.on('selectedOverlay', selfcheck(onSelectOverlay));
-    store.on('map.drawingMode', function(e){
-        if(editor) editor.exit();
-        editor = mode2editor[e.new_val];
-        if(editor) editor.enter(map);
-    });
+function toPoints(latLngs){
+    latLngs = _.flatten(latLngs);
+    return latLngs.map(function(ll){ return [ll.lng, ll.lat] });
 }
 
 function OverlayView(config, store)
@@ -1354,16 +1362,16 @@ function OverlayView(config, store)
         data: {
             mode: null,
              
-            wallTypes: config.overlay.types.wall,
-            carpetTypes: config.overlay.types.carpet,
-            noteTypes: config.overlay.types.note,
+            lineTypes: config.overlay.types.lines,
+            rectTypes: config.overlay.types.rects,
+            noteTypes: config.overlay.types.notes,
 
-            selWallType: wallType(store),
-            selCarpetType: carpetType(store),
+            selLineType: lineType(store),
+            selRectType: rectType(store),
             selNoteType: noteType(store)
         },
         methods: {
-            select: function(sel){ 
+            select: function(mode){ 
                 store(DRAWING_MODE_SET, MODES[mode]);
             },
             cssClass: function(p){
@@ -1377,15 +1385,17 @@ function OverlayView(config, store)
     });
 
     store.on('ui.overlay', function(e){
-        vm.selWallType = wallType(store);
-        vm.selCarpetType = carpetType(store);
+        vm.selLineType = lineType(store);
+        vm.selRectType = rectType(store);
         vm.selNoteType = noteType(store);
     });
 }
 
 var OverlaysModule = function(config, store, map){
     OverlayView(config, store);
-    uiMap(store, map);
+    var omv = OverlayMapView(config, store, map);
+    OverlaySelectTools(config, store, map, omv);
+    OverlayDrawing(store, map);
 };
 
 initComponents();

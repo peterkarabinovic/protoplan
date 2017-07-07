@@ -108,8 +108,11 @@ var overlayReducer = function(state, action){
         case a.OVERLAY_FEAT_ADD: 
             var cat = action.payload.cat;
             var feat = action.payload.feat;
-            feat = Immutable.set(feat, 'id', generateId(state, 'selectedOverlay.'+cat))
-            state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat));
+            feat = _.extend({}, feat, {
+                id: generateId(state, 'selectedOverlay.'+cat),
+                type: state.ui.overlay.types[cat]
+            })
+            state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat.id));
             return Immutable.set(state, 'selectedOverlay.'+cat+'.'+feat.id, feat);
 
         case a.OVERLAY_FEAT_UPDATE: 

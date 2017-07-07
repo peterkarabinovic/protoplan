@@ -2,17 +2,17 @@ export default
 {
     "overlay": {
         "types": {
-            "wall": {
+            "lines": {
                 "1": {
                     "name": "Тонкая стена",
-                    "style": {"weight":2, "color": "green"}
+                    "style": {"weight":5, "color": "green"}
                 },
                 "2": {
                     "name": "Толстая стена",
-                    "style": {"weight":8, "color": "green"}
+                    "style": {"weight":10, "color": "green"}
                 }
             },
-            "carpet": {
+            "rects": {
                 "1": {
                     "name": "Ковер персидский",
                     "style": {"stroke":false, "fillOpacity": "0.5", "fillColor": "#a25203" }
@@ -22,7 +22,7 @@ export default
                     "style": {"stroke":false, "fillOpacity": "0.5", "fillColor": "grey  " }
                 }
             },
-            "note": {
+            "notes": {
 
             }
         }

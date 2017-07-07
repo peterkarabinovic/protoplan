@@ -27,9 +27,9 @@ export default {
         error: '',
         overlay: {
             types: {
-                wall: 1,
-                carpet: 1,
-                note: 1
+                lines: 1,
+                rects: 1,
+                notes: 1
             },
             feat: undefined
         }
@@ -73,12 +73,12 @@ export function selectedOverlayId(store) {
 }
 
 
-export function wallType(store) {
-    return store.state.ui.overlay.type.wall;
+export function lineType(store) {
+    return store.state.ui.overlay.types.lines;
 }
-export function carpetType(store) {
-    return store.state.ui.overlay.type.carpet;
+export function rectType(store) {
+    return store.state.ui.overlay.types.rects;
 }
 export function noteType(store) {
-    return store.state.ui.overlay.type.note;
+    return store.state.ui.overlay.types.notes;
 }

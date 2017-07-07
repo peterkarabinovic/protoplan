@@ -1,6 +1,7 @@
 
 import * as a from '../../actions.js'
 import {str} from '../../utils/utils.js'
+import {selectedOverlayId} from '../../state.js'
 
 export default function(config, store, map, overlayMapView)
 {
@@ -9,9 +10,10 @@ export default function(config, store, map, overlayMapView)
 
     var selectedLayer = null;
     var cat2group = overlayMapView.cat2group;
+    var cat2layers = overlayMapView.cat2layers;
 
     function onFeatureClick(cat, e){
-        var layer_id = e.layer.id.split(','),
+        var layer_id = e.layer.id.split('.'),
             feat_id = str(cat,'.',layer_id[1]);
         store(a.OVERLAY_FEAT_SELECT, feat_id);
     }
