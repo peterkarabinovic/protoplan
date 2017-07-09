@@ -9,7 +9,7 @@ export default function(store, map){
 
     var line = null;
     var tooltip = null; 
-    store.on('map.drawingMode', function(e)
+    store.on('map.drawMode', function(e)
     {
         if(e.new_val == DRAW_DISTANCE)
         {
@@ -17,7 +17,7 @@ export default function(store, map){
             line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'})   
             line.on('editable:editing', on_edit)
         }
-        else {
+        else if(e.old_val == DRAW_DISTANCE) {
             L.setOptions(map.editTools, {skipMiddleMarkers: false});            
         }
     });
@@ -25,6 +25,7 @@ export default function(store, map){
     store.on('selectedBase.distance', function(e){
         if(!e.new_val || !e.new_val.points) {
             if(line) {
+                line.disableEdit();
                 map.removeLayer(line);
                 line = null;
             }
@@ -32,7 +33,7 @@ export default function(store, map){
     });
 
     store.on('selectedBase.size_m', function(e){
-        if(!line || !e.new_val) return
+        if(!line || !e.new_val || !selectedBase(store).distance) return
         var points = selectedBase(store).distance.points;
         var latLngs = points.map(function(it){
             return map.unproject(it,1);
@@ -49,7 +50,7 @@ export default function(store, map){
         if(line.getLatLngs().length == 2) 
         {
             var latLngs = line.getLatLngs();
-            map.editTools.stopDrawing();
+            map.editTools.commitDrawing();
             var points = latLngs.map(function(it){
                 return map.project(it,1);
             });

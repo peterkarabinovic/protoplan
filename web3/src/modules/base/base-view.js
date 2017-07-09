@@ -1,7 +1,7 @@
 import {t} from '../../locale.js'
 import {DRAW_DISTANCE} from '../../map/modes.js'
 import {svgToBase64} from '../../svg/parser.js'
-import {baseLayer, selectedBase} from '../../state.js'
+import {baseLayer} from '../../state.js'
 import {BASE_LAYER_SET, 
         BASE_LAYER_SAVE,
         DRAWING_MODE_SET, 
@@ -16,7 +16,8 @@ function BaseView(store) {
         data: {
             width: null, height: null,
             lineLength: null,
-            error: ''
+            error: '',
+            selectedBase: store.prop('selectedBase')
         },
         methods: 
         {
@@ -54,46 +55,46 @@ function BaseView(store) {
                 store(BASE_DISTANCE_LENGTH_SET, this.lineLength);
             },
             needDrawLine: function(){
-                return this.width && !this.lineLength;
+                return this.selectedBase.$val && !this.selectedBase.$val.distance;
             },
             needRecalculate: function(){
-                var bl = selectedBase(store);
-                return this.lineLength > 0 && this.lineLength != Math.round(bl.distance.length_m);
+                var sb = this.selectedBase.$val;
+                return sb && this.lineLength > 0 && this.lineLength != Math.round(sb.distance.length_m);
             },
             needSave: function(){
                 var bl = baseLayer(store),
-                    el = selectedBase(store);
-                return !bl || !_.isEqual(bl.size_m, el.size_m) || !_.isEqual(bl.url, el.url);
+                    sb = this.selectedBase.$val;
+                return sb &&  (!_.isEqual(bl.size_m, sb.size_m) || !_.isEqual(bl.url, sb.url));
 
             },
             save: function(){
-                var el = selectedBase(store);
-                store(BASE_LAYER_SAVE, {base: el})
+                store(BASE_LAYER_SAVE, {base: this.selectedBase.$val})
             }
         }, 
         computed: {
             widthHeight: function(){
-                return this.width ? this.width + ' m / ' + this.height + ' m' : ''
+                var sb = this.selectedBase.$val;
+                return sb && sb.size_m ? Math.round(sb.size_m.x) + ' m / ' + Math.round(sb.size_m.y) + ' m' : ''
             }
         }
     });
 
-    function updateWidthHeight(e){
-        var base = e.new_val;
-        if(base && base.size_m) { 
-            vm.width = Math.round(base.size_m.x);
-            vm.height = Math.round(base.size_m.y);
-        }
-        else {
-            vm.width = vm.height = null;
-        }
-    }
+    // function updateWidthHeight(e){
+    //     var base = e.new_val;
+    //     if(base && base.size_m) { 
+    //         vm.width = Math.round(base.size_m.x);
+    //         vm.height = Math.round(base.size_m.y);
+    //     }
+    //     else {
+    //         vm.width = vm.height = null;
+    //     }
+    // }
 
     function updateLength_m(e){
         vm.lineLength = e.new_val;
     }
 
-    store.on('selectedBase', updateWidthHeight);
+    // store.on('selectedBase', updateWidthHeight);
     store.on('selectedBase.distance.length_m', updateLength_m);    
 
     return vm;

@@ -1,6 +1,7 @@
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
-import {lineType, rectType, noteType} from '../../state.js' 
+import {lineType, rectType, noteType, drawMode, 
+        selectedOverlayFeat, overlayLayer, selectedOverlay} from '../../state.js' 
 
 import OverlayMapView from './overlay-map-view.js'
 import OverlaySelectTools from './overlay-select-tools.js'
@@ -10,44 +11,68 @@ import OverlayDrawing from './overlay-drawing.js'
 function OverlayView(config, store)
 {
     var MODES = {
-        "line": m.DRAW_WALL,
-        "rect": m.DRAW_RECT,
-        "note": m.DRAW_NOTE
+        "lines": m.DRAW_WALL,
+        "rects": m.DRAW_RECT,
+        "notes": m.DRAW_NOTE
     };
 
 
     var vm = new Vue({
-        el:"#overlays-layer",
+        el:"#overlays-layer", 
         template: '#overlays-layer-template',
         data: {
             mode: null,
-             
-            lineTypes: config.overlay.types.lines,
-            rectTypes: config.overlay.types.rects,
-            noteTypes: config.overlay.types.notes,
-
-            selLineType: lineType(store),
-            selRectType: rectType(store),
-            selNoteType: noteType(store)
+            selectedOverlay: store.prop('selectedOverlay'),
+            types: {
+                lines: {
+                    sel: store.prop('ui.overlay.types.lines'),
+                    list: config.overlay.types.lines 
+                },
+                rects: {
+                    sel: store.prop('ui.overlay.types.rects'),
+                    list: config.overlay.types.rects 
+                },
+                notes: {
+                    sel: store.prop('ui.overlay.types.notes'),
+                    list: config.overlay.types.notes
+                }
+            },
+            type: null,
         },
-        methods: {
+        methods: { 
             select: function(mode){ 
-                store(a.DRAWING_MODE_SET, MODES[mode])
+                var m = MODES[mode];
+                store(a.DRAWING_MODE_SET, drawMode(store) == m ? undefined : m );
             },
             cssClass: function(p){
-                return p == this.mode ? 'w3-text-red'  : 'w3-text-grey';
+                return p == this.mode ? 'w3-border-blue  w3-border'  : '';
+            },
+            needSave: function(){
+                var so = this.selectedOverlay.$val;
+                return so && !_.isEqual(overlayLayer(store), so);
+            },
+            save: function(){
+                var o = this.selectedOverlay.$val;
+                store(a.OVERLAY_SAVE, o);
+                this.selectedOverlay.$val = null;
             }
         }
     })
 
-    store.on('map.drawingMode', function(e){
+    store.on('map.drawMode', function(e){
         vm.mode = _.findKey(MODES, function(it) { return it == e.new_val});
     });
 
-    store.on('ui.overlay', function(e){
-        vm.selLineType = lineType(store);
-        vm.selRectType = rectType(store);
-        vm.selNoteType = noteType(store);
+    store.on('ui.overlay.feat', function(){
+        var feat = selectedOverlayFeat(store);
+        vm.type = feat ? vm.types[feat.cat] : null;
+    })
+
+    vm.$watch('type.sel.$val', function(val){
+        if(val) {
+            var feat = selectedOverlayFeat(store);
+            store(a.OVERLAY_TYPE_SELECT, {feat: feat, type_id: val});
+        }
     });
 }
 
@@ -55,5 +80,5 @@ export default function(config, store, map){
     OverlayView(config, store);
     var omv = OverlayMapView(config, store, map);
     OverlaySelectTools(config, store, map, omv);
-    OverlayDrawing(store, map);
+    OverlayDrawing(store, map, omv);
 }

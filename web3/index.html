@@ -57,6 +57,7 @@
             .leaflet-container {
                 background-color:rgba(255,0,0,0.0);
             }
+            .leaflet-tooltip {border-radius: inherit; pointer-events: auto; }
             .pointer {
                 cursor: pointer;
             }
@@ -67,12 +68,15 @@
         <div id='app'>
 
             <div id="left-panel" class="w3-margin">
+                <div id='error' v-if='error.$val' class="w3-text-red w3-container">
+                    {{error.$val}}
+                </div>
                 <div id="pavilion"></div>
-                <div id='pavilion-layers' v-show='selectedPavilion'>
-                    <folding title="Базовый слой" class="w3-margin-top">
+                <div id='pavilion-layers'>
+                    <folding title="Базовый слой" class="w3-margin-top" v-show='selectedPavilion.$val'>
                         <div id='base-layer'></div>
                     </folding>
-                    <folding title="Дополнительный слой">
+                    <folding title="Дополнительный слой" v-show='hasBase.$val'>
                         <div id='overlays-layer'></div>
                     </folding>
                 </div>
@@ -89,7 +93,7 @@
                 <button class="w3-button w3-light-blue w3-margin-bottom" @click='addPavilion'>Новый павильон</button>
                 <folding title='Павильоны' open='true'>
                     <table class='w3-table w3-striped'>
-                        <tr v-for='p in pavilions' :class="{'w3-light-grey': isSelected(p)}">
+                        <tr v-for='(p,id) in pavilions.$val' :class="{'w3-light-grey': isSelected(p)}">
                             <td @click='selectPavilion(p)' class='pointer'>{{p.name}}</td>
                             <td @click='deletePavilion(p)'><i class='material-icons pointer'>delete</i></td>
                         </tr>
@@ -99,7 +103,7 @@
         </script>
 
          <script type="text/x-template" id="base-layer-template">
-            <div>
+            <div class='w3-container'>
                 <span class='w3-tiny w3-text-pink' v-if='error'>{{error}}</span>
                 <div class="w3-section">
                     <input id="file" type="file" accept=".svg" @change='on_file'>
@@ -126,56 +130,43 @@
          </script>
 
          <script type="text/x-template" id="overlays-layer-template">
-            <div>
-                <div class="w3-section" :class="cssClass('line')" @click='select("line")'>
-                    <i class="material-icons pointer" >timeline</i>
-                    Линия
+            <div class='w3-container'>
+                <div class='w3-section'>
+                    <button class="w3-btn w3-padding-small" :class="cssClass('lines')" @click='select("lines")' title='Стена'>
+                        <i class="material-icons pointer w3-text-grey" >timeline</i>
+                    </button>
+                    <button class="w3-btn w3-padding-small" :class="cssClass('rects')" @click='select("rects")' title='Ковер'>
+                        <i class="material-icons pointer w3-text-grey">receipt</i>
+                    </button>
+                    <button class="w3-btn w3-padding-small" :class="cssClass('notes')" @click='select("notes")' title='Комментарий'>
+                        <i class="material-icons pointer w3-text-grey">note</i>
+                    </button>
                 </div>
-                <div class="w3-section" :class="cssClass('rect')" @click='select("rect")'>
-                    <i class="material-icons pointer">receipt</i>
-                    Ковер
+                <div class='w3-section' v-if='type'>
+                    <select v-model='type.sel.$val' class="w3-select">
+                        <option v-for='(val, key) in type.list' v-bind:value="key">{{val.name}}</option>
+                    </select>
                 </div>
-                <div class="w3-section" :class="cssClass('note')" @click='select("note")'>
-                    <i class="material-icons pointer">note</i>
-                    Комментарий
-                </div>
+                <div class="w3-section" v-if="needSave()">
+                    <button class='w3-button w3-light-blue' @click='save'>Сохранить</button>
+                </div>                
             </div>
          </script>
 
          <script type="text/x-template" id="overlay-tooltip-template">
             <div>
-            <div>
-                <i class='w3-small material-icons pointer'>delete</i>
-            </div>
-            <div>
-                <i class='w3-small material-icons pointer'>delete</i>
-            </div>
-            <div>
-                <i class='w3-small material-icons pointer'>delete</i>
-            </div>
-            <div>
-                <i class='w3-small material-icons pointer'>delete</i>
-            </div>
-            <div>
-                <i class='w3-small material-icons pointer'>delete</i>
-            </div>
-            <div>
-                <i class='w3-small material-icons pointer'>delete</i>
-            </div>
-            <div>
-                <i class='w3-small material-icons pointer'>delete</i>
-            </div>
+                <i class='material-icons pointer'>delete</i>
             </div>
          </script>
 
         <script src='libs/underscore.js'></script>
         <script src='libs/leaflet.js'></script>
         <script src='libs/d3.js'></script>
-        <script src='libs/L.D3SvgOverlay.js'></script>
         <script src='libs/Leaflet.Editable.js'></script>
+        <script src='libs/L.Editable.Drag.js'></script>
         <script src='libs/canvas-layer.js'></script>
         <script src='libs/vue.js'></script>
-        <script src='dist/index.js?v=3'></script>
+        <script src='dist/app.js?v=3'></script>
 
 
     </body>

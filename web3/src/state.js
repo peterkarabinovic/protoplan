@@ -9,7 +9,7 @@ export default {
 
     },
     map: {
-        drawingMode: undefined,
+        drawMode: undefined,
         size_m: undefined
     },
     selectedPavilion: undefined,
@@ -36,6 +36,10 @@ export default {
     }
 }
 
+export function drawMode(store) {
+    return store.state.map.drawMode;
+}
+
 function entity(type, store, id)
 {
     var e = store.state.entities[type];
@@ -51,12 +55,12 @@ export function selectedPavilion(store){
 
 export function baseLayer(store) {
     var pavi = selectedPavilion(store);
-    return  pavi && pavi.base &&  baseById(store, pavi.base) || {};
+    return  pavi && baseById(store, pavi.id) || {};
 }
 
 export function overlayLayer(store) {
     var pavi = selectedPavilion(store);
-    return  pavi && pavi.overlay &&  overlayById(store, pavi.overlay) || {};
+    return  pavi && overlayById(store, pavi.id) || {};
 }
 
 
@@ -65,13 +69,21 @@ export function selectedBase(store) {
 }
 
 export function selectedOverlay(store) {
-    return store.state.selectedBase  || {};
+    return store.state.selectedOverlay  || {};
 }
 
 export function selectedOverlayId(store) {
     return (selectedOverlay(store).id || -1).toString();
 }
 
+export function selectedOverlayFeat(store) {
+    var feat = store.state.ui.overlay.feat;
+    if(feat){
+        var p = feat.split('.');
+        return {cat: p[0], id: p[1]};
+    }
+    return null; 
+}
 
 export function lineType(store) {
     return store.state.ui.overlay.types.lines;

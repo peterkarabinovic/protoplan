@@ -25,6 +25,7 @@ def create_data_file(file_name):
 
 pavilions_json = create_data_file('pavilions.json')
 base_json = create_data_file('base.json')
+overlay_json = create_data_file('overlay.json')
 
 
 # Model
@@ -80,19 +81,35 @@ def base_layers_delete(id):
 
 def base_layers_update(id, new_base):
     with base_layers() as layers:
-        if id == 0 or id == '0':
-            base = {}
-            id = str(int(max(layers.keys())) + 1) if layers else '1'
-        else:
-            base = layers.get(id, {})
+        base = layers.get(id, {})
         base = dict(base, **new_base)
-        base['id'] = id
         layers[id] = base
         with codecs.open(base_json, 'w', 'utf-8') as json_file:
             json_file.write(json.dumps(layers, ensure_ascii=False))
         return base
 
-    
+@contextmanager
+def overlay_layers():
+    with codecs.open(overlay_json, 'r', "utf-8") as file:
+        yield json.load(file)    
+            
+def overlay_update(id, new_overlay):
+    with overlay_layers() as layers:
+        overlay = layers.get(id, {})
+        overlay = dict(overlay, **new_overlay)
+        layers[id] = overlay
+        with codecs.open(overlay_json, 'w', 'utf-8') as json_file:
+            json_file.write(json.dumps(layers, ensure_ascii=False))
+        return overlay
+
+def overlay_delete(id):
+    if id is None:
+        return
+    id = str(id)
+    with overlay_layers() as layers:
+        layers = {k: v for k, v in layers.items() if k != id }
+        with codecs.open(overlay_json, 'w', 'utf-8') as json_file:
+            json_file.write(json.dumps(layers, ensure_ascii=False))
 
 app = Flask(__name__, static_folder='')
 
@@ -138,9 +155,14 @@ def update_pavilion(id):
 @app.route('/pavilions/<id>|delete', methods=['POST'])
 def delete_pavilion(id):
     base_layers_delete(id)
+    overlay_delete(id)
     pavilion_delete(id)
     return "ok"
 
+@app.route('/bases/')
+def bases():
+    with base_layers() as bases:
+        return flask.jsonify(bases)
 
 @app.route('/pavilions/<id>/base/', methods=['POST'])
 def update_base(id):
@@ -151,11 +173,19 @@ def update_base(id):
     base = base_layers_update(id, base)
     return flask.jsonify({"id": base['id']})
 
-@app.route('/bases/')
-def bases():
-    with base_layers() as bases:
-        return flask.jsonify(bases)
+@app.route('/overlays/')
+def overlay():
+    with overlay_layers() as overlays:
+        return flask.jsonify(overlays)
 
+@app.route('/pavilions/<id>/overlay/', methods=['POST'])
+def update_overlay(id):
+    overlay = json.loads(request.data)
+    pavi = pavilion_by_id(id)
+    if not pavi:
+        return "Pavilion not found {}".format(id), 404
+    overlay = overlay_update(id, overlay)
+    return flask.jsonify({"id": overlay['id']})
 
 
 

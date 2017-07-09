@@ -30,7 +30,7 @@ export default function(config, store, map)
 
     var cat2group = {
         lines: {group: lineGroup, toLayer: toPolyline},
-        rects: {group: rectGroup, toLayer: toPolygon},
+        rects: {group: rectGroup, toLayer: toLeafletRect},
         notes: {group: noteGroup, toLayer: toNote}
     }
 
@@ -68,6 +68,24 @@ export default function(config, store, map)
     store.on('selectedOverlay.rects', _.partial(updateGroup, 'rects') );
     store.on('selectedOverlay.notes', _.partial(updateGroup, 'notes') );
 
+    function updateStyles(cat, e)
+    {
+        var id = e.path[2],
+            type = e.new_val;
+        var overlay_id = selectedOverlayId(store);
+        var layer_id = str(overlay_id, '.', id);
+        var layes = cat2layers[cat];
+        console.log('selectedOverlay.'+cat+'.*.type', id);
+        if(layes[layer_id]){
+            var style = config.overlay.types[cat][type].style;
+            layes[layer_id].setStyle(style);
+        }
+    }
+
+    store.on('selectedOverlay.lines.*.type', _.partial(updateStyles, 'lines') );
+    store.on('selectedOverlay.rects.*.type', _.partial(updateStyles, 'rects') );
+    store.on('selectedOverlay.notes.*.type', _.partial(updateStyles, 'notes') );
+
     return {cat2group: cat2group, cat2layers:cat2layers};
 }
 
@@ -78,8 +96,8 @@ function toPolyline(id, line, style)
     return poly;
 }
 
-function toPolygon(id, rect, style){
-    var poly = L.polygon(toLatLngs(rect.points), style);
+function toLeafletRect(id, rect, style){
+    var poly = L.rectangle(toLatLngs(rect.points), style);
     poly.id = id;
     return poly;
 }

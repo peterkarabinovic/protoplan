@@ -53,39 +53,6 @@ export function Store(reducers, middleware)
     return s;
 }
 
-/**
- * Recursive run by properties search diff and fire events 
- * @param {*} new_obj 
- * @param {*} old_obj 
- * @param {*} listeners 
- * @param {*} path 
- */
-// function find_and_fire(path, new_obj, old_obj, listeners)
-// {
-//     if( _.isEmpty(listeners) )
-//         return
-
-//     new_obj = new_obj || {};
-//     old_obj = old_obj || {};
-       
-//     var props = diffs(new_obj, old_obj);    
-//     var max_level = +_.max(_.keys(listeners));
-//     props.forEach(function(prop){
-//         var o1 = new_obj[prop];
-//         var o2 = old_obj[prop];
-//         var p = path.concat([prop]);
-//         listeners = reject_array_prop(listeners, p.length, function(it){
-//             if(_match(p, it.path)) {
-//                 it.fn({new_val: o1, old_val: o2, path: p});
-//                 return !_.contains(it.path, '*');
-//             }
-//             return false;
-//         });
-//         if(max_level > p.length)
-//             find_and_fire(p, o1, o2, listeners);
-//     });
-// }
-
 
 function find_and_fire(path, new_obj, old_obj, listeners)
 {

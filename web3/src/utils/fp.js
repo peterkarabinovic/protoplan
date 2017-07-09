@@ -81,18 +81,14 @@ export var Immutable = (function(){
     i.get = function(obj, path){
         if(!_.isArray(path))
             path = path.split('.');
-        if(_.isUndefined(obj))
-            return obj;
-
-        if(path.length == 1){
-            return obj[path[0]];
-        }
-        else {
-            var prop = path[0];
-            var prop_val = obj[prop];
-            return i.get(prop_val, path.slice(1));
-        }
-
+            
+        for(var i in path){
+            var p = path[i];
+            if(_.isUndefined(obj))
+                break;
+            obj = obj[p];    
+        }    
+        return obj;
     }
     return i;
 })();

@@ -85,39 +85,6 @@ function Store(reducers, middleware)
     return s;
 }
 
-/**
- * Recursive run by properties search diff and fire events 
- * @param {*} new_obj 
- * @param {*} old_obj 
- * @param {*} listeners 
- * @param {*} path 
- */
-// function find_and_fire(path, new_obj, old_obj, listeners)
-// {
-//     if( _.isEmpty(listeners) )
-//         return
-
-//     new_obj = new_obj || {};
-//     old_obj = old_obj || {};
-       
-//     var props = diffs(new_obj, old_obj);    
-//     var max_level = +_.max(_.keys(listeners));
-//     props.forEach(function(prop){
-//         var o1 = new_obj[prop];
-//         var o2 = old_obj[prop];
-//         var p = path.concat([prop]);
-//         listeners = reject_array_prop(listeners, p.length, function(it){
-//             if(_match(p, it.path)) {
-//                 it.fn({new_val: o1, old_val: o2, path: p});
-//                 return !_.contains(it.path, '*');
-//             }
-//             return false;
-//         });
-//         if(max_level > p.length)
-//             find_and_fire(p, o1, o2, listeners);
-//     });
-// }
-
 
 function find_and_fire(path, new_obj, old_obj, listeners)
 {
@@ -211,130 +178,6 @@ function reduceReducers(reducers){
     }
 }
 
-function str() {
-    return "".concat.apply("",arguments);
-}
-
-function startswith(str, substr) { 
-    return str && str.indexOf(str) === 0;
-}
-
-
-/*
- * Selfcheck - wrap callback function for check if it already called in stack above
- */
-
-function initComponents()
-{
-
-    Vue.component('folding', {
-        props: ['title', 'open'],
-
-        template: str('<div style="cursor: pointer;">',
-                    '<span @click="on_click" style="margin-left: -1.2em" class="w3-text-grey">',
-                    '<i  style="margin-right: 0.4em" class="material-icons">{{icon}}</i>',
-                    '{{title}}</span>',
-                    '<div v-show="is_open"><slot></slot></div>',
-                  '</div>'),
-
-        data: function(){
-            return {
-                is_open: this.open == 'true'
-            }
-        },
-        computed: {
-            icon: function(){
-                return ['chevron_right', 'expand_more'][+this.is_open];
-            }
-        },
-        methods: {
-            on_click: function(){
-                this.is_open = !this.is_open;
-            }
-        }
-    });
-
-}
-
-/**
- * Init state
- */
-var initState = {
-    pavilions: {
-
-    },
-    map: {
-        drawingMode: undefined,
-        size_m: undefined
-    },
-    selectedPavilion: undefined,
-    selectedBase: undefined,
-    selectedOverlay: undefined,
-    entities: {
-        bases: {}, // base layers,
-        overlays: {}, // additinal layers
-        stands: {},
-        stand_types: {},
-        stand_categories: {},
-        equipments: {} 
-    },
-    ui: {
-        error: '',
-        overlay: {
-            types: {
-                lines: 1,
-                rects: 1,
-                notes: 1
-            },
-            feat: undefined
-        }
-    }
-};
-
-function entity(type, store, id)
-{
-    var e = store.state.entities[type];
-    return e && e[id] || {};
-}
-
-var baseById = _.partial(entity, 'bases');
-var overlayById = _.partial(entity, 'overlays');
-
-function selectedPavilion(store){
-    return store.state.selectedPavilion;
-}
-
-function baseLayer(store) {
-    var pavi = selectedPavilion(store);
-    return  pavi && pavi.base &&  baseById(store, pavi.base) || {};
-}
-
-
-
-
-function selectedBase(store) {
-    return store.state.selectedBase  || {};
-}
-
-function selectedOverlay(store) {
-    return store.state.selectedBase  || {};
-}
-
-function selectedOverlayId(store) {
-    return (selectedOverlay(store).id || -1).toString();
-}
-
-
-function lineType(store) {
-    return store.state.ui.overlay.types.lines;
-}
-function rectType(store) {
-    return store.state.ui.overlay.types.rects;
-}
-function noteType(store) {
-    return store.state.ui.overlay.types.notes;
-}
-
 /**
  *  Small functional programming stuff 
  */
@@ -418,21 +261,167 @@ var Immutable = (function(){
     i.get = function(obj, path){
         if(!_.isArray(path))
             path = path.split('.');
-        if(_.isUndefined(obj))
-            return obj;
-
-        if(path.length == 1){
-            return obj[path[0]];
-        }
-        else {
-            var prop = path[0];
-            var prop_val = obj[prop];
-            return i.get(prop_val, path.slice(1));
-        }
-
+            
+        for(var i in path){
+            var p = path[i];
+            if(_.isUndefined(obj))
+                break;
+            obj = obj[p];    
+        }    
+        return obj;
     };
     return i;
 })();
+
+function bindProp(store)
+{
+    var props = {};
+
+    function listener(prop) {
+        return function(e){
+            prop.$val = e.new_val;
+        }
+    }
+
+    store.prop = function(path){
+        if(props[path])
+            return props[path];
+
+        var prop = { $val: Immutable.get(store.state, path) };
+        props[path] = prop;
+        store.on(path, listener(prop));
+        return prop;
+    };
+}
+
+function str() {
+    return "".concat.apply("",arguments);
+}
+
+function startswith(str, substr) { 
+    return str && str.indexOf(str) === 0;
+}
+
+
+/*
+ * Selfcheck - wrap callback function for check if it already called in stack above
+ */
+
+function initComponents()
+{
+
+    Vue.component('folding', {
+        props: ['title', 'open'],
+
+        template: str('<div style="cursor: pointer;">',
+                    '<span @click="on_click" style="margin-left: -1.2em" class="w3-text-grey">',
+                    '<i  style="margin-right: 0.4em" class="material-icons">{{icon}}</i>',
+                    '{{title}}</span>',
+                    '<div v-show="is_open"><slot></slot></div>',
+                  '</div>'),
+
+        data: function(){
+            return {
+                is_open: this.open == 'true'
+            }
+        },
+        computed: {
+            icon: function(){
+                return ['chevron_right', 'expand_more'][+this.is_open];
+            }
+        },
+        methods: {
+            on_click: function(){
+                this.is_open = !this.is_open;
+            }
+        }
+    });
+
+}
+
+/**
+ * Init state
+ */
+var initState = {
+    pavilions: {
+
+    },
+    map: {
+        drawMode: undefined,
+        size_m: undefined
+    },
+    selectedPavilion: undefined,
+    selectedBase: undefined,
+    selectedOverlay: undefined,
+    entities: {
+        bases: {}, // base layers,
+        overlays: {}, // additinal layers
+        stands: {},
+        stand_types: {},
+        stand_categories: {},
+        equipments: {} 
+    },
+    ui: {
+        error: '',
+        overlay: {
+            types: {
+                lines: 1,
+                rects: 1,
+                notes: 1
+            },
+            feat: undefined
+        }
+    }
+};
+
+function drawMode(store) {
+    return store.state.map.drawMode;
+}
+
+function entity(type, store, id)
+{
+    var e = store.state.entities[type];
+    return e && e[id] || {};
+}
+
+var baseById = _.partial(entity, 'bases');
+var overlayById = _.partial(entity, 'overlays');
+
+function selectedPavilion(store){
+    return store.state.selectedPavilion;
+}
+
+function baseLayer(store) {
+    var pavi = selectedPavilion(store);
+    return  pavi && baseById(store, pavi.id) || {};
+}
+
+function overlayLayer(store) {
+    var pavi = selectedPavilion(store);
+    return  pavi && overlayById(store, pavi.id) || {};
+}
+
+
+function selectedBase(store) {
+    return store.state.selectedBase  || {};
+}
+
+function selectedOverlay(store) {
+    return store.state.selectedOverlay  || {};
+}
+
+function selectedOverlayId(store) {
+    return (selectedOverlay(store).id || -1).toString();
+}
+
+function selectedOverlayFeat(store) {
+    var feat = store.state.ui.overlay.feat;
+    if(feat){
+        var p = feat.split('.');
+        return {cat: p[0], id: p[1]};
+    }
+    return null; 
+}
 
 var INIT = 'INIT';
 
@@ -455,20 +444,32 @@ var BASE_DISTANCE_LENGTH_SET = 'BASE_DISTANCE_LENGTH_SET';
 var DRAWING_MODE_SET = 'DRAWING_MODE_SET';
 
 var OVERLAY_FEAT_ADD = 'OVERLAY_FEAT_ADD';
+var OVERLAYS_LOADED = 'OVERLAYS_LOADED';
 var OVERLAY_FEAT_UPDATE = 'OVERLAY_FEAT_UPDATE';
 var OVERLAY_FEAT_DELETE = 'OVERLAY_FEAT_DELETE';
 var OVERLAY_FEAT_SELECT = 'OVERLAY_FEAT_SELECT';
+var OVERLAY_TYPE_SELECT = 'OVERLAY_TYPE_SELECT';
 var OVERLAY_SAVE = 'OVERLAY_SAVE';
+var OVERLAY_SAVED = 'OVERLAY_SAVED';
 
 
 var ERROR_SET = 'ERROR_SET';
+
+var errorReducer = function(state, action){
+    switch(action.type){
+        case ERROR_SET:
+            return Immutable.set(state, 'ui.error', action.payload);
+    }
+    state = Immutable.set(state, 'ui.error');
+    return state;
+};
 
 var mapReducer = function(state, action)
 {
     switch(action.type){
         case DRAWING_MODE_SET:
             var mode = action.payload;
-            return Immutable.set(state, 'map.drawingMode', mode);
+            return Immutable.set(state, 'map.drawMode', mode);
 
     }
     return state;
@@ -491,6 +492,8 @@ var pavilionReducer = function(state, action)
             if(state.selectedPavilion && state.selectedPavilion.id == pavi_id) {
                 state = Immutable.set(state, 'selectedPavilion');
                 state = Immutable.set(state, 'selectedBase');
+                state = Immutable.set(state, 'selectedOverlay');
+                state = Immutable.set(state, 'ui.overlay.feat');
             }
             return state;
 
@@ -507,9 +510,11 @@ var pavilionReducer = function(state, action)
             if(pavi) {
                 var base = state.entities.bases[pavi.id] || {id: pavi.id};
                 state = Immutable.set(state, 'selectedBase', base);
+                state = Immutable.set(state, str('entities.bases.',pavi.id), base);                
                 state = Immutable.set(state, 'map.size_m', base.size_m);
                 var overlay = state.entities.overlays[pavi.id] || {id:pavi.id};
-                state = Immutable.set(state, 'selectedOverlay', base);
+                state = Immutable.set(state, 'selectedOverlay', overlay);
+                state = Immutable.set(state, str('entities.overlays.',pavi.id), overlay);
             }
             return state;
             
@@ -552,7 +557,7 @@ var baseReducer = function(state, action)
             if(state.pavilions[base.id]) {
                 state = Immutable.set(state, 'entities.bases.'+base.id, base);
                 if(state.selectedPavilion && base.id == state.selectedPavilion.id)
-                    state = Immutable.extend(state, 'selectedBase', base);
+                    state = Immutable.set(state, 'selectedBase', base);
             }
             else {
                 state = Immutable.remove(state, 'entities.bases.'+base.id);
@@ -564,6 +569,9 @@ var baseReducer = function(state, action)
 
 var overlayReducer = function(state, action){
     switch(action.type){
+        case OVERLAYS_LOADED:
+            return Immutable.set(state, 'entities.overlays', action.payload);
+
         case OVERLAY_FEAT_ADD: 
             var cat = action.payload.cat;
             var feat = action.payload.feat;
@@ -572,7 +580,7 @@ var overlayReducer = function(state, action){
                 type: state.ui.overlay.types[cat]
             });
             state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat.id));
-            return Immutable.set(state, 'selectedOverlay.'+cat+'.'+feat.id, feat);
+            return Immutable.set(state, str('selectedOverlay.',cat,'.',feat.id), feat);
 
         case OVERLAY_FEAT_UPDATE: 
             var type = action.payload.type;
@@ -588,29 +596,44 @@ var overlayReducer = function(state, action){
             return Immutable.remove(state, 'ui.overlay.feat');
 
         case OVERLAY_FEAT_SELECT:
-            return Immutable.set(state, 'ui.overlay.feat', action.payload);
-
-                    
-        case OVERLAY_SAVE:
-            var overlay = state.selectedOverlay;
-            var pavi_id = state.selectedPavilion.id;
-            if(!overlay.id) {
-                overlay = Immutable.set(overlay, 'id', pavi_id);
+            var feat_id = action.payload;
+            if(feat_id) {
+               var p = feat_id.split('.'),
+                   cat = p[0],
+                   id = +p[1];
+                var feat = state.selectedOverlay[cat][id];
+                state = Immutable.set(state, str('ui.overlay.types.',cat), feat.type);
             }
-            state = Immutable.set(state, 'selectedOverlay', overlay);
-            return Immutable.extend(state, 'entities.overlays', {id: overlay} );
+            return Immutable.set(state, 'ui.overlay.feat', feat_id);
+        
+        case OVERLAY_TYPE_SELECT:
+            var p = action.payload;
+            state = Immutable.set(state, str('ui.overlay.types.',p.feat.cat), p.type_id);
+            return Immutable.set(state, str('selectedOverlay.',p.feat.cat,'.',p.feat.id, '.type'),  p.type_id)
+
+        case OVERLAY_SAVED:
+            var overlay = action.payload;
+            if(state.pavilions[overlay.id]) {
+                state = Immutable.set(state, 'entities.overlays.'+overlay.id, overlay);
+                if(state.selectedPavilion && overlay.id == state.selectedPavilion.id)
+                    state = Immutable.extend(state, 'selectedOverlay', overlay);
+            }
+            else {
+                state = Immutable.remove(state, 'entities.overlays.'+overlay.id);
+            }
+            return state;
     }
     return state;
 };
 
 
 
-var reducers = reduceReducers([mapReducer, pavilionReducer, baseReducer, overlayReducer]);
+var reducers = reduceReducers([errorReducer, mapReducer, pavilionReducer, baseReducer, overlayReducer]);
 
 
 function generateId(state, path){
     var ids = _.keys( Immutable.get(state, path) || {} );
-    return ids.length ? _.max(ids) + 1 : 1;
+    return ids.length ? +_.max(ids) + 1 : 1;
 }
 
 function RequestsMiddleware(store){
@@ -628,6 +651,11 @@ function RequestsMiddleware(store){
                     d3.json('/bases/')
                       .get(function(bases){
                             store(BASES_LOADED, bases);
+                      });
+
+                    d3.json('/overlays/')
+                      .get(function(bases){
+                            store(OVERLAYS_LOADED, bases);
                       });
 
                     break;
@@ -661,13 +689,29 @@ function RequestsMiddleware(store){
                     d3.request('/pavilions/'+base_layer.id+'/base/')
                         .mimeType("application/json")
                         .send('POST', JSON.stringify(base_layer), function(er, xhr){
-                            if(er) store(ERROR_SET, er);
+                            if(er) store(ERROR_SET, er.target.responseText);
                             else {
                                 var res = JSON.parse(xhr.responseText);
                                 base_layer = _.extend({}, base_layer, res);
                                 store(BASE_LAYER_SAVED, base_layer);
                             }
                         });
+                    break;
+
+                case OVERLAY_SAVE:
+                    var overlay = action.payload;
+                    d3.request('/pavilions/'+overlay.id+'/overlay/')
+                        .mimeType("application/json")
+                        .send('POST', JSON.stringify(overlay), function(er, xhr){
+                            if(er) store(ERROR_SET, er.target.responseText || 'Connection error');
+                            else {
+                                var res = JSON.parse(xhr.responseText);
+                                overlay = _.extend({}, overlay, res);
+                                store(OVERLAY_SAVED, overlay);
+                            }
+                        });
+                    break;
+
 
                     
             }
@@ -850,8 +894,8 @@ var PavilionModule = function (store)
         el: "#pavilion",
         template: '#pavilion-template',
         data: {
-            pavilions: _.values(store.state.pavilions),
-            selectedPavilion: _.clone(store.state.selectedPavilion || {})
+            pavilions: store.prop('pavilions'),
+            selectedPavilion: store.prop('selectedPavilion')
         },
         methods: {
             addPavilion: function(){
@@ -867,29 +911,25 @@ var PavilionModule = function (store)
                 store(PAVILION_SELECT, pavi);
             },
             isSelected: function(pavi){
-                return _.isEqual(pavi,  this.selectedPavilion);
+                return _.isEqual(pavi,  this.selectedPavilion.$val);
             }
 
         }        
     });
 
-    store.on('pavilions', function(e){
-        vm.pavilions = _.values(e.new_val);
-    });
-
-    store.on('selectedPavilion', function(e){
-        vm.selectedPavilion = e.new_val;
-    });
-
-
     var vm2 = new Vue({
         el: '#pavilion-layers',
-        data: { selectedPavilion: store.state.selectedPavilion}
+        data: { 
+            selectedPavilion: store.prop('selectedPavilion'),
+            hasBase: store.prop('selectedBase.url')
+        }
     });
 
-    store.on('selectedPavilion', function(e){
-        vm2.selectedPavilion = e.new_val;
+    var vm3 = new Vue({
+        el: '#error',
+        data: { error: store.prop('ui.error') }
     });
+    
 };
 
 var cur_locale = 'ru';
@@ -998,7 +1038,7 @@ var BaseMapDistance = function(store, map){
 
     var line = null;
     var tooltip = null; 
-    store.on('map.drawingMode', function(e)
+    store.on('map.drawMode', function(e)
     {
         if(e.new_val == DRAW_DISTANCE)
         {
@@ -1006,7 +1046,7 @@ var BaseMapDistance = function(store, map){
             line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'});   
             line.on('editable:editing', on_edit);
         }
-        else {
+        else if(e.old_val == DRAW_DISTANCE) {
             L.setOptions(map.editTools, {skipMiddleMarkers: false});            
         }
     });
@@ -1014,6 +1054,7 @@ var BaseMapDistance = function(store, map){
     store.on('selectedBase.distance', function(e){
         if(!e.new_val || !e.new_val.points) {
             if(line) {
+                line.disableEdit();
                 map.removeLayer(line);
                 line = null;
             }
@@ -1021,7 +1062,7 @@ var BaseMapDistance = function(store, map){
     });
 
     store.on('selectedBase.size_m', function(e){
-        if(!line || !e.new_val) return
+        if(!line || !e.new_val || !selectedBase(store).distance) return
         var points = selectedBase(store).distance.points;
         var latLngs = points.map(function(it){
             return map.unproject(it,1);
@@ -1038,7 +1079,7 @@ var BaseMapDistance = function(store, map){
         if(line.getLatLngs().length == 2) 
         {
             var latLngs = line.getLatLngs();
-            map.editTools.stopDrawing();
+            map.editTools.commitDrawing();
             var points = latLngs.map(function(it){
                 return map.project(it,1);
             });
@@ -1069,7 +1110,8 @@ function BaseView(store) {
         data: {
             width: null, height: null,
             lineLength: null,
-            error: ''
+            error: '',
+            selectedBase: store.prop('selectedBase')
         },
         methods: 
         {
@@ -1107,46 +1149,46 @@ function BaseView(store) {
                 store(BASE_DISTANCE_LENGTH_SET, this.lineLength);
             },
             needDrawLine: function(){
-                return this.width && !this.lineLength;
+                return this.selectedBase.$val && !this.selectedBase.$val.distance;
             },
             needRecalculate: function(){
-                var bl = selectedBase(store);
-                return this.lineLength > 0 && this.lineLength != Math.round(bl.distance.length_m);
+                var sb = this.selectedBase.$val;
+                return sb && this.lineLength > 0 && this.lineLength != Math.round(sb.distance.length_m);
             },
             needSave: function(){
                 var bl = baseLayer(store),
-                    el = selectedBase(store);
-                return !bl || !_.isEqual(bl.size_m, el.size_m) || !_.isEqual(bl.url, el.url);
+                    sb = this.selectedBase.$val;
+                return sb &&  (!_.isEqual(bl.size_m, sb.size_m) || !_.isEqual(bl.url, sb.url));
 
             },
             save: function(){
-                var el = selectedBase(store);
-                store(BASE_LAYER_SAVE, {base: el});
+                store(BASE_LAYER_SAVE, {base: this.selectedBase.$val});
             }
         }, 
         computed: {
             widthHeight: function(){
-                return this.width ? this.width + ' m / ' + this.height + ' m' : ''
+                var sb = this.selectedBase.$val;
+                return sb && sb.size_m ? Math.round(sb.size_m.x) + ' m / ' + Math.round(sb.size_m.y) + ' m' : ''
             }
         }
     });
 
-    function updateWidthHeight(e){
-        var base = e.new_val;
-        if(base && base.size_m) { 
-            vm.width = Math.round(base.size_m.x);
-            vm.height = Math.round(base.size_m.y);
-        }
-        else {
-            vm.width = vm.height = null;
-        }
-    }
+    // function updateWidthHeight(e){
+    //     var base = e.new_val;
+    //     if(base && base.size_m) { 
+    //         vm.width = Math.round(base.size_m.x);
+    //         vm.height = Math.round(base.size_m.y);
+    //     }
+    //     else {
+    //         vm.width = vm.height = null;
+    //     }
+    // }
 
     function updateLength_m(e){
         vm.lineLength = e.new_val;
     }
 
-    store.on('selectedBase', updateWidthHeight);
+    // store.on('selectedBase', updateWidthHeight);
     store.on('selectedBase.distance.length_m', updateLength_m);    
 
     return vm;
@@ -1167,7 +1209,7 @@ var OverlayMapView = function(config, store, map)
 
     var cat2group = {
         lines: {group: lineGroup, toLayer: toPolyline},
-        rects: {group: rectGroup, toLayer: toPolygon},
+        rects: {group: rectGroup, toLayer: toLeafletRect},
         notes: {group: noteGroup, toLayer: toNote}
     };
 
@@ -1205,6 +1247,24 @@ var OverlayMapView = function(config, store, map)
     store.on('selectedOverlay.rects', _.partial(updateGroup, 'rects') );
     store.on('selectedOverlay.notes', _.partial(updateGroup, 'notes') );
 
+    function updateStyles(cat, e)
+    {
+        var id = e.path[2],
+            type = e.new_val;
+        var overlay_id = selectedOverlayId(store);
+        var layer_id = str(overlay_id, '.', id);
+        var layes = cat2layers[cat];
+        console.log('selectedOverlay.'+cat+'.*.type', id);
+        if(layes[layer_id]){
+            var style = config.overlay.types[cat][type].style;
+            layes[layer_id].setStyle(style);
+        }
+    }
+
+    store.on('selectedOverlay.lines.*.type', _.partial(updateStyles, 'lines') );
+    store.on('selectedOverlay.rects.*.type', _.partial(updateStyles, 'rects') );
+    store.on('selectedOverlay.notes.*.type', _.partial(updateStyles, 'notes') );
+
     return {cat2group: cat2group, cat2layers:cat2layers};
 };
 
@@ -1215,8 +1275,8 @@ function toPolyline(id, line, style)
     return poly;
 }
 
-function toPolygon(id, rect, style){
-    var poly = L.polygon(toLatLngs(rect.points), style);
+function toLeafletRect(id, rect, style){
+    var poly = L.rectangle(toLatLngs(rect.points), style);
     poly.id = id;
     return poly;
 }
@@ -1232,72 +1292,94 @@ function toLatLngs(points) {
 var OverlaySelectTools = function(config, store, map, overlayMapView)
 {
     var tooltipContent = document.getElementById('overlay-tooltip-template').text;
-    var tooltip = L.tooltip({permanent:true}).setContent(tooltipContent);
+    var tooltip = L.tooltip({permanent:true, interactive: true}).setContent(tooltipContent);
+    var $delete = function() { return tooltip.getElement().getElementsByTagName('i')[0]; };
 
-    var selectedLayer = null;
     var cat2group = overlayMapView.cat2group;
     var cat2layers = overlayMapView.cat2layers;
-
-    function onFeatureClick(cat, e){
-        var layer_id = e.layer.id.split('.'),
-            feat_id = str(cat,'.',layer_id[1]);
-        store(OVERLAY_FEAT_SELECT, feat_id);
-    }
-
-    _.mapObject(cat2group, function(val, cat){
-        val.group.on('click', _.partial(onFeatureClick, cat));
-    });
 
     function onDeleteFeat(){
         store(OVERLAY_FEAT_DELETE);
     }
 
-    function updateSelectedLayer(e){
-        if(selectedLayer) {
-            selectedLayer.disableEdit();
-            selectedLayer = null;
-            L.DomEvent.off(tooltip.getElement(), 'click', onDeleteFeat);
-            map.removeLayer(tooltip);
-        }
-        var feat_path = e.new_val;
-        if(feat_path){
-            var p = feat_path.split('.'),
-                cat = p[0],
-                id = p[1];
-            var overlay_id = selectedOverlayId(store);
-            var layer_id = str(overlay_id, '.', id);
-            selectedLayer = cat2layers[cat][layer_id];
-            if(selectedLayer) {
-                selectedLayer.enableEdit(map);      
-                tooltip.setLatLng(selectedLayer.getCenter());
-                map.addLayer(tooltip);
-                L.DomEvent.on(tooltip.getElement(), 'click', onDeleteFeat);
-            }
+    function onFeatClick(cat, e){
+        var layer_id = e.layer.id.split('.'),
+            feat_id = str(cat,'.',layer_id[1]);
+        store(OVERLAY_FEAT_SELECT, feat_id);
+        closeTooltip(tooltip);         
+    }
+
+    function onFeatContext(cat, e){
+        onFeatClick(cat, e);
+        tooltip.setLatLng(e.latlng);
+        map.addLayer(tooltip); 
+        L.DomEvent.on($delete(), 'click', onDeleteFeat);
+    }
+
+    function closeTooltip(){
+        if(tooltip._map) {
+            map.removeLayer(tooltip); 
+            L.DomEvent.off($delete(), 'click', onDeleteFeat);
         }
     }
 
-    store.on('ui.overlay.feat', updateSelectedLayer);
+    _.mapObject(cat2group, function(val, cat){
+        val.group.on('click', _.partial(onFeatClick, cat));
+    });
 
     
+    _.mapObject(cat2group, function(val, cat){
+        val.group.on('contextmenu', _.partial(onFeatContext, cat));
+    });
+
+    store.on('ui.overlay.feat', closeTooltip);
+    // map.on('click', closeTooltip);
+
+  
 };
 
-var OverlayDrawing = function(store, map)
+var OverlayDrawing = function(store, map, overlayMapView)
 {
     var editor = null;
+    var selectedLayer = null;
+    var cat2layers = overlayMapView.cat2layers;
+
+
     var m2e = {};
     m2e[DRAW_WALL] = editFeat('lines', store, map);
     m2e[DRAW_RECT] = editFeat('rects', store, map);
     m2e[DRAW_NOTE] = editNote(store, map);
 
+    function updateSelectedLayer(e){
+        if(selectedLayer) {
+            selectedLayer.disableEdit();
+            selectedLayer = null;
+        }
+        var feat_path = e.new_val;
+        if(feat_path){
+            var feat = selectedOverlayFeat(store);
+            var overlay_id = selectedOverlayId(store);
+            var layer_id = str(overlay_id, '.', feat.id);
+            selectedLayer = cat2layers[feat.cat][layer_id];
+            if(selectedLayer) {
+                L.setOptions(map.editTools, {skipMiddleMarkers: feat.cat !== 'lines', draggable: true});
+                selectedLayer.enableEdit(map);      
+            }
+        }
+    }
 
-    store.on('map.drawingMode', function(e){
+    function onDrawMode(e) {
         if(editor) editor.exit();
         editor = m2e[e.new_val];
         if(editor) {
             editor.enter();
             store(OVERLAY_FEAT_SELECT);
         }
-    });
+    }
+
+
+    store.on('map.drawMode', onDrawMode);
+    store.on('ui.overlay.feat', updateSelectedLayer);
 };
 
 
@@ -1316,8 +1398,16 @@ function editFeat(cat, store, map)
     }
 
     function onCommit(){
-        var feat =  { points: toPoints(layer.getLatLngs())};
-        store(OVERLAY_FEAT_ADD, {feat: feat, cat: cat});
+        var checkDist = 1;
+        _.reduce(_.flatten(layer.getLatLngs()), function(l1,l2){
+            var d = l1.distanceTo(l2);
+            if(d < checkDist) checkDist = d;
+            return l2;
+        });
+        if(checkDist == 1) {
+            var feat =  { points: toPoints(layer.getLatLngs())};
+            store(OVERLAY_FEAT_ADD, {feat: feat, cat: cat});
+        }
         store(DRAWING_MODE_SET);
     }
     return {enter:enter, exit:exit};
@@ -1343,51 +1433,76 @@ function editNote() {
 // }
 
 function toPoints(latLngs){
+    var f = L.Util.formatNum;
     latLngs = _.flatten(latLngs);
-    return latLngs.map(function(ll){ return [ll.lng, ll.lat] });
+    return latLngs.map(function(ll){ return [f(ll.lng,2), f(ll.lat,2)] });
 }
 
 function OverlayView(config, store)
 {
     var MODES = {
-        "line": DRAW_WALL,
-        "rect": DRAW_RECT,
-        "note": DRAW_NOTE
+        "lines": DRAW_WALL,
+        "rects": DRAW_RECT,
+        "notes": DRAW_NOTE
     };
 
 
     var vm = new Vue({
-        el:"#overlays-layer",
+        el:"#overlays-layer", 
         template: '#overlays-layer-template',
         data: {
             mode: null,
-             
-            lineTypes: config.overlay.types.lines,
-            rectTypes: config.overlay.types.rects,
-            noteTypes: config.overlay.types.notes,
-
-            selLineType: lineType(store),
-            selRectType: rectType(store),
-            selNoteType: noteType(store)
+            selectedOverlay: store.prop('selectedOverlay'),
+            types: {
+                lines: {
+                    sel: store.prop('ui.overlay.types.lines'),
+                    list: config.overlay.types.lines 
+                },
+                rects: {
+                    sel: store.prop('ui.overlay.types.rects'),
+                    list: config.overlay.types.rects 
+                },
+                notes: {
+                    sel: store.prop('ui.overlay.types.notes'),
+                    list: config.overlay.types.notes
+                }
+            },
+            type: null,
         },
-        methods: {
+        methods: { 
             select: function(mode){ 
-                store(DRAWING_MODE_SET, MODES[mode]);
+                var m = MODES[mode];
+                store(DRAWING_MODE_SET, drawMode(store) == m ? undefined : m );
             },
             cssClass: function(p){
-                return p == this.mode ? 'w3-text-red'  : 'w3-text-grey';
+                return p == this.mode ? 'w3-border-blue  w3-border'  : '';
+            },
+            needSave: function(){
+                var so = this.selectedOverlay.$val;
+                return so && !_.isEqual(overlayLayer(store), so);
+            },
+            save: function(){
+                var o = this.selectedOverlay.$val;
+                store(OVERLAY_SAVE, o);
+                this.selectedOverlay.$val = null;
             }
         }
     });
 
-    store.on('map.drawingMode', function(e){
+    store.on('map.drawMode', function(e){
         vm.mode = _.findKey(MODES, function(it) { return it == e.new_val});
     });
 
-    store.on('ui.overlay', function(e){
-        vm.selLineType = lineType(store);
-        vm.selRectType = rectType(store);
-        vm.selNoteType = noteType(store);
+    store.on('ui.overlay.feat', function(){
+        var feat = selectedOverlayFeat(store);
+        vm.type = feat ? vm.types[feat.cat] : null;
+    });
+
+    vm.$watch('type.sel.$val', function(val){
+        if(val) {
+            var feat = selectedOverlayFeat(store);
+            store(OVERLAY_TYPE_SELECT, {feat: feat, type_id: val});
+        }
     });
 }
 
@@ -1395,13 +1510,14 @@ var OverlaysModule = function(config, store, map){
     OverlayView(config, store);
     var omv = OverlayMapView(config, store, map);
     OverlaySelectTools(config, store, map, omv);
-    OverlayDrawing(store, map);
+    OverlayDrawing(store, map, omv);
 };
 
 initComponents();
 
 
 var store = Store(reducers, [RequestsMiddleware]);
+bindProp(store);
 store.state = initState;
 window.store = store;
 

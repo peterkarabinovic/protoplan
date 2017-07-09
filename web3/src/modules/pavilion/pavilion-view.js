@@ -7,8 +7,8 @@ export default function (store)
         el: "#pavilion",
         template: '#pavilion-template',
         data: {
-            pavilions: _.values(store.state.pavilions),
-            selectedPavilion: _.clone(store.state.selectedPavilion || {})
+            pavilions: store.prop('pavilions'),
+            selectedPavilion: store.prop('selectedPavilion')
         },
         methods: {
             addPavilion: function(){
@@ -24,27 +24,23 @@ export default function (store)
                 store(PAVILION_SELECT, pavi);
             },
             isSelected: function(pavi){
-                return _.isEqual(pavi,  this.selectedPavilion);
+                return _.isEqual(pavi,  this.selectedPavilion.$val);
             }
 
         }        
     });
 
-    store.on('pavilions', function(e){
-        vm.pavilions = _.values(e.new_val);
-    })
-
-    store.on('selectedPavilion', function(e){
-        vm.selectedPavilion = e.new_val;
-    })
-
-
     var vm2 = new Vue({
         el: '#pavilion-layers',
-        data: { selectedPavilion: store.state.selectedPavilion}
+        data: { 
+            selectedPavilion: store.prop('selectedPavilion'),
+            hasBase: store.prop('selectedBase.url')
+        }
     });
 
-    store.on('selectedPavilion', function(e){
-        vm2.selectedPavilion = e.new_val;
-    })
+    var vm3 = new Vue({
+        el: '#error',
+        data: { error: store.prop('ui.error') }
+    });
+    
 }
