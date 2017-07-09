@@ -78,9 +78,21 @@ function editFeat(cat, store, map)
     return {enter:enter, exit:exit};
 }
 
-function editNote() {
+function editNote(store, map) 
+{
     function enter() {
+         var url = 'assets/examples/atm.svg'
+         L.imageOverlay(url, [[100,100],[200,200]]).addTo(map);
+         L.imageOverlay(url, [[200,200],[250,150]]).addTo(map);
 
+        var topleft    = L.latLng(300, 100),
+            topright   = L.latLng(300, 150),
+            bottomleft = L.latLng(400, 100);
+
+        var overlay = L.imageOverlay.rotated(url, topleft, topright, bottomleft, {
+            opacity: 0.8,
+            interactive: true,
+        }).addTo(map);         
     }
 
     function exit(){
