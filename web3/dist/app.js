@@ -1261,7 +1261,7 @@ function textDocument(text, style)
                '<text x="0" y="20" fill="{fill}" font-family="{font-family}" ',
                'font-style="{font-style}" font-size="{font-size}">{text}</text>',
                 '</svg>').replace('{fill}', style.fill || 'grey')
-                         .replace('{font-family}', style['font-family'] || 'Verdana')
+                         .replace('{font-family}', style['font-family'] || 'Times')
                          .replace('{font-size}', style['font-size'] || '1pt')
                          .replace('{font-style}', style['font-style'] || 'normal')
                          .replace('{text}', text);
