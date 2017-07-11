@@ -13,7 +13,7 @@ export default function (store, map)
         if(url) {
             var size_m = selectedBase(store).size_m
             var bounds =  L.latLngBounds([[0,0], [size_m.y, size_m.x]]);
-            baseLayer = L.imageOverlay(url, bounds).addTo(map);
+            baseLayer = L.imageOverlay(url, bounds, {crossOrigin: true}).addTo(map);
             map.fitBounds(bounds);
         }
     });

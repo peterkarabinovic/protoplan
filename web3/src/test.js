@@ -8,6 +8,7 @@ var  map = L.map('map', {
     crs: L.CRS.Simple,
     zoomControl: false,
     attributionControl: false,
+    draggable: true,
     editable: true,
         editOptions: {
             // skipMiddleMarkers: true
@@ -75,7 +76,7 @@ function drawLine(groupLayer)
     var line = null;
 
     function enter(){
-        line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'});
+        line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10', transform: true});
         line.on('editable:drawing:commit', on_commit)
 
     }
@@ -106,7 +107,7 @@ function drawRect(groupLayer){
     var rect = null;
     
     function enter(){
-        rect = map.editTools.startRectangle(undefined, {weight:2, color: 'red', dashArray:'5,10'});
+        rect = map.editTools.startRectangle(undefined, {weight:2, color: 'red', dashArray:'5,10', transform: true});
         rect.on('editable:drawing:commit', on_commit)
     }
     function exit(){
@@ -118,6 +119,10 @@ function drawRect(groupLayer){
         rect.setStyle({weight:2, color: 'green'});
         groupLayer.addLayer(rect);
         rect.off('editable:drawing:commit', on_commit)
+        L.setOptions(map.editTools, {draggable: true});
+        rect.enableEdit(map);      
+        rect.transform.enable({scaling: false})
+        window.rect = rect;
         rect = null;
     }
     return {enter:enter, exit: exit};

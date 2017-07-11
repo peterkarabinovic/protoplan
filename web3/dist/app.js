@@ -1020,7 +1020,7 @@ var BaseMapView = function (store, map)
         if(url) {
             var size_m = selectedBase(store).size_m;
             var bounds =  L.latLngBounds([[0,0], [size_m.y, size_m.x]]);
-            baseLayer$$1 = L.imageOverlay(url, bounds).addTo(map);
+            baseLayer$$1 = L.imageOverlay(url, bounds, {crossOrigin: true}).addTo(map);
             map.fitBounds(bounds);
         }
     });
@@ -1416,18 +1416,16 @@ function editFeat(cat, store, map)
 function editNote(store, map) 
 {
     function enter() {
-         var url = 'assets/examples/atm.svg';
-         L.imageOverlay(url, [[100,100],[200,200]]).addTo(map);
-         L.imageOverlay(url, [[200,200],[250,150]]).addTo(map);
-
-        var topleft    = L.latLng(300, 100),
-            topright   = L.latLng(300, 150),
-            bottomleft = L.latLng(400, 100);
-
-        var overlay = L.imageOverlay.rotated(url, topleft, topright, bottomleft, {
-            opacity: 0.8,
-            interactive: true,
-        }).addTo(map);         
+        var url = 'assets/examples/atm.svg';
+        for(var i=0; i<200; i++) 
+        {
+            var dx  = Math.random() * 500;
+            var dy  = Math.random() * 500;
+            var ang = Math.random() * 180;
+            L.rotateImageLayer(url, [[200+dx,200+dy],[250+dx,150+dy]], {rotation: ang}).addTo(map);
+            // L.imageOverlay(url, [[200+dx,200+dy],[250+dx,150+dy]], {rotation: ang}).addTo(map);
+        }
+        
     }
 
     function exit(){
@@ -1436,19 +1434,32 @@ function editNote(store, map)
     return {enter:enter, exit:exit};
 }
 
-// function toWall(polyline){
-//     return {
-//         points: toPoints(polyline.getLatLngs()),
-//         id: polyline.id,
-//         style: polyline.style
-//     }
-// }
+
 
 function toPoints(latLngs){
     var f = L.Util.formatNum;
     latLngs = _.flatten(latLngs);
     return latLngs.map(function(ll){ return [f(ll.lng,2), f(ll.lat,2)] });
 }
+
+
+L.rotateImageLayer = function(url, bounds, options) {
+    return new L.RotateImageLayer(url, bounds, options);
+};
+// A quick extension to allow image layer rotation.
+L.RotateImageLayer = L.ImageOverlay.extend({
+    options: {rotation: 0},
+    _animateZoom: function(e){
+        L.ImageOverlay.prototype._animateZoom.call(this, e);
+        var img = this._image;
+        img.style[L.DomUtil.TRANSFORM] += ' rotate(' + this.options.rotation + 'deg)';
+    },
+    _reset: function(){
+        L.ImageOverlay.prototype._reset.call(this);
+        var img = this._image;
+        img.style[L.DomUtil.TRANSFORM] += ' rotate(' + this.options.rotation + 'deg)';
+    }
+});
 
 function OverlayView(config, store)
 {

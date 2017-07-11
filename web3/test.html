@@ -47,29 +47,13 @@
         <script src='libs/underscore.js'></script>
         <script src='libs/leaflet.js'></script>
         <script src='libs/Leaflet.Editable.js'></script>
+        <script src='libs/L.Editable.Drag.js'></script>
         <script src='libs/d3.js'></script>
         <script src='libs/vue.js'></script>
-        <!--<script src='dist/test.js'></script>-->
-        <script>
-
-            var prop = {val:1}
-
-            var vm1 = new Vue({
-                data: {
-                    prop: prop
-                }
-            });
-
-            var vm2 = new Vue({
-                data: {
-                    prop: prop
-                }
-            });
-
-            prop.val = [4,4,4,4];
-            console.log(vm1.prop.val);
-            console.log(vm2.prop.val);
-        </script>
-        
+        <script src='libs/leaflet-path-transform/src/Util.js'></script>
+        <script src='libs/leaflet-path-transform/src/Matrix.js'></script>
+        <script src='libs/leaflet-path-transform/src/Path.Transform.js'></script>
+        <script src='dist/test.js'></script>
+       
     </body>
 </html>

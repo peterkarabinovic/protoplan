@@ -120,6 +120,12 @@ app = Flask(__name__, static_folder='')
 def index():
   return app.send_static_file('index.html')
 
+
+@app.route('/test')
+@app.route('/test.html')
+def test():
+  return app.send_static_file('test.html')
+
 @app.route('/dist/<path:path>')
 def send_js(path):
     return send_from_directory('dist', path)
