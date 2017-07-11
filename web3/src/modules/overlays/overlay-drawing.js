@@ -2,6 +2,7 @@ import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
 import {str} from '../../utils/utils.js'
 import {selectedOverlayId, selectedOverlayFeat} from '../../state.js'
+import {isRotateImage} from '../../svg/leaflet-rotate-image.js'
 
 export default function(store, map, overlayMapView)
 {
@@ -13,11 +14,12 @@ export default function(store, map, overlayMapView)
     var m2e = {}
     m2e[m.DRAW_WALL] = editFeat('lines', store, map)
     m2e[m.DRAW_RECT] = editFeat('rects', store, map)
-    m2e[m.DRAW_NOTE] = editNote(store, map)
+    // m2e[m.DRAW_NOTE] = editNote(store, map)
 
     function updateSelectedLayer(e){
         if(selectedLayer) {
-            selectedLayer.disableEdit();
+            if(!isRotateImage(selectedLayer))
+                selectedLayer.disableEdit();
             selectedLayer = null;
         }
         var feat_path = e.new_val;
@@ -80,22 +82,26 @@ function editFeat(cat, store, map)
 
 function editNote(store, map) 
 {
-    function enter() {
-        var url = 'assets/examples/atm.svg'
-        for(var i=0; i<200; i++) 
-        {
-            var dx  = Math.random() * 500;
-            var dy  = Math.random() * 500;
-            var ang = Math.random() * 180;
-            L.rotateImageLayer(url, [[200+dx,200+dy],[250+dx,150+dy]], {rotation: ang}).addTo(map);
-            // L.imageOverlay(url, [[200+dx,200+dy],[250+dx,150+dy]], {rotation: ang}).addTo(map);
+    function onClick(e){
+        var feat = {
+            topLeft: e.latlng,
+            rotate: 0            
         }
-        
+        store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
+        store(a.DRAWING_MODE_SET);
+    }
+
+    function enter() 
+    {        
+        L.DomUtil.addClass(map._container,'text-cusor');
+        map.on('click',onClick);    
     }
 
     function exit(){
-
+        L.DomUtil.removeClass(map._container,'text-cusor');
+        map.off('click',onClick);            
     }
+
     return {enter:enter, exit:exit};
 }
 
@@ -108,20 +114,3 @@ function toPoints(latLngs){
 }
 
 
-L.rotateImageLayer = function(url, bounds, options) {
-    return new L.RotateImageLayer(url, bounds, options);
-};
-// A quick extension to allow image layer rotation.
-L.RotateImageLayer = L.ImageOverlay.extend({
-    options: {rotation: 0},
-    _animateZoom: function(e){
-        L.ImageOverlay.prototype._animateZoom.call(this, e);
-        var img = this._image;
-        img.style[L.DomUtil.TRANSFORM] += ' rotate(' + this.options.rotation + 'deg)';
-    },
-    _reset: function(){
-        L.ImageOverlay.prototype._reset.call(this);
-        var img = this._image;
-        img.style[L.DomUtil.TRANSFORM] += ' rotate(' + this.options.rotation + 'deg)';
-    }
-});

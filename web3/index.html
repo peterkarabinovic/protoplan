@@ -61,6 +61,9 @@
             .pointer {
                 cursor: pointer;
             }
+            .text-cusor {
+                cursor: text;
+            }
            
         </style>
     </head>
@@ -95,7 +98,7 @@
                     <table class='w3-table w3-striped'>
                         <tr v-for='(p,id) in pavilions.$val' :class="{'w3-light-grey': isSelected(p)}">
                             <td @click='selectPavilion(p)' class='pointer'>{{p.name}}</td>
-                            <td @click='deletePavilion(p)'><i class='material-icons pointer'>delete</i></td>
+                            <td @click='deletePavilion(p)'><i class='material-icons pointer w3-text-grey'>delete</i></td>
                         </tr>
                     </table>
                 </folding>

@@ -31,7 +31,8 @@ export default {
                 rects: 1,
                 notes: 1
             },
-            feat: undefined
+            feat: undefined,
+            text: 'Text label'
         }
     }
 }

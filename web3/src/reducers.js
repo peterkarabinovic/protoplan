@@ -127,7 +127,10 @@ var overlayReducer = function(state, action){
             feat = _.extend({}, feat, {
                 id: generateId(state, 'selectedOverlay.'+cat),
                 type: state.ui.overlay.types[cat]
-            })
+            });
+            if(cat == 'notes'){
+                feat = _.extend({}, feat, {text: state.ui.overlay.text});
+            }
             state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat.id));
             return Immutable.set(state, str('selectedOverlay.',cat,'.',feat.id), feat);
 

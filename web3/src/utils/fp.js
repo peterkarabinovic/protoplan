@@ -23,7 +23,8 @@ export function Either(left, right){
     return {
         fold: function(left_fn, right_fn) {
             left === void 0 ? right_fn(right) : left_fn(left)
-        }
+        },
+        right: right
     }
 };
 

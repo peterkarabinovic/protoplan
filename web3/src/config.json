@@ -23,7 +23,14 @@ export default
                 }
             },
             "notes": {
-
+                "1": {
+                    "name": "Стиль текста #1",
+                    "style": {"fill": "grey", "font-family":"Times", "font-size": "medium"}
+                },
+                "2": {
+                    "name": "Стиль текста #2",
+                    "style": {"fill": "red", "font-family":"Verdana", "font-size": "large", "font-style":"italic"}
+                }
             }
         }
     }

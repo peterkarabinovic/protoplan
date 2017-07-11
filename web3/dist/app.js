@@ -25,7 +25,14 @@ var config = {
                 }
             },
             "notes": {
-
+                "1": {
+                    "name": "Стиль текста #1",
+                    "style": {"fill": "grey", "font-family":"Times", "font-size": "medium"}
+                },
+                "2": {
+                    "name": "Стиль текста #2",
+                    "style": {"fill": "red", "font-family":"Verdana", "font-size": "large", "font-style":"italic"}
+                }
             }
         }
     }
@@ -203,7 +210,8 @@ function Either(left, right){
     return {
         fold: function(left_fn, right_fn) {
             left === void 0 ? right_fn(right) : left_fn(left);
-        }
+        },
+        right: right
     }
 }
 
@@ -369,7 +377,8 @@ var initState = {
                 rects: 1,
                 notes: 1
             },
-            feat: undefined
+            feat: undefined,
+            text: 'Text label'
         }
     }
 };
@@ -579,6 +588,9 @@ var overlayReducer = function(state, action){
                 id: generateId(state, 'selectedOverlay.'+cat),
                 type: state.ui.overlay.types[cat]
             });
+            if(cat == 'notes'){
+                feat = _.extend({}, feat, {text: state.ui.overlay.text});
+            }
             state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat.id));
             return Immutable.set(state, str('selectedOverlay.',cat,'.',feat.id), feat);
 
@@ -964,6 +976,17 @@ var DRAW_WALL = 'draw-wall';
 var DRAW_RECT = 'draw-rect';
 var DRAW_NOTE = 'draw-note';
 
+var hidenElement = null;
+
+function getHidenEl(){
+    if(hidenElement)
+        return hidenElement;
+    hidenElement = document.createElement("div");    
+    hidenElement.style = 'visibility: hidden; position: absolute; top:0; left:0;';
+    hidenElement = document.body.appendChild(hidenElement);
+    return hidenElement;
+}
+
 function svgToBase64(svg_text)
 {
     if(!svg_text || svg_text.length < 7) 
@@ -987,7 +1010,12 @@ function svgToBase64(svg_text)
     var data_uri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(raw_svg)));
     
     if(!viewBox && (svg_document.width.baseVal.value == 0 || svg_document.height.baseVal.value == 0 )){
-        return Either.left(t('no_svg_dimensions'))
+        var node = document.importNode(svg_document, true);
+        node = getHidenEl().appendChild(node);
+        var box = node.getBBox();
+        viewBox = [0,0,box.x + box.width, box.y + box.height];
+        getHidenEl().removeChild(node);
+        // return Either.left(t('no_svg_dimensions'))
     }
     var width = 0, height = 0;
     if(viewBox){
@@ -1201,6 +1229,44 @@ var BaseModule = function(store, map)
     BaseMapDistance(store, map);
 };
 
+// A quick extension to allow image layer rotation.
+var RotateImageOverlay = L.ImageOverlay.extend({
+    options: {rotation: 0},
+    _animateZoom: function(e){
+        L.ImageOverlay.prototype._animateZoom.call(this, e);
+        var img = this._image;
+        img.style[L.DomUtil.TRANSFORM] += ' rotate(' + this.options.rotation + 'deg)';
+    },
+    _reset: function(){
+        L.ImageOverlay.prototype._reset.call(this);
+        var img = this._image;
+        img.style[L.DomUtil.TRANSFORM] += ' rotate(' + this.options.rotation + 'deg)';
+    }
+});
+
+function rotateImageOverlay(url, bounds, options) {
+    return new RotateImageOverlay(url, bounds, options);
+}
+
+function isRotateImage(obj){
+    return obj instanceof RotateImageOverlay;
+}
+
+function textDocument(text, style)
+{
+    style = style || {};
+    'Times, serif';
+    return str('<?xml version="1.0" encoding="utf-8"?>',
+               '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">',
+               '<text x="0" y="20" fill="{fill}" font-family="{font-family}" ',
+               'font-style="{font-style}" font-size="{font-size}">{text}</text>',
+                '</svg>').replace('{fill}', style.fill || 'grey')
+                         .replace('{font-family}', style['font-family'] || 'Verdana')
+                         .replace('{font-size}', style['font-size'] || '1pt')
+                         .replace('{font-style}', style['font-style'] || 'normal')
+                         .replace('{text}', text);
+}
+
 var OverlayMapView = function(config, store, map)
 {
     var lineGroup = L.featureGroup().addTo(map);
@@ -1210,7 +1276,7 @@ var OverlayMapView = function(config, store, map)
     var cat2group = {
         lines: {group: lineGroup, toLayer: toPolyline},
         rects: {group: rectGroup, toLayer: toLeafletRect},
-        notes: {group: noteGroup, toLayer: toNote}
+        notes: {group: noteGroup, toLayer: _.partial(toNote, map)}
     };
 
     var cat2layers = {
@@ -1245,7 +1311,6 @@ var OverlayMapView = function(config, store, map)
 
     store.on('selectedOverlay.lines', _.partial(updateGroup, 'lines') );
     store.on('selectedOverlay.rects', _.partial(updateGroup, 'rects') );
-    store.on('selectedOverlay.notes', _.partial(updateGroup, 'notes') );
 
     function updateStyles(cat, e)
     {
@@ -1254,16 +1319,34 @@ var OverlayMapView = function(config, store, map)
         var overlay_id = selectedOverlayId(store);
         var layer_id = str(overlay_id, '.', id);
         var layes = cat2layers[cat];
-        console.log('selectedOverlay.'+cat+'.*.type', id);
         if(layes[layer_id]){
             var style = config.overlay.types[cat][type].style;
             layes[layer_id].setStyle(style);
         }
     }
 
+    function updateNotes(e)
+    {
+        var id = e.path[2];
+        var overlay_id = selectedOverlayId(store);
+        var layer_id = str(overlay_id, '.', id);
+        var layers = cat2layers.notes;
+        if(e.old_val && layers[layer_id]) {
+            cat2group.notes.group.removeLayer(layes[layer_id]);
+            delete layers[layer_id];
+        } 
+        if(e.new_val) {
+            var note = e.new_val;
+            var style = config.overlay.types.notes[note.type].style;
+            var layer = toNote(map, layer_id, note, style);
+            cat2group.notes.group.addLayer(layer);            
+            layers[layer_id] = layer;
+        }
+    }
+
     store.on('selectedOverlay.lines.*.type', _.partial(updateStyles, 'lines') );
     store.on('selectedOverlay.rects.*.type', _.partial(updateStyles, 'rects') );
-    store.on('selectedOverlay.notes.*.type', _.partial(updateStyles, 'notes') );
+    store.on('selectedOverlay.notes.*.*', updateNotes );
 
     return {cat2group: cat2group, cat2layers:cat2layers};
 };
@@ -1281,7 +1364,15 @@ function toLeafletRect(id, rect, style){
     return poly;
 }
 
-function toNote(id, note, style){
+function toNote(map, id, note, style)
+{
+    var svg_text = textDocument(note.text, style);
+    var d = svgToBase64(svg_text).right;
+    var rb = map.latLngToContainerPoint(note.topLeft).add({x: d.width, y: d.height});
+    var rightBottom = map.containerPointToLatLng(rb); 
+    var layer = rotateImageOverlay(d.data_uri, [note.topLeft, rightBottom], {rotate: note.rotate});
+    layer.id = id;
+    return layer;
 }
 
 
@@ -1348,11 +1439,12 @@ var OverlayDrawing = function(store, map, overlayMapView)
     var m2e = {};
     m2e[DRAW_WALL] = editFeat('lines', store, map);
     m2e[DRAW_RECT] = editFeat('rects', store, map);
-    m2e[DRAW_NOTE] = editNote(store, map);
+    // m2e[m.DRAW_NOTE] = editNote(store, map)
 
     function updateSelectedLayer(e){
         if(selectedLayer) {
-            selectedLayer.disableEdit();
+            if(!isRotateImage(selectedLayer))
+                selectedLayer.disableEdit();
             selectedLayer = null;
         }
         var feat_path = e.new_val;
@@ -1413,53 +1505,11 @@ function editFeat(cat, store, map)
     return {enter:enter, exit:exit};
 }
 
-function editNote(store, map) 
-{
-    function enter() {
-        var url = 'assets/examples/atm.svg';
-        for(var i=0; i<200; i++) 
-        {
-            var dx  = Math.random() * 500;
-            var dy  = Math.random() * 500;
-            var ang = Math.random() * 180;
-            L.rotateImageLayer(url, [[200+dx,200+dy],[250+dx,150+dy]], {rotation: ang}).addTo(map);
-            // L.imageOverlay(url, [[200+dx,200+dy],[250+dx,150+dy]], {rotation: ang}).addTo(map);
-        }
-        
-    }
-
-    function exit(){
-
-    }
-    return {enter:enter, exit:exit};
-}
-
-
-
 function toPoints(latLngs){
     var f = L.Util.formatNum;
     latLngs = _.flatten(latLngs);
     return latLngs.map(function(ll){ return [f(ll.lng,2), f(ll.lat,2)] });
 }
-
-
-L.rotateImageLayer = function(url, bounds, options) {
-    return new L.RotateImageLayer(url, bounds, options);
-};
-// A quick extension to allow image layer rotation.
-L.RotateImageLayer = L.ImageOverlay.extend({
-    options: {rotation: 0},
-    _animateZoom: function(e){
-        L.ImageOverlay.prototype._animateZoom.call(this, e);
-        var img = this._image;
-        img.style[L.DomUtil.TRANSFORM] += ' rotate(' + this.options.rotation + 'deg)';
-    },
-    _reset: function(){
-        L.ImageOverlay.prototype._reset.call(this);
-        var img = this._image;
-        img.style[L.DomUtil.TRANSFORM] += ' rotate(' + this.options.rotation + 'deg)';
-    }
-});
 
 function OverlayView(config, store)
 {
