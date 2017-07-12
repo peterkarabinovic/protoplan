@@ -1,0 +1,19 @@
+ <!--<svg  version="1.1" 
+ width="100px" height="50px"
+ viewBox="0 0 20 10"
+ xmlns="http://www.w3.org/2000/svg"> 
+  <text x="50%" y="50%" dy=".3em">Look, I’m centered!</text>
+ </svg>-->
+
+ <svg xmlns="http://www.w3.org/2000/svg">
+ <text 
+    transform='matrix(1,0,0,1,0,0)'
+    y="16" >Look, I’m centered!</text>
+ </svg>
+
+ <!--<svg width='200px' height='100px' 
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 400 120" 
+    preserveAspectRatio2="xMidYMid meet">
+ <text y="60">I’m also resizeable! I’m also resizeable! I’m also resizeable!</text>
+ </svg>-->

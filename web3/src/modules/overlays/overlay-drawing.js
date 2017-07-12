@@ -1,8 +1,10 @@
+
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
 import {str} from '../../utils/utils.js'
 import {selectedOverlayId, selectedOverlayFeat} from '../../state.js'
 import {isRotateImage} from '../../svg/leaflet-rotate-image.js'
+import {Text} from '../../svg/leaflet-text.js'
 
 export default function(store, map, overlayMapView)
 {
@@ -14,7 +16,7 @@ export default function(store, map, overlayMapView)
     var m2e = {}
     m2e[m.DRAW_WALL] = editFeat('lines', store, map)
     m2e[m.DRAW_RECT] = editFeat('rects', store, map)
-    // m2e[m.DRAW_NOTE] = editNote(store, map)
+    m2e[m.DRAW_NOTE] = editNote(store, map)
 
     function updateSelectedLayer(e){
         if(selectedLayer) {
@@ -87,8 +89,10 @@ function editNote(store, map)
             topLeft: e.latlng,
             rotate: 0            
         }
-        store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
-        store(a.DRAWING_MODE_SET);
+        // store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
+        // store(a.DRAWING_MODE_SET);
+        var style = {"fill": "red", "fontFamily":"Verdana", "fontSize": "large", "fontStyle":"italic"};
+        new Text(e.latlng, null, "Kino i nimci", 0, style).addTo(map)
     }
 
     function enter() 
