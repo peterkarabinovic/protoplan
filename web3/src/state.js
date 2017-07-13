@@ -86,12 +86,9 @@ export function selectedOverlayFeat(store) {
     return null; 
 }
 
-export function lineType(store) {
-    return store.state.ui.overlay.types.lines;
+export function selectedOverlayText(store){
+    return store.state.ui.overlay.text;
 }
-export function rectType(store) {
-    return store.state.ui.overlay.types.rects;
-}
-export function noteType(store) {
+export function selectedOverlayNoteType(store){
     return store.state.ui.overlay.types.notes;
 }

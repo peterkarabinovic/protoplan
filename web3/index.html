@@ -93,7 +93,7 @@
         <!-- Vue Templates -->
         <script type="text/x-template" id="pavilion-template">
             <div>
-                <button class="w3-button w3-light-blue w3-margin-bottom" @click='addPavilion'>Новый павильон</button>
+                <button class="w3-btn w3-light-blue w3-margin-bottom" @click='addPavilion'>Новый павильон</button>
                 <folding title='Павильоны' open='true'>
                     <table class='w3-table w3-striped'>
                         <tr v-for='(p,id) in pavilions.$val' :class="{'w3-light-grey': isSelected(p)}">
@@ -150,8 +150,9 @@
                         <option v-for='(val, key) in type.list' v-bind:value="key">{{val.name}}</option>
                     </select>
                 </div>
-                <div class="w3-section" v-if="needSave()">
-                    <button class='w3-button w3-light-blue' @click='save'>Сохранить</button>
+                <div  v-if="needSave()">
+                    <button class='w3-btn w3-light-blue w3-small w3-padding' @click='save'>Сохранить</button>
+                    <button class='w3-btn w3-light-blue w3-small w3-padding' @click='rollback'>Отменить</button>
                 </div>                
             </div>
          </script>
@@ -170,7 +171,7 @@
         <script src='libs/Leaflet.ImageOverlay.Rotated.js'></script>
         <script src='libs/canvas-layer.js'></script>
         <script src='libs/vue.js'></script>
-        <script src='dist/app.js?v=3'></script>
+        <script src='dist/app.js?v=4'></script>
 
 
     </body>

@@ -1,6 +1,6 @@
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
-import {lineType, rectType, noteType, drawMode, 
+import { drawMode, 
         selectedOverlayFeat, overlayLayer, selectedOverlay} from '../../state.js' 
 
 import OverlayMapView from './overlay-map-view.js'
@@ -55,6 +55,9 @@ function OverlayView(config, store)
                 var o = this.selectedOverlay.$val;
                 store(a.OVERLAY_SAVE, o);
                 this.selectedOverlay.$val = null;
+            },
+            rollback: function(){
+                store(a.OVERLAY_ROLLBACK);
             }
         }
     })
@@ -80,5 +83,5 @@ export default function(config, store, map){
     OverlayView(config, store);
     var omv = OverlayMapView(config, store, map);
     OverlaySelectTools(config, store, map, omv);
-    OverlayDrawing(store, map, omv);
+    OverlayDrawing(config, store, map, omv);
 }

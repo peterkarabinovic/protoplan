@@ -53,34 +53,46 @@ function Store(reducers, middleware)
     };
     s.state = {};
 
-    var listeners = {};
-    
+    var listeners = [];
+    var listener_table = {};
+    var lastId = 0;
+    function stamp(fn){ 
+        fn._redux_id = fn._redux_id || ++lastId;
+        return fn._redux_id;
+    }
+
     s.on = function(path, fn){
         var paths = path.split(' ');
         paths.forEach(function(p){
-            p = p.trim().split('.');
-            listeners[p.length] = listeners[p.length] || [];
-            listeners[p.length].push( {path:p, fn:fn} );
+            var pp = p.trim().split('.');
+            var listener_id = p + '.' + stamp(fn);
+            listeners.push(listener_id);
+            listener_table[listener_id] = {path:pp, fn:fn} ;
         });
     };
 
     s.off = function(path, fn){
         var paths = path.split(' ');
-        paths.forEach(function(p){
-            p = p.split('.');
-            var ln = p.length;
-            listeners = reject_array_prop(listeners, ln, function(it){ 
-                return _.isEqual(it.path, p) &&  it.fn == fn; 
-            });
+        var ids = paths.map(function(p){
+            var listener_id = p.trim() + '.' + stamp(fn);
+            delete listener_table[listener_id];
         });
+        listeners = _.without(listeners, ids);
         
     };
 
     s.dispatch = function(action){
         var old_state = s.state;
         s.state = reducers(s.state, action);
-        if(s.state !== old_state)
-            find_and_fire([], s.state, old_state, listeners);
+        if(s.state !== old_state) {
+            var ef = events_finder(s.state, old_state);
+            listeners.forEach(function(id){
+                var li = listener_table[id];
+                ef(li.path).forEach(function(e){
+                    li.fn(e);
+                });
+            });
+        }
         return s.state;
     };
 
@@ -92,81 +104,99 @@ function Store(reducers, middleware)
     return s;
 }
 
-
-function find_and_fire(path, new_obj, old_obj, listeners)
+function events_finder(new_obj, old_obj)
 {
-    var visits = [ [path, new_obj, old_obj] ];
-    var listeners_copy = null;
-
-    while(visits.length) 
+    if(new_obj === old_obj)
+        return function() {return [];}
+    var _changes = diff_props(new_obj, old_obj);
+    function events(changes, nobj, oobj, path)
     {
-        var v = visits.shift(),
-            path = v[0],
-            new_obj = v[1] || {},
-            old_obj = v[2] || {};
+        if(_.isEmpty(oobj) && _.isEmpty(nobj))
+            return [];
+        nobj = nobj || {};
+        oobj = oobj || {};
+        if(_.isEmpty(changes))
+            _.extend(changes, diff_props(nobj, oobj));
 
-        var props = diffs(new_obj, old_obj);
-        if(props.length) { 
-            listeners_copy = listeners_copy || _.clone(listeners);   
-            var max_level = +_.max(_.keys(listeners_copy));
-            props.forEach(function(prop){
-                var o1 = new_obj[prop];
-                var o2 = old_obj[prop];
-                var p = path.concat([prop]);
-                listeners_copy = reject_array_prop(listeners_copy, p.length, function(it){
-                    if(_match(p, it.path)) {
-                        it.fn({new_val: o1, old_val: o2, path: p});
-                        return !_.contains(it.path, '*');
+        var prop = path[0];
+        var rect = path.slice(1);        
+        if(prop === '*')
+        {
+            var _events = [];
+            for(var key in changes){
+                var ch = changes[key];
+                if(ch) {
+                    ch.nobj = ch.nobj || nobj[key];
+                    ch.oobj = ch.oobj || oobj[key];
+                    ch.changes = ch.changes || {};
+                    if(path.length === 1)
+                        _events.push({
+                            path: [key],
+                            new_val: ch.nobj,
+                            old_val: ch.oobj
+                        });
+                    else 
+                    {
+                        events(ch.changes, ch.nobj, ch.oobj, rect).forEach(function(e){
+                            e.path.unshift(key);
+                            _events.push(e);
+                        });
                     }
-                    return false;
-                });
-                if(max_level > p.length)
-                    visits.push([p, o1, o2]);
-            });
+                }
+            }
+            return _events;
         }
-        if(_.isEmpty(listeners_copy))
-            return;
+        else if(changes[prop]){
+            var ch = changes[prop];
+            ch.nobj = ch.nobj || nobj[prop];
+            ch.oobj = ch.oobj || oobj[prop];
+            ch.changes = ch.changes || {};
+            if(path.length == 1)
+                return [{path: [prop], new_val: ch.nobj, old_val: ch.oobj}]
+            else
+                return events(ch.changes, ch.nobj, ch.oobj, rect).map(function(e){
+                    e.path.unshift(prop);
+                    return e;
+                })
+        }
+        else 
+            return [];
     }
-       
+
+    return function(path)
+    {
+        return events(_changes, new_obj, old_obj, path)
+
+    }
 }
 
-function reject_array_prop(obj, prop, reject_fn){
-    var a = obj[prop];
-    if(a){
-        a =  _.reject(a, reject_fn);
-        if(a.length)
-            obj[prop] = a;
-        else
-            delete obj[prop];
-    }
-    return obj;
-}
-
-/**
- * find the properties that is not equals
- * @param {Object} obj1  
- * @param {Object} obj2 
- */
-function diffs(new_obj, old_obj)
+function diffs(new_obj, old_obj, keys)
 {
-    if(!_.isObject(new_obj) || !_.isObject(old_obj))
-        return [];
-    var keys = _.uniq( Object.keys(new_obj).concat( Object.keys(old_obj) ) );
     return keys.reduce(function(diffs, key){
         return _.isEqual(new_obj[key], old_obj[key]) ? diffs : diffs.concat(key);
     },[]);
 }
 
 
-function _match(path, mask_path){
-    path = _.clone(path);
-    for(var i in mask_path) {
-        if(mask_path[i] === '*')
-            path[i] = '*';
-    }
-    return _.isEqual(path, mask_path);
+function diff_props(nobj, oobj){
+    if(!_.isObject(nobj))
+        nobj = {};
+    if(!_.isObject(oobj))
+        oobj = {};
+    var props = _.uniq( Object.keys(nobj).concat( Object.keys(oobj) ) );
+    var diff_props = diffs(nobj, oobj, props).sort();
+    return _.reduce(props, function(memo, prop){
+        var i = _.indexOf(diff_props, prop, true);
+        if(i !== -1) {
+            diff_props.splice(i,1);
+            memo[prop] = {};
+        }
+        else {
+            memo[prop] = null;
+        }
+        return memo;
+    }, {})
 }
-
 
 /**
  *  Reducer helpers
@@ -432,6 +462,13 @@ function selectedOverlayFeat(store) {
     return null; 
 }
 
+function selectedOverlayText(store){
+    return store.state.ui.overlay.text;
+}
+function selectedOverlayNoteType(store){
+    return store.state.ui.overlay.types.notes;
+}
+
 var INIT = 'INIT';
 
 var PAVILION_ADD = 'PAVILION_ADD';
@@ -458,6 +495,7 @@ var OVERLAY_FEAT_UPDATE = 'OVERLAY_FEAT_UPDATE';
 var OVERLAY_FEAT_DELETE = 'OVERLAY_FEAT_DELETE';
 var OVERLAY_FEAT_SELECT = 'OVERLAY_FEAT_SELECT';
 var OVERLAY_TYPE_SELECT = 'OVERLAY_TYPE_SELECT';
+var OVERLAY_ROLLBACK = 'OVERLAY_ROLLBACK';
 var OVERLAY_SAVE = 'OVERLAY_SAVE';
 var OVERLAY_SAVED = 'OVERLAY_SAVED';
 
@@ -588,16 +626,13 @@ var overlayReducer = function(state, action){
                 id: generateId(state, 'selectedOverlay.'+cat),
                 type: state.ui.overlay.types[cat]
             });
-            if(cat == 'notes'){
-                feat = _.extend({}, feat, {text: state.ui.overlay.text});
-            }
             state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat.id));
             return Immutable.set(state, str('selectedOverlay.',cat,'.',feat.id), feat);
 
         case OVERLAY_FEAT_UPDATE: 
-            var type = action.payload.type;
+            var cat = action.payload.cat;
             var feat = action.payload.feat;
-            return Immutable.set(state, 'selectedOverlay.'+type+'.'+feat.id, feat);
+            return Immutable.extend(state, 'selectedOverlay.'+cat+'.'+feat.id, feat);
 
         case OVERLAY_FEAT_DELETE: 
             var feat_id = state.ui.overlay.feat,
@@ -634,6 +669,11 @@ var overlayReducer = function(state, action){
                 state = Immutable.remove(state, 'entities.overlays.'+overlay.id);
             }
             return state;
+
+        case OVERLAY_ROLLBACK:
+            var overlay = state.selectedOverlay;
+            overlay = state.entities.overlays[overlay.id];
+            return Immutable.set(state, 'selectedOverlay', overlay);
     }
     return state;
 };
@@ -1229,43 +1269,157 @@ var BaseModule = function(store, map)
     BaseMapDistance(store, map);
 };
 
-// A quick extension to allow image layer rotation.
-var RotateImageOverlay = L.ImageOverlay.extend({
-    options: {rotation: 0},
-    _animateZoom: function(e){
-        L.ImageOverlay.prototype._animateZoom.call(this, e);
-        var img = this._image;
-        img.style[L.DomUtil.TRANSFORM] += ' rotate(' + this.options.rotation + 'deg)';
+var _invSvg = null;
+
+function invSvg(){
+    if(_invSvg) return _invSvg;
+    _invSvg = L.SVG.create("svg");    
+    _invSvg.style = 'visibility: hidden; position: absolute; top:0; left:0;';
+    _invSvg = document.body.appendChild(_invSvg);
+    return _invSvg;
+}
+
+
+
+L.Text = L.Layer.extend({
+    options:  {
+        fill: 'black',
+        fontFamily: 'Times',
+        fontSize: 'medium',
+        fontStyle: 'normal'
     },
-    _reset: function(){
-        L.ImageOverlay.prototype._reset.call(this);
-        var img = this._image;
-        img.style[L.DomUtil.TRANSFORM] += ' rotate(' + this.options.rotation + 'deg)';
+
+    initialize: function (latLngs, text, rotate, style) {
+        this.style = L.extend({}, this.options, style);
+        this.topLeft = latLngs[0];
+        this.bottomRight = latLngs[1];
+        this.rotate = rotate;
+        this.text = text;
+    },
+
+    _project: function(){
+        console.log('Text _project');
+    },
+
+    beforeAdd: function (map) {
+        // Renderer is set here because we need to call renderer.getEvents
+        // before this.getEvents.
+        this._renderer = map.getRenderer(this);
+    },
+
+    onAdd: function () {
+        var path = this._path = L.SVG.create('text');
+        path.textContent = this.text;
+        this._updateStyle();
+        this.bbox = this._getBBox(this._map, path);
+        if(!this.bottomRight) {
+            var xy = this._calculateBounds(this._map,this.bbox, this.topLeft);
+            this.topLeft = xy[0];
+            this.bottomRight = xy[1];
+            // this.bottomRight = this._calculateBottomRight(this._map, this.topLeft, path);
+        }
+
+        // var b = L.latLngBounds(this.topLeft, this.bottomRight);
+        // this.poly = L.polygon([this.topLeft, L.latLng(this.topLeft.lat, this.bottomRight.lng), 
+        //                        this.bottomRight, L.latLng(this.bottomRight.lat, this.topLeft.lng),this.topLeft ]).addTo(this._map)
+
+
+        if (this.options.interactive) {
+            L.DomUtil.addClass(path, 'leaflet-interactive');
+        }
+        this._renderer._addPath(this);
+        this._update();
+        this._map.on('zoomend', this._update, this);
+        // this._renderer._layers[L.stamp(this)] = this;
+    },
+
+    onRemove: function(){
+        this._map.off('zoomend', this._update, this);        
+        this._renderer._removePath(this);
+    },
+
+    setStyle: function(style, notupdate){
+        this.style = L.extend({}, this.options, style);
+        if(!this._map) return;
+        this._updateStyle();
+        this.bbox = this._getBBox(this._map, this._path);
+        if(notupdate) return;
+        this._update();
+    },
+
+    setText: function(text, notupdate){
+        this.text = text;
+        if(!this._map) return;
+        this._path.textContent = this.text;
+        this.bbox = this._getBBox(this._map, this._path);
+        if(notupdate) return;
+        this._update();
+    },
+
+    setLatLngs: function(latLngs){
+        this.topLeft = latLngs[0];
+        this.bottomRight = latLngs[1];
+        this._update();
+    },
+    getLatLngs: function(){
+        return [this.topLeft, this.bottomRight];
+    },
+    setRotate: function(rotate, notupdate){
+        this.rotate = rotate;
+        if(!this._map) return;
+        this.bbox = this._getBBox(this._map, this._path);        
+        if(notupdate) return;
+        this._update();
+    },
+
+    _updateStyle: function(){
+        this._path.setAttribute('fill', this.style.fill);
+        this._path.setAttribute('font-family', this.style.fontFamily);
+        this._path.setAttribute('font-size', this.style.fontSize);
+        this._path.setAttribute('font-style', this.style.fontStyle);        
+    },
+
+    _update: function(){
+        var tl = this._map.latLngToLayerPoint(this.topLeft);
+        var br = this._map.latLngToLayerPoint(this.bottomRight);
+        this._path.setAttribute('x', tl.x);
+        this._path.setAttribute('y', br.y);
+        var bb = this.bbox;
+        var wTransf = (br.x - tl.x) / (bb.width);
+        var hTransf = (br.y - tl.y) / (bb.height);
+        var dx = -(wTransf-1) * tl.x;
+        var dy = -(hTransf-1) * br.y;
+        this._path.setAttribute('transform', 'translate('+dx+','+dy+') scale('+wTransf+ ','+ hTransf +')');        
+        // this._path.setAttribute('transform', 'matrix('+wTransf+ ', 0, 0, '+ hTransf +',0 ,0)');        
+    },
+
+    _calculateBounds: function(map, bbox, clickPoint){
+        var cp = map.latLngToLayerPoint(clickPoint); 
+        var tl = cp.add({x: 0, y: -bbox.height/2});
+        var br = cp.add({x: bbox.width, y: bbox.height/2});
+        return [map.layerPointToLatLng(tl), map.layerPointToLatLng(br)]        
+    },
+
+    _getBBox: function(map, path){
+        var prev_y = path.getAttribute('y') || 0;
+        var prev_x = path.getAttribute('x') || 0;
+        var noParent = !path.parent;
+        path.setAttribute('y', '16px');
+        path.setAttribute('x', '0px');
+        if(noParent)
+            path = invSvg().appendChild(path);
+        var bbox = path.getBBox();
+        path.setAttribute('y', prev_y);
+        path.setAttribute('x', prev_x);
+        if(noParent)
+            invSvg().removeChild(path);    
+        return bbox;    
     }
+
 });
 
-function rotateImageOverlay(url, bounds, options) {
-    return new RotateImageOverlay(url, bounds, options);
-}
 
-function isRotateImage(obj){
-    return obj instanceof RotateImageOverlay;
-}
-
-function textDocument(text, style)
-{
-    style = style || {};
-    'Times, serif';
-    return str('<?xml version="1.0" encoding="utf-8"?>',
-               '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">',
-               '<text x="0" y="20" fill="{fill}" font-family="{font-family}" ',
-               'font-style="{font-style}" font-size="{font-size}">{text}</text>',
-                '</svg>').replace('{fill}', style.fill || 'grey')
-                         .replace('{font-family}', style['font-family'] || 'Times')
-                         .replace('{font-size}', style['font-size'] || '1pt')
-                         .replace('{font-style}', style['font-style'] || 'normal')
-                         .replace('{text}', text);
-}
+var Text = L.Text;
 
 var OverlayMapView = function(config, store, map)
 {
@@ -1276,7 +1430,7 @@ var OverlayMapView = function(config, store, map)
     var cat2group = {
         lines: {group: lineGroup, toLayer: toPolyline},
         rects: {group: rectGroup, toLayer: toLeafletRect},
-        notes: {group: noteGroup, toLayer: _.partial(toNote, map)}
+        notes: {group: noteGroup, toLayer: toText}
     };
 
     var cat2layers = {
@@ -1285,68 +1439,41 @@ var OverlayMapView = function(config, store, map)
         notes: {},
     };
 
-    function updateGroup(cat, e){
-        var features = e.new_val || [];
+    function updateLayers(cat, e){
+        var layers = cat2layers[cat];
         var group = cat2group[cat].group;
         var toLayer = cat2group[cat].toLayer; 
         var overlay_id = selectedOverlayId(store);
-        var the_layers = _.clone(cat2layers[cat]);
-        _.mapObject(features, function(feat, id){
-            var layer_id = str(overlay_id, '.', id);
-            if(the_layers[layer_id]) {
-                delete the_layers[layer_id];
-            }
-            else {
-                var style = config.overlay.types[cat][feat.type].style;
-                var layer = toLayer(layer_id, feat, style); 
-                group.addLayer(layer);
-                cat2layers[cat][layer_id] = layer;
-            }
-        });
-        _.mapObject(the_layers, function(layer, id){
-            group.removeLayer(layer);
-            delete cat2layers[cat][id];
-        });
-    }
-
-    store.on('selectedOverlay.lines', _.partial(updateGroup, 'lines') );
-    store.on('selectedOverlay.rects', _.partial(updateGroup, 'rects') );
-
-    function updateStyles(cat, e)
-    {
-        var id = e.path[2],
-            type = e.new_val;
-        var overlay_id = selectedOverlayId(store);
-        var layer_id = str(overlay_id, '.', id);
-        var layes = cat2layers[cat];
-        if(layes[layer_id]){
-            var style = config.overlay.types[cat][type].style;
-            layes[layer_id].setStyle(style);
-        }
-    }
-
-    function updateNotes(e)
-    {
-        var id = e.path[2];
-        var overlay_id = selectedOverlayId(store);
-        var layer_id = str(overlay_id, '.', id);
-        var layers = cat2layers.notes;
-        if(e.old_val && layers[layer_id]) {
-            cat2group.notes.group.removeLayer(layes[layer_id]);
-            delete layers[layer_id];
-        } 
-        if(e.new_val) {
-            var note = e.new_val;
-            var style = config.overlay.types.notes[note.type].style;
-            var layer = toNote(map, layer_id, note, style);
-            cat2group.notes.group.addLayer(layer);            
+        var layer_id = str(overlay_id, '.', _.last(e.path));
+        if(e.new_val && !e.old_val) {
+            var feat = e.new_val;
+            var style = config.overlay.types[cat][feat.type].style;
+            var layer = toLayer(layer_id, feat, style);
+            group.addLayer(layer);
             layers[layer_id] = layer;
         }
+        else if(!e.new_val && e.old_val){
+            var layer = layers[layer_id];
+            map.removeLayer(layer);
+            delete layers[layer_id];
+        }
+        else {
+            var feat = e.new_val;
+            var layer = layers[layer_id];
+            var style = config.overlay.types[cat][feat.type].style;
+            layer.setStyle(style, true);  
+            if(cat === 'notes'){
+                layer.setText(feat.text, true);
+                layer.setRotate(feat.rotate, true);
+            }    
+            layer.setLatLngs(toLatLngs(feat.points));    
+        }
     }
 
-    store.on('selectedOverlay.lines.*.type', _.partial(updateStyles, 'lines') );
-    store.on('selectedOverlay.rects.*.type', _.partial(updateStyles, 'rects') );
-    store.on('selectedOverlay.notes.*.*', updateNotes );
+
+    store.on('selectedOverlay.lines.*', _.partial(updateLayers, 'lines') );
+    store.on('selectedOverlay.rects.*', _.partial(updateLayers, 'rects') );
+    store.on('selectedOverlay.notes.*', _.partial(updateLayers, 'notes') );
 
     return {cat2group: cat2group, cat2layers:cat2layers};
 };
@@ -1364,13 +1491,9 @@ function toLeafletRect(id, rect, style){
     return poly;
 }
 
-function toNote(map, id, note, style)
+function toText(id, note, style)
 {
-    var svg_text = textDocument(note.text, style);
-    var d = svgToBase64(svg_text).right;
-    var rb = map.latLngToContainerPoint(note.topLeft).add({x: d.width, y: d.height});
-    var rightBottom = map.containerPointToLatLng(rb); 
-    var layer = rotateImageOverlay(d.data_uri, [note.topLeft, rightBottom], {rotate: note.rotate});
+    var layer = new Text(toLatLngs(note.points), note.text, note.rotate, style);
     layer.id = id;
     return layer;
 }
@@ -1429,114 +1552,7 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
   
 };
 
-var _invSvg = null;
-
-function invSvg(){
-    if(_invSvg) return _invSvg;
-    _invSvg = L.SVG.create("svg");    
-    _invSvg.style = 'visibility: hidden; position: absolute; top:0; left:0;';
-    _invSvg = document.body.appendChild(_invSvg);
-    return _invSvg;
-}
-
-
-
-L.Text = L.Layer.extend({
-    options:  {
-        fill: 'black',
-        fontFamily: 'Times',
-        fontSize: 'medium',
-        fontStyle: 'normal'
-    },
-
-    initialize: function (topLeft, bottomRight, text, rotate, options) {
-        L.setOptions(this, options);
-        this.topLeft = topLeft;
-        this.bottomRight = bottomRight;
-        this.rotate = rotate;
-        this.text = text;
-    },
-
-    _project: function(){
-        console.log('Text _project');
-    },
-
-    beforeAdd: function (map) {
-        // Renderer is set here because we need to call renderer.getEvents
-        // before this.getEvents.
-        this._renderer = map.getRenderer(this);
-    },
-
-    onAdd: function () {
-        var path = this._path = L.SVG.create('text');
-        path.textContent = this.text;
-        this._updateStyle(this.options);
-        if(!this.bottomRight) {
-            var xy = this._calculateBounds(this._map, this.topLeft, path);
-            this.topLeft = xy[0];
-            this.bottomRight = xy[1];
-            // this.bottomRight = this._calculateBottomRight(this._map, this.topLeft, path);
-        }
-
-        // var b = L.latLngBounds(this.topLeft, this.bottomRight);
-        // this.poly = L.polygon([this.topLeft, L.latLng(this.topLeft.lat, this.bottomRight.lng), 
-        //                        this.bottomRight, L.latLng(this.bottomRight.lat, this.topLeft.lng),this.topLeft ]).addTo(this._map)
-
-
-        if (this.options.interactive) {
-            L.DomUtil.addClass(path, 'leaflet-interactive');
-        }
-        this._renderer._addPath(this);
-        this._update();
-        this._renderer._layers[L.stamp(this)] = this;
-    },
-
-    onRemove: function(){
-        this._renderer._removePath(this);
-    },
-
-    _updateStyle: function(style){
-        this._path.setAttribute('fill', style.fill);
-        this._path.setAttribute('font-family', style.fontFamily);
-        this._path.setAttribute('font-size', style.fontSize);
-        this._path.setAttribute('font-style', style.fontStyle);        
-    },
-
-    _update: function(){
-        var tl = this._map.latLngToLayerPoint(this.topLeft);
-        var br = this._map.latLngToLayerPoint(this.bottomRight);
-        this._path.setAttribute('x', tl.x);
-        this._path.setAttribute('y', br.y);
-        this._path.setAttribute('transform', '');
-        var bb = this._path.getBBox();
-        var wTransf = (br.x - tl.x) / (bb.width);
-        var hTransf = (br.y - tl.y) / (bb.height);
-        var dx = -(wTransf-1) * tl.x;
-        var dy = -(hTransf-1) * br.y;
-        this._path.setAttribute('transform', 'translate('+dx+','+dy+') scale('+wTransf+ ','+ hTransf +')');        
-        // this._path.setAttribute('transform', 'matrix('+wTransf+ ', 0, 0, '+ hTransf +',0 ,0)');        
-    },
-
-    _calculateBounds: function(map, clickPoint, path){
-        path.setAttribute('y', '16px');
-        path.setAttribute('x', '0px');
-        var node = document.importNode(path, true);
-        node = invSvg().appendChild(path);
-        var bbox = node.getBBox();
-        path.setAttribute('y', 0); 
-        invSvg().removeChild(node);
-        var cp = map.latLngToLayerPoint(clickPoint); 
-        var tl = cp.add({x: 0, y: -bbox.height/2});
-        var br = cp.add({x: bbox.width, y: bbox.height/2});
-        return [map.layerPointToLatLng(tl), map.layerPointToLatLng(br)]        
-    }
-
-});
-
-
-var Text = L.Text;
-
-var OverlayDrawing = function(store, map, overlayMapView)
+var OverlayDrawing = function(config, store, map, overlayMapView)
 {
     var editor = null;
     var selectedLayer = null;
@@ -1546,12 +1562,21 @@ var OverlayDrawing = function(store, map, overlayMapView)
     var m2e = {};
     m2e[DRAW_WALL] = editFeat('lines', store, map);
     m2e[DRAW_RECT] = editFeat('rects', store, map);
-    m2e[DRAW_NOTE] = editNote(store, map);
+    m2e[DRAW_NOTE] = editNote(config, store, map);
+
+    function onFeatChanges(e){
+        if(checkGeom(selectedLayer)){
+            var selFeat = selectedOverlayFeat(store);
+            var feat =  {points: toPoints(selectedLayer.getLatLngs()), id: selFeat.id};
+            store(OVERLAY_FEAT_UPDATE, {feat: feat, cat: selFeat.cat});
+        }
+    }
 
     function updateSelectedLayer(e){
         if(selectedLayer) {
-            if(!isRotateImage(selectedLayer))
-                selectedLayer.disableEdit();
+            selectedLayer.off('editable:dragend', onFeatChanges);
+            selectedLayer.off('editable:vertex:dragend', onFeatChanges);
+            selectedLayer.disableEdit();
             selectedLayer = null;
         }
         var feat_path = e.new_val;
@@ -1560,10 +1585,14 @@ var OverlayDrawing = function(store, map, overlayMapView)
             var overlay_id = selectedOverlayId(store);
             var layer_id = str(overlay_id, '.', feat.id);
             selectedLayer = cat2layers[feat.cat][layer_id];
-            if(selectedLayer) {
+            if(selectedLayer && feat.cat !== 'notes') {
                 L.setOptions(map.editTools, {skipMiddleMarkers: feat.cat !== 'lines', draggable: true});
-                selectedLayer.enableEdit(map);      
+                selectedLayer.enableEdit(map);   
+                selectedLayer.on('editable:dragend', onFeatChanges);
+                selectedLayer.on('editable:vertex:dragend', onFeatChanges);
             }
+            else 
+            selectedLayer = null;
         }
     }
 
@@ -1597,13 +1626,8 @@ function editFeat(cat, store, map)
     }
 
     function onCommit(){
-        var checkDist = 1;
-        _.reduce(_.flatten(layer.getLatLngs()), function(l1,l2){
-            var d = l1.distanceTo(l2);
-            if(d < checkDist) checkDist = d;
-            return l2;
-        });
-        if(checkDist == 1) {
+        if(checkGeom(layer))
+        {
             var feat =  { points: toPoints(layer.getLatLngs())};
             store(OVERLAY_FEAT_ADD, {feat: feat, cat: cat});
         }
@@ -1612,17 +1636,24 @@ function editFeat(cat, store, map)
     return {enter:enter, exit:exit};
 }
 
-function editNote(store, map) 
+function editNote(config, store, map) 
 {
     function onClick(e){
+        var text = selectedOverlayText(store);
+        var type = selectedOverlayNoteType(store);
+        var style = config.overlay.types.notes[type].style;
+        var $text = new Text([e.latlng],  text, 0, style).addTo(map);        
         var feat = {
-            topLeft: e.latlng,
-            rotate: 0            
+            points: toPoints($text.getLatLngs()),
+            rotate: 0,
+            text: text,
+            type: type         
         };
-        // store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
-        // store(a.DRAWING_MODE_SET);
-        var style = {"fill": "red", "fontFamily":"Verdana", "fontSize": "large", "fontStyle":"italic"};
-        new Text(e.latlng, null, "Kino i nimci", 0, style).addTo(map);
+        map.removeLayer($text);
+        store(OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
+        store(DRAWING_MODE_SET);
+        // var style = {"fill": "red", "fontFamily":"Verdana", "fontSize": "large", "fontStyle":"italic"};
+        // new Text([e.latlng],  "Kino i nimci", 0, style).addTo(map)
     }
 
     function enter() 
@@ -1645,6 +1676,16 @@ function toPoints(latLngs){
     var f = L.Util.formatNum;
     latLngs = _.flatten(latLngs);
     return latLngs.map(function(ll){ return [f(ll.lng,2), f(ll.lat,2)] });
+}
+
+function checkGeom(layer){
+    var checkDist = 1;
+    _.reduce(_.flatten(layer.getLatLngs()), function(l1,l2){
+        var d = l1.distanceTo(l2);
+        if(d < checkDist) checkDist = d;
+        return l2;
+    });
+    return checkDist == 1;
 }
 
 function OverlayView(config, store)
@@ -1694,6 +1735,9 @@ function OverlayView(config, store)
                 var o = this.selectedOverlay.$val;
                 store(OVERLAY_SAVE, o);
                 this.selectedOverlay.$val = null;
+            },
+            rollback: function(){
+                store(OVERLAY_ROLLBACK);
             }
         }
     });
@@ -1719,7 +1763,7 @@ var OverlaysModule = function(config, store, map){
     OverlayView(config, store);
     var omv = OverlayMapView(config, store, map);
     OverlaySelectTools(config, store, map, omv);
-    OverlayDrawing(store, map, omv);
+    OverlayDrawing(config, store, map, omv);
 };
 
 initComponents();

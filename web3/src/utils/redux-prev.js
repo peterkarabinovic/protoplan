@@ -14,46 +14,34 @@ export function Store(reducers, middleware)
     }
     s.state = {};
 
-    var listeners = [];
-    var listener_table = {};
-    var lastId = 0;
-    function stamp(fn){ 
-        fn._redux_id = fn._redux_id || ++lastId;
-        return fn._redux_id;
-    }
-
+    var listeners = {};
+    
     s.on = function(path, fn){
         var paths = path.split(' ');
         paths.forEach(function(p){
-            var pp = p.trim().split('.');
-            var listener_id = p + '.' + stamp(fn);
-            listeners.push(listener_id);
-            listener_table[listener_id] = {path:pp, fn:fn} ;
+            p = p.trim().split('.');
+            listeners[p.length] = listeners[p.length] || []
+            listeners[p.length].push( {path:p, fn:fn} );
         });
     };
 
     s.off = function(path, fn){
         var paths = path.split(' ');
-        var ids = paths.map(function(p){
-            var listener_id = p.trim() + '.' + stamp(fn);
-            delete listener_table[listener_id];
+        paths.forEach(function(p){
+            p = p.split('.');
+            var ln = p.length;
+            listeners = reject_array_prop(listeners, ln, function(it){ 
+                return _.isEqual(it.path, p) &&  it.fn == fn; 
+            });
         });
-        listeners = _.without(listeners, ids);
         
     };
 
     s.dispatch = function(action){
         var old_state = s.state;
         s.state = reducers(s.state, action);
-        if(s.state !== old_state) {
-            var ef = events_finder(s.state, old_state);
-            listeners.forEach(function(id){
-                var li = listener_table[id];
-                ef(li.path).forEach(function(e){
-                    li.fn(e);
-                })
-            })
-        }
+        if(s.state !== old_state)
+            find_and_fire([], s.state, old_state, listeners)
         return s.state;
     }
 
@@ -65,68 +53,26 @@ export function Store(reducers, middleware)
     return s;
 }
 
-function events_finder(new_obj, old_obj)
+function change_finder(new_obj, old_obj)
 {
     if(new_obj === old_obj)
-        return function() {return [];}
-    var _changes = diff_props(new_obj, old_obj);
-    function events(changes, nobj, oobj, path)
-    {
-        if(_.isEmpty(oobj) && _.isEmpty(nobj))
-            return [];
-        nobj = nobj || {};
-        oobj = oobj || {};
-        if(_.isEmpty(changes))
-            _.extend(changes, diff_props(nobj, oobj));
-
-        var prop = path[0];
-        var rect = path.slice(1);        
-        if(prop === '*')
-        {
-            var _events = [];
-            for(var key in changes){
-                var ch = changes[key];
-                if(ch) {
-                    ch.nobj = ch.nobj || nobj[key];
-                    ch.oobj = ch.oobj || oobj[key];
-                    ch.changes = ch.changes || {};
-                    if(path.length === 1)
-                        _events.push({
-                            path: [key],
-                            new_val: ch.nobj,
-                            old_val: ch.oobj
-                        });
-                    else 
-                    {
-                        events(ch.changes, ch.nobj, ch.oobj, rect).forEach(function(e){
-                            e.path.unshift(key);
-                            _events.push(e);
-                        })
-                    }
-                }
-            }
-            return _events;
-        }
-        else if(changes[prop]){
-            var ch = changes[prop];
-            ch.nobj = ch.nobj || nobj[prop];
-            ch.oobj = ch.oobj || oobj[prop];
-            ch.changes = ch.changes || {};
-            if(path.length == 1)
-                return [{path: [prop], new_val: ch.nobj, old_val: ch.oobj}]
-            else
-                return events(ch.changes, ch.nobj, ch.oobj, rect).map(function(e){
-                    e.path.unshift(prop);
-                    return e;
-                })
-        }
-        else 
-            return [];
+        return function() {return null;}
+    changes = {};
+    function find(nobj, oobj){
+        if(!_.isObject(nobj))
+            nobj = {};
+        if(!_.isObject(oobj))
+            oobj = {};
+        var props = _.uniq( Object.keys(nobj).concat( Object.keys(oobj) ) );
+        var diff_props = diffs(nobj, oobj);
     }
+    return function(path, le){
+        path = _.clone(path);
+        var nobj = new_obj, oobj = old_obj;
+        var prop = path.shift();
+        changes[]
 
-    return function(path)
-    {
-        return events(_changes, new_obj, old_obj, path)
+
 
     }
 }
@@ -185,8 +131,11 @@ function reject_array_prop(obj, prop, reject_fn){
  * @param {Object} obj1  
  * @param {Object} obj2 
  */
-function diffs(new_obj, old_obj, keys)
+function diffs(new_obj, old_obj)
 {
+    if(!_.isObject(new_obj) || !_.isObject(old_obj))
+        return [];
+    var keys = _.uniq( Object.keys(new_obj).concat( Object.keys(old_obj) ) );
     return keys.reduce(function(diffs, key){
         return _.isEqual(new_obj[key], old_obj[key]) ? diffs : diffs.concat(key);
     },[]);
@@ -202,25 +151,6 @@ function _match(path, mask_path){
     return _.isEqual(path, mask_path);
 }
 
-function diff_props(nobj, oobj){
-    if(!_.isObject(nobj))
-        nobj = {};
-    if(!_.isObject(oobj))
-        oobj = {};
-    var props = _.uniq( Object.keys(nobj).concat( Object.keys(oobj) ) );
-    var diff_props = diffs(nobj, oobj, props).sort();
-    return _.reduce(props, function(memo, prop){
-        var i = _.indexOf(diff_props, prop, true);
-        if(i !== -1) {
-            diff_props.splice(i,1);
-            memo[prop] = {}
-        }
-        else {
-            memo[prop] = null;
-        }
-        return memo;
-    }, {})
-}
 
 /**
  *  Reducer helpers

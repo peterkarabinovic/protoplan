@@ -2,11 +2,10 @@
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
 import {str} from '../../utils/utils.js'
-import {selectedOverlayId, selectedOverlayFeat} from '../../state.js'
-import {isRotateImage} from '../../svg/leaflet-rotate-image.js'
+import {selectedOverlayId, selectedOverlayFeat, selectedOverlayText, selectedOverlayNoteType} from '../../state.js'
 import {Text} from '../../svg/leaflet-text.js'
 
-export default function(store, map, overlayMapView)
+export default function(config, store, map, overlayMapView)
 {
     var editor = null;
     var selectedLayer = null;
@@ -16,12 +15,25 @@ export default function(store, map, overlayMapView)
     var m2e = {}
     m2e[m.DRAW_WALL] = editFeat('lines', store, map)
     m2e[m.DRAW_RECT] = editFeat('rects', store, map)
-    m2e[m.DRAW_NOTE] = editNote(store, map)
+    m2e[m.DRAW_NOTE] = editNote(config, store, map)
+
+    function log(e){
+        console.log(e);
+    }
+
+    function onFeatChanges(e){
+        if(checkGeom(selectedLayer)){
+            var selFeat = selectedOverlayFeat(store);
+            var feat =  {points: toPoints(selectedLayer.getLatLngs()), id: selFeat.id};
+            store(a.OVERLAY_FEAT_UPDATE, {feat: feat, cat: selFeat.cat});
+        }
+    }
 
     function updateSelectedLayer(e){
         if(selectedLayer) {
-            if(!isRotateImage(selectedLayer))
-                selectedLayer.disableEdit();
+            selectedLayer.off('editable:dragend', onFeatChanges)
+            selectedLayer.off('editable:vertex:dragend', onFeatChanges)
+            selectedLayer.disableEdit();
             selectedLayer = null;
         }
         var feat_path = e.new_val;
@@ -30,10 +42,14 @@ export default function(store, map, overlayMapView)
             var overlay_id = selectedOverlayId(store)
             var layer_id = str(overlay_id, '.', feat.id);
             selectedLayer = cat2layers[feat.cat][layer_id];
-            if(selectedLayer) {
+            if(selectedLayer && feat.cat !== 'notes') {
                 L.setOptions(map.editTools, {skipMiddleMarkers: feat.cat !== 'lines', draggable: true});
-                selectedLayer.enableEdit(map);      
+                selectedLayer.enableEdit(map);   
+                selectedLayer.on('editable:dragend', onFeatChanges)
+                selectedLayer.on('editable:vertex:dragend', onFeatChanges)
             }
+            else 
+            selectedLayer = null;
         }
     }
 
@@ -67,13 +83,8 @@ function editFeat(cat, store, map)
     }
 
     function onCommit(){
-        var checkDist = 1;
-        _.reduce(_.flatten(layer.getLatLngs()), function(l1,l2){
-            var d = l1.distanceTo(l2);
-            if(d < checkDist) checkDist = d;
-            return l2;
-        });
-        if(checkDist == 1) {
+        if(checkGeom(layer))
+        {
             var feat =  { points: toPoints(layer.getLatLngs())};
             store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: cat});
         }
@@ -82,17 +93,24 @@ function editFeat(cat, store, map)
     return {enter:enter, exit:exit};
 }
 
-function editNote(store, map) 
+function editNote(config, store, map) 
 {
     function onClick(e){
+        var text = selectedOverlayText(store);
+        var type = selectedOverlayNoteType(store);
+        var style = config.overlay.types.notes[type].style;
+        var $text = new Text([e.latlng],  text, 0, style).addTo(map)        
         var feat = {
-            topLeft: e.latlng,
-            rotate: 0            
-        }
-        // store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
-        // store(a.DRAWING_MODE_SET);
-        var style = {"fill": "red", "fontFamily":"Verdana", "fontSize": "large", "fontStyle":"italic"};
-        new Text(e.latlng, null, "Kino i nimci", 0, style).addTo(map)
+            points: toPoints($text.getLatLngs()),
+            rotate: 0,
+            text: text,
+            type: type         
+        };
+        map.removeLayer($text);
+        store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
+        store(a.DRAWING_MODE_SET);
+        // var style = {"fill": "red", "fontFamily":"Verdana", "fontSize": "large", "fontStyle":"italic"};
+        // new Text([e.latlng],  "Kino i nimci", 0, style).addTo(map)
     }
 
     function enter() 
@@ -115,6 +133,16 @@ function toPoints(latLngs){
     var f = L.Util.formatNum;
     latLngs = _.flatten(latLngs);
     return latLngs.map(function(ll){ return [f(ll.lng,2), f(ll.lat,2)] });
+}
+
+function checkGeom(layer){
+    var checkDist = 1;
+    _.reduce(_.flatten(layer.getLatLngs()), function(l1,l2){
+        var d = l1.distanceTo(l2);
+        if(d < checkDist) checkDist = d;
+        return l2;
+    });
+    return checkDist == 1;
 }
 
 

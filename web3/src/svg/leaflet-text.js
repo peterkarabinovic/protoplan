@@ -19,10 +19,10 @@ L.Text = L.Layer.extend({
         fontStyle: 'normal'
     },
 
-    initialize: function (topLeft, bottomRight, text, rotate, options) {
-        L.setOptions(this, options);
-        this.topLeft = topLeft;
-        this.bottomRight = bottomRight;
+    initialize: function (latLngs, text, rotate, style) {
+        this.style = L.extend({}, this.options, style);
+        this.topLeft = latLngs[0];
+        this.bottomRight = latLngs[1];
         this.rotate = rotate;
         this.text = text;
     },
@@ -40,9 +40,10 @@ L.Text = L.Layer.extend({
     onAdd: function () {
         var path = this._path = L.SVG.create('text');
         path.textContent = this.text;
-        this._updateStyle(this.options);
+        this._updateStyle();
+        this.bbox = this._getBBox(this._map, path);
         if(!this.bottomRight) {
-            var xy = this._calculateBounds(this._map, this.topLeft, path);
+            var xy = this._calculateBounds(this._map,this.bbox, this.topLeft);
             this.topLeft = xy[0];
             this.bottomRight = xy[1];
             // this.bottomRight = this._calculateBottomRight(this._map, this.topLeft, path);
@@ -58,18 +59,54 @@ L.Text = L.Layer.extend({
         }
         this._renderer._addPath(this);
         this._update();
-        this._renderer._layers[L.stamp(this)] = this;
+        this._map.on('zoomend', this._update, this);
+        // this._renderer._layers[L.stamp(this)] = this;
     },
 
     onRemove: function(){
+        this._map.off('zoomend', this._update, this);        
         this._renderer._removePath(this);
     },
 
-    _updateStyle: function(style){
-        this._path.setAttribute('fill', style.fill);
-        this._path.setAttribute('font-family', style.fontFamily);
-        this._path.setAttribute('font-size', style.fontSize);
-        this._path.setAttribute('font-style', style.fontStyle);        
+    setStyle: function(style, notupdate){
+        this.style = L.extend({}, this.options, style);
+        if(!this._map) return;
+        this._updateStyle();
+        this.bbox = this._getBBox(this._map, this._path);
+        if(notupdate) return;
+        this._update();
+    },
+
+    setText: function(text, notupdate){
+        this.text = text;
+        if(!this._map) return;
+        this._path.textContent = this.text;
+        this.bbox = this._getBBox(this._map, this._path);
+        if(notupdate) return;
+        this._update();
+    },
+
+    setLatLngs: function(latLngs){
+        this.topLeft = latLngs[0];
+        this.bottomRight = latLngs[1];
+        this._update();
+    },
+    getLatLngs: function(){
+        return [this.topLeft, this.bottomRight];
+    },
+    setRotate: function(rotate, notupdate){
+        this.rotate = rotate;
+        if(!this._map) return;
+        this.bbox = this._getBBox(this._map, this._path);        
+        if(notupdate) return;
+        this._update();
+    },
+
+    _updateStyle: function(){
+        this._path.setAttribute('fill', this.style.fill);
+        this._path.setAttribute('font-family', this.style.fontFamily);
+        this._path.setAttribute('font-size', this.style.fontSize);
+        this._path.setAttribute('font-style', this.style.fontStyle);        
     },
 
     _update: function(){
@@ -77,8 +114,7 @@ L.Text = L.Layer.extend({
         var br = this._map.latLngToLayerPoint(this.bottomRight);
         this._path.setAttribute('x', tl.x);
         this._path.setAttribute('y', br.y);
-        this._path.setAttribute('transform', '');
-        var bb = this._path.getBBox();
+        var bb = this.bbox;
         var wTransf = (br.x - tl.x) / (bb.width);
         var hTransf = (br.y - tl.y) / (bb.height);
         var dx = -(wTransf-1) * tl.x;
@@ -87,18 +123,27 @@ L.Text = L.Layer.extend({
         // this._path.setAttribute('transform', 'matrix('+wTransf+ ', 0, 0, '+ hTransf +',0 ,0)');        
     },
 
-    _calculateBounds: function(map, clickPoint, path){
-        path.setAttribute('y', '16px');
-        path.setAttribute('x', '0px');
-        var node = document.importNode(path, true);
-        node = invSvg().appendChild(path);
-        var bbox = node.getBBox();
-        path.setAttribute('y', 0); 
-        invSvg().removeChild(node);
+    _calculateBounds: function(map, bbox, clickPoint){
         var cp = map.latLngToLayerPoint(clickPoint); 
         var tl = cp.add({x: 0, y: -bbox.height/2});
         var br = cp.add({x: bbox.width, y: bbox.height/2});
         return [map.layerPointToLatLng(tl), map.layerPointToLatLng(br)]        
+    },
+
+    _getBBox: function(map, path){
+        var prev_y = path.getAttribute('y') || 0;
+        var prev_x = path.getAttribute('x') || 0;
+        var noParent = !path.parent;
+        path.setAttribute('y', '16px');
+        path.setAttribute('x', '0px');
+        if(noParent)
+            path = invSvg().appendChild(path);
+        var bbox = path.getBBox();
+        path.setAttribute('y', prev_y);
+        path.setAttribute('x', prev_x);
+        if(noParent)
+            invSvg().removeChild(path);    
+        return bbox;    
     }
 
 });

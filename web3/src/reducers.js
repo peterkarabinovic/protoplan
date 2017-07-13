@@ -128,16 +128,13 @@ var overlayReducer = function(state, action){
                 id: generateId(state, 'selectedOverlay.'+cat),
                 type: state.ui.overlay.types[cat]
             });
-            if(cat == 'notes'){
-                feat = _.extend({}, feat, {text: state.ui.overlay.text});
-            }
             state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat.id));
             return Immutable.set(state, str('selectedOverlay.',cat,'.',feat.id), feat);
 
         case a.OVERLAY_FEAT_UPDATE: 
-            var type = action.payload.type;
+            var cat = action.payload.cat;
             var feat = action.payload.feat;
-            return Immutable.set(state, 'selectedOverlay.'+type+'.'+feat.id, feat);
+            return Immutable.extend(state, 'selectedOverlay.'+cat+'.'+feat.id, feat);
 
         case a.OVERLAY_FEAT_DELETE: 
             var feat_id = state.ui.overlay.feat,
@@ -174,6 +171,11 @@ var overlayReducer = function(state, action){
                 state = Immutable.remove(state, 'entities.overlays.'+overlay.id);
             }
             return state;
+
+        case a.OVERLAY_ROLLBACK:
+            var overlay = state.selectedOverlay;
+            overlay = state.entities.overlays[overlay.id];
+            return Immutable.set(state, 'selectedOverlay', overlay);
     }
     return state;
 }
