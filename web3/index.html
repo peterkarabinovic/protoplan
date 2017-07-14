@@ -58,6 +58,12 @@
                 background-color:rgba(255,0,0,0.0);
             }
             .leaflet-tooltip {border-radius: inherit; pointer-events: auto; }
+            /* To Text svg element be clickable*/
+            .leaflet-pane > svg text.leaflet-interactive {
+                pointer-events: visiblePainted; /* IE 9-10 doesn't have auto */
+                pointer-events: auto;
+            }
+            
             .pointer {
                 cursor: pointer;
             }

@@ -21,32 +21,34 @@ export default function(config, store, map, overlayMapView)
         console.log(e);
     }
 
-    function onFeatChanges(e){
+    function onSelectedGeometryChanges(e){
         if(checkGeom(selectedLayer)){
             var selFeat = selectedOverlayFeat(store);
             var feat =  {points: toPoints(selectedLayer.getLatLngs()), id: selFeat.id};
             store(a.OVERLAY_FEAT_UPDATE, {feat: feat, cat: selFeat.cat});
         }
+        selectedLayer.disableEdit();
+        selectedLayer.enableEdit(map); 
+
     }
 
     function updateSelectedLayer(e){
         if(selectedLayer) {
-            selectedLayer.off('editable:dragend', onFeatChanges)
-            selectedLayer.off('editable:vertex:dragend', onFeatChanges)
+            selectedLayer.off('editable:dragend', onSelectedGeometryChanges)
+            selectedLayer.off('editable:vertex:dragend', onSelectedGeometryChanges)
             selectedLayer.disableEdit();
             selectedLayer = null;
         }
-        var feat_path = e.new_val;
-        if(feat_path){
-            var feat = selectedOverlayFeat(store);
+        var feat = selectedOverlayFeat(store);
+        if(feat){
             var overlay_id = selectedOverlayId(store)
             var layer_id = str(overlay_id, '.', feat.id);
             selectedLayer = cat2layers[feat.cat][layer_id];
-            if(selectedLayer && feat.cat !== 'notes') {
+            if(selectedLayer) {
                 L.setOptions(map.editTools, {skipMiddleMarkers: feat.cat !== 'lines', draggable: true});
                 selectedLayer.enableEdit(map);   
-                selectedLayer.on('editable:dragend', onFeatChanges)
-                selectedLayer.on('editable:vertex:dragend', onFeatChanges)
+                selectedLayer.on('editable:dragend', onSelectedGeometryChanges)
+                selectedLayer.on('editable:vertex:dragend', onSelectedGeometryChanges)
             }
             else 
             selectedLayer = null;
@@ -64,7 +66,7 @@ export default function(config, store, map, overlayMapView)
 
 
     store.on('map.drawMode', onDrawMode);
-    store.on('ui.overlay.feat', updateSelectedLayer);
+    store.on('ui.overlay.feat selectedOverlay', updateSelectedLayer);
 }
 
 

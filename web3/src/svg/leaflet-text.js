@@ -1,3 +1,4 @@
+import {UniformRectEditor} from './leaflet-uniform-rect-editor.js'
 
 var _invSvg = null;
 
@@ -16,7 +17,8 @@ L.Text = L.Layer.extend({
         fill: 'black',
         fontFamily: 'Times',
         fontSize: 'medium',
-        fontStyle: 'normal'
+        fontStyle: 'normal',
+        interactive: true
     },
 
     initialize: function (latLngs, text, rotate, style) {
@@ -42,12 +44,7 @@ L.Text = L.Layer.extend({
         path.textContent = this.text;
         this._updateStyle();
         this.bbox = this._getBBox(this._map, path);
-        if(!this.bottomRight) {
-            var xy = this._calculateBounds(this._map,this.bbox, this.topLeft);
-            this.topLeft = xy[0];
-            this.bottomRight = xy[1];
-            // this.bottomRight = this._calculateBottomRight(this._map, this.topLeft, path);
-        }
+        this.setLatLngs([this.topLeft, this.bottomRight], true);
 
         // var b = L.latLngBounds(this.topLeft, this.bottomRight);
         // this.poly = L.polygon([this.topLeft, L.latLng(this.topLeft.lat, this.bottomRight.lng), 
@@ -66,6 +63,9 @@ L.Text = L.Layer.extend({
     onRemove: function(){
         this._map.off('zoomend', this._update, this);        
         this._renderer._removePath(this);
+        if(this.polygon) {
+            this.disableEdit();
+        }
     },
 
     setStyle: function(style, notupdate){
@@ -86,9 +86,16 @@ L.Text = L.Layer.extend({
         this._update();
     },
 
-    setLatLngs: function(latLngs){
+    setLatLngs: function(latLngs, notupdate){
         this.topLeft = latLngs[0];
         this.bottomRight = latLngs[1];
+        if(!this.bottomRight && this._map) {
+            var xy = this._calculateBounds(this._map,this.bbox, this.topLeft);
+            this.topLeft = xy[0];
+            this.bottomRight = xy[1];
+        }
+        if(notupdate) return;
+        
         this._update();
     },
     getLatLngs: function(){
@@ -133,7 +140,7 @@ L.Text = L.Layer.extend({
     _getBBox: function(map, path){
         var prev_y = path.getAttribute('y') || 0;
         var prev_x = path.getAttribute('x') || 0;
-        var noParent = !path.parent;
+        var noParent = !path.parentNode;
         path.setAttribute('y', '16px');
         path.setAttribute('x', '0px');
         if(noParent)
@@ -144,7 +151,50 @@ L.Text = L.Layer.extend({
         if(noParent)
             invSvg().removeChild(path);    
         return bbox;    
+    },
+
+    _rediectEditorEvents: function(e){
+        e.target = this;
+        this.fire(e.type, e, true);
+    },
+
+    enableEdit: function(map){
+        var ll = this.getLatLngs();
+        var latLngs = [ll[0], L.latLng(ll[0].lat, ll[1].lng),ll[1], L.latLng(ll[1].lat, ll[0].lng),ll[0] ];
+        var style = {fill: true, weight:1, color: 'grey', fillOpacity: 0.1, opacity:0.1, editorClass: UniformRectEditor}
+        this.polygon = L.polygon(latLngs, style).addTo(map);
+        this.polygon.enableEdit(map);
+        // this.polygon.addEventParent(this);
+        this.polygon.on('editable:dragend editable:vertex:dragend contextmenu', this._rediectEditorEvents, this);
+        this.polygon.on('editable:vertex:drag editable:drag', this._dragVertex, this);
+        
+    },
+
+    disableEdit: function(){
+        if(!this.polygon) return;
+        this.polygon.disableEdit();
+        this.polygon.off('editable:dragend editable:vertex:dragend contextmenu', this._rediectEditorEvents, this);
+        this.polygon.off('editable:vertex:drag editable:drag', this._dragVertex, this);
+        
+        this._map.removeLayer(this.polygon);
+        this.polygon = null;
+    },
+
+    _dragVertex: function(e){
+        var ll = this.polygon.getLatLngs()[0];        
+        this.setLatLngs([ll[0], ll[2]]);
+        // var ll = this.getLatLngs();
+        // ll[1] = e.latlng;
+        // var latLngs = [ll[0], L.latLng(ll[0].lat, ll[1].lng),ll[1], L.latLng(ll[1].lat, ll[0].lng),ll[0] ];
+        // this.polygon.setLatLngs(latLngs);
+        // this.setLatLngs(ll);
+        // // this.polygon.editor.reset()
+        // // e.latlng.lat = this.topLeft.lat;
+        // console.log(e);
+        // L.DomEvent.stopPropagation(e);
     }
+
+
 
 });
 

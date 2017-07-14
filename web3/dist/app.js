@@ -1269,6 +1269,54 @@ var BaseModule = function(store, map)
     BaseMapDistance(store, map);
 };
 
+/**
+ * Extention for Leaflet.Editable editor for edit uiniform Rectangle
+ */
+
+
+var UniformRectEditor = L.Editable.RectangleEditor.extend({
+
+    lp: function(gp){
+        return this.map.latLngToLayerPoint(gp);
+    },
+    gp: function(lp){
+        return this.map.layerPointToLatLng(lp);
+    },
+
+    onVertexMarkerDragStart: function(e){
+            var index = e.vertex.getIndex(),
+                oppositeIndex = (index + 2) % 4,
+                opposite = e.vertex.latlngs[oppositeIndex];
+        this.oppositePoint = this.lp(opposite);
+        this.originPoint = this.lp(e.vertex.latlng);
+        this.initDist = this.oppositePoint.distanceTo(this.originPoint);
+    },
+
+    extendBounds: function(e){
+
+            var index = e.vertex.getIndex(),
+                current = e.vertex.latlngs[index],
+                next = e.vertex.getNext(),
+                previous = e.vertex.getPrevious(),
+                oppositeIndex = (index + 2) % 4,
+                opposite = e.vertex.latlngs[oppositeIndex];
+
+                
+            var ratio = this.oppositePoint.distanceTo(this.lp(e.latlng)) / this.initDist || 1;
+            var scale = L.point(ratio, ratio);
+
+            var newLatLng = this.gp(this.originPoint.subtract(this.oppositePoint).scaleBy(scale).add(this.oppositePoint));     
+            var bounds = new L.LatLngBounds(newLatLng, opposite);
+            // Update latlngs by hand to preserve order.
+            e.vertex.latlng.update(newLatLng);
+            e.vertex._latlng.update(newLatLng);
+            previous.latlng.update([newLatLng.lat, opposite.lng]);
+            next.latlng.update([opposite.lat, newLatLng.lng]);
+            this.updateBounds(bounds);
+            this.refreshVertexMarkers();
+    }
+});
+
 var _invSvg = null;
 
 function invSvg(){
@@ -1286,7 +1334,8 @@ L.Text = L.Layer.extend({
         fill: 'black',
         fontFamily: 'Times',
         fontSize: 'medium',
-        fontStyle: 'normal'
+        fontStyle: 'normal',
+        interactive: true
     },
 
     initialize: function (latLngs, text, rotate, style) {
@@ -1312,12 +1361,7 @@ L.Text = L.Layer.extend({
         path.textContent = this.text;
         this._updateStyle();
         this.bbox = this._getBBox(this._map, path);
-        if(!this.bottomRight) {
-            var xy = this._calculateBounds(this._map,this.bbox, this.topLeft);
-            this.topLeft = xy[0];
-            this.bottomRight = xy[1];
-            // this.bottomRight = this._calculateBottomRight(this._map, this.topLeft, path);
-        }
+        this.setLatLngs([this.topLeft, this.bottomRight], true);
 
         // var b = L.latLngBounds(this.topLeft, this.bottomRight);
         // this.poly = L.polygon([this.topLeft, L.latLng(this.topLeft.lat, this.bottomRight.lng), 
@@ -1336,6 +1380,9 @@ L.Text = L.Layer.extend({
     onRemove: function(){
         this._map.off('zoomend', this._update, this);        
         this._renderer._removePath(this);
+        if(this.polygon) {
+            this.disableEdit();
+        }
     },
 
     setStyle: function(style, notupdate){
@@ -1356,9 +1403,16 @@ L.Text = L.Layer.extend({
         this._update();
     },
 
-    setLatLngs: function(latLngs){
+    setLatLngs: function(latLngs, notupdate){
         this.topLeft = latLngs[0];
         this.bottomRight = latLngs[1];
+        if(!this.bottomRight && this._map) {
+            var xy = this._calculateBounds(this._map,this.bbox, this.topLeft);
+            this.topLeft = xy[0];
+            this.bottomRight = xy[1];
+        }
+        if(notupdate) return;
+        
         this._update();
     },
     getLatLngs: function(){
@@ -1403,7 +1457,7 @@ L.Text = L.Layer.extend({
     _getBBox: function(map, path){
         var prev_y = path.getAttribute('y') || 0;
         var prev_x = path.getAttribute('x') || 0;
-        var noParent = !path.parent;
+        var noParent = !path.parentNode;
         path.setAttribute('y', '16px');
         path.setAttribute('x', '0px');
         if(noParent)
@@ -1414,7 +1468,50 @@ L.Text = L.Layer.extend({
         if(noParent)
             invSvg().removeChild(path);    
         return bbox;    
+    },
+
+    _rediectEditorEvents: function(e){
+        e.target = this;
+        this.fire(e.type, e, true);
+    },
+
+    enableEdit: function(map){
+        var ll = this.getLatLngs();
+        var latLngs = [ll[0], L.latLng(ll[0].lat, ll[1].lng),ll[1], L.latLng(ll[1].lat, ll[0].lng),ll[0] ];
+        var style = {fill: true, weight:1, color: 'grey', fillOpacity: 0.1, opacity:0.1, editorClass: UniformRectEditor};
+        this.polygon = L.polygon(latLngs, style).addTo(map);
+        this.polygon.enableEdit(map);
+        // this.polygon.addEventParent(this);
+        this.polygon.on('editable:dragend editable:vertex:dragend contextmenu', this._rediectEditorEvents, this);
+        this.polygon.on('editable:vertex:drag editable:drag', this._dragVertex, this);
+        
+    },
+
+    disableEdit: function(){
+        if(!this.polygon) return;
+        this.polygon.disableEdit();
+        this.polygon.off('editable:dragend editable:vertex:dragend contextmenu', this._rediectEditorEvents, this);
+        this.polygon.off('editable:vertex:drag editable:drag', this._dragVertex, this);
+        
+        this._map.removeLayer(this.polygon);
+        this.polygon = null;
+    },
+
+    _dragVertex: function(e){
+        var ll = this.polygon.getLatLngs()[0];        
+        this.setLatLngs([ll[0], ll[2]]);
+        // var ll = this.getLatLngs();
+        // ll[1] = e.latlng;
+        // var latLngs = [ll[0], L.latLng(ll[0].lat, ll[1].lng),ll[1], L.latLng(ll[1].lat, ll[0].lng),ll[0] ];
+        // this.polygon.setLatLngs(latLngs);
+        // this.setLatLngs(ll);
+        // // this.polygon.editor.reset()
+        // // e.latlng.lat = this.topLeft.lat;
+        // console.log(e);
+        // L.DomEvent.stopPropagation(e);
     }
+
+
 
 });
 
@@ -1564,32 +1661,34 @@ var OverlayDrawing = function(config, store, map, overlayMapView)
     m2e[DRAW_RECT] = editFeat('rects', store, map);
     m2e[DRAW_NOTE] = editNote(config, store, map);
 
-    function onFeatChanges(e){
+    function onSelectedGeometryChanges(e){
         if(checkGeom(selectedLayer)){
             var selFeat = selectedOverlayFeat(store);
             var feat =  {points: toPoints(selectedLayer.getLatLngs()), id: selFeat.id};
             store(OVERLAY_FEAT_UPDATE, {feat: feat, cat: selFeat.cat});
         }
+        selectedLayer.disableEdit();
+        selectedLayer.enableEdit(map); 
+
     }
 
     function updateSelectedLayer(e){
         if(selectedLayer) {
-            selectedLayer.off('editable:dragend', onFeatChanges);
-            selectedLayer.off('editable:vertex:dragend', onFeatChanges);
+            selectedLayer.off('editable:dragend', onSelectedGeometryChanges);
+            selectedLayer.off('editable:vertex:dragend', onSelectedGeometryChanges);
             selectedLayer.disableEdit();
             selectedLayer = null;
         }
-        var feat_path = e.new_val;
-        if(feat_path){
-            var feat = selectedOverlayFeat(store);
+        var feat = selectedOverlayFeat(store);
+        if(feat){
             var overlay_id = selectedOverlayId(store);
             var layer_id = str(overlay_id, '.', feat.id);
             selectedLayer = cat2layers[feat.cat][layer_id];
-            if(selectedLayer && feat.cat !== 'notes') {
+            if(selectedLayer) {
                 L.setOptions(map.editTools, {skipMiddleMarkers: feat.cat !== 'lines', draggable: true});
                 selectedLayer.enableEdit(map);   
-                selectedLayer.on('editable:dragend', onFeatChanges);
-                selectedLayer.on('editable:vertex:dragend', onFeatChanges);
+                selectedLayer.on('editable:dragend', onSelectedGeometryChanges);
+                selectedLayer.on('editable:vertex:dragend', onSelectedGeometryChanges);
             }
             else 
             selectedLayer = null;
@@ -1607,7 +1706,7 @@ var OverlayDrawing = function(config, store, map, overlayMapView)
 
 
     store.on('map.drawMode', onDrawMode);
-    store.on('ui.overlay.feat', updateSelectedLayer);
+    store.on('ui.overlay.feat selectedOverlay', updateSelectedLayer);
 };
 
 
