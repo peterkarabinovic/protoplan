@@ -1,3 +1,4 @@
+
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
 import { drawMode, 
@@ -5,7 +6,8 @@ import { drawMode,
 
 import OverlayMapView from './overlay-map-view.js'
 import OverlaySelectTools from './overlay-select-tools.js'
-import OverlayDrawing from './overlay-drawing.js'
+import OverlayEditing from './overlay-editing.js'
+import {Text} from '../../svg/leaflet-text.js'
 
 
 function OverlayView(config, store)
@@ -38,6 +40,7 @@ function OverlayView(config, store)
                 }
             },
             type: null,
+            text: null
         },
         methods: { 
             select: function(mode){ 
@@ -69,6 +72,7 @@ function OverlayView(config, store)
     store.on('ui.overlay.feat', function(){
         var feat = selectedOverlayFeat(store);
         vm.type = feat ? vm.types[feat.cat] : null;
+        vm.text = feat && feat.cat === 'notes' ? store.state.selectedOverlay.notes[feat.id].text : null; 
     })
 
     vm.$watch('type.sel.$val', function(val){
@@ -77,11 +81,20 @@ function OverlayView(config, store)
             store(a.OVERLAY_TYPE_SELECT, {feat: feat, type_id: val});
         }
     });
+    return vm;
 }
 
 export default function(config, store, map){
-    OverlayView(config, store);
+    var ov = OverlayView(config, store);
     var omv = OverlayMapView(config, store, map);
     OverlaySelectTools(config, store, map, omv);
-    OverlayDrawing(config, store, map, omv);
+    var oe = OverlayEditing(config, store, map, omv);
+
+    ov.$watch('text', _.debounce(function(text){
+        if(text && text.trim().length > 0) {
+            oe.onTextChange(text);  
+        }
+    },100));
+
 }
+

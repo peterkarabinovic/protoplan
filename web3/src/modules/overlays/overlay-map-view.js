@@ -1,6 +1,6 @@
 import {selectedOverlayId} from '../../state.js'
-import {str} from '../../utils/utils.js'
-import {Text} from '../../svg/leaflet-text.js'
+import {str, toLatLngs} from '../../utils/utils.js'
+import {EditableText} from '../../svg/leaflet-text-editable.js'
 /**
  * 
  *  overlay state 
@@ -95,12 +95,9 @@ function toLeafletRect(id, rect, style){
 
 function toText(id, note, style)
 {
-    var layer = new Text(toLatLngs(note.points), note.text, note.rotate, style);
+    var layer = new EditableText(toLatLngs(note.points), note.text, note.rotate, style);
     layer.id = id;
     return layer;
 }
 
 
-function toLatLngs(points) {
-    return points.map(function(p){ return  L.latLng(p[1], p[0])});
-}

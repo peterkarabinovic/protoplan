@@ -340,6 +340,16 @@ function startswith(str, substr) {
     return str && str.indexOf(str) === 0;
 }
 
+function toLatLngs(points) {
+    return points.map(function(p){ return  L.latLng(p[1], p[0])});
+}
+
+function toPoints(latLngs){
+    var f = L.Util.formatNum;
+    latLngs = _.flatten(latLngs);
+    return latLngs.map(function(ll){ return [f(ll.lng,2), f(ll.lat,2)] });
+}
+
 
 /*
  * Selfcheck - wrap callback function for check if it already called in stack above
@@ -457,7 +467,9 @@ function selectedOverlayFeat(store) {
     var feat = store.state.ui.overlay.feat;
     if(feat){
         var p = feat.split('.');
-        return {cat: p[0], id: p[1]};
+        var f = {cat: p[0], id: p[1]};
+        feat = store.state.selectedOverlay[f.cat][f.id];
+        return _.extend(f, feat);
     }
     return null; 
 }
@@ -465,7 +477,7 @@ function selectedOverlayFeat(store) {
 function selectedOverlayText(store){
     return store.state.ui.overlay.text;
 }
-function selectedOverlayNoteType(store){
+function overlayNoteType(store){
     return store.state.ui.overlay.types.notes;
 }
 
@@ -494,6 +506,8 @@ var OVERLAYS_LOADED = 'OVERLAYS_LOADED';
 var OVERLAY_FEAT_UPDATE = 'OVERLAY_FEAT_UPDATE';
 var OVERLAY_FEAT_DELETE = 'OVERLAY_FEAT_DELETE';
 var OVERLAY_FEAT_SELECT = 'OVERLAY_FEAT_SELECT';
+var OVERLAY_FEAT_ROTATE = 'OVERLAY_FEAT_ROTATE';
+var OVERLAY_FEAT_TEXT = 'OVERLAY_FEAT_TEXT';
 var OVERLAY_TYPE_SELECT = 'OVERLAY_TYPE_SELECT';
 var OVERLAY_ROLLBACK = 'OVERLAY_ROLLBACK';
 var OVERLAY_SAVE = 'OVERLAY_SAVE';
@@ -642,6 +656,22 @@ var overlayReducer = function(state, action){
             state = Immutable.remove(state, 'selectedOverlay.'+cat+'.'+id);
             return Immutable.remove(state, 'ui.overlay.feat');
 
+        case OVERLAY_FEAT_ROTATE:
+            var feat_id = state.ui.overlay.feat,
+                p = feat_id.split('.'),
+                cat = p[0],
+                id = +p[1];
+            var angle = state.selectedOverlay[cat][id].rotate;
+            return Immutable.set(state, str('selectedOverlay.',cat,'.',id,'.rotate'), (angle-45) % 360);
+
+        case OVERLAY_FEAT_TEXT:
+            var feat = action.payload;
+            var feat_id = state.ui.overlay.feat,
+                p = feat_id.split('.'),
+                cat = p[0],
+                id = +p[1];
+            return Immutable.extend(state, str('selectedOverlay.',cat,'.',id), feat);
+
         case OVERLAY_FEAT_SELECT:
             var feat_id = action.payload;
             if(feat_id) {
@@ -673,7 +703,8 @@ var overlayReducer = function(state, action){
         case OVERLAY_ROLLBACK:
             var overlay = state.selectedOverlay;
             overlay = state.entities.overlays[overlay.id];
-            return Immutable.set(state, 'selectedOverlay', overlay);
+            state = Immutable.set(state, 'selectedOverlay', overlay);
+            return Immutable.remove(state, 'ui.overlay.feat');
     }
     return state;
 };
@@ -1270,52 +1301,209 @@ var BaseModule = function(store, map)
 };
 
 /**
- * Extention for Leaflet.Editable editor for edit uiniform Rectangle
+ * @class  L.Matrix
+ *
+ * @param {Number} a
+ * @param {Number} b
+ * @param {Number} c
+ * @param {Number} d
+ * @param {Number} e
+ * @param {Number} f
  */
+L.Matrix = function(a, b, c, d, e, f) {
+
+  /**
+   * @type {Array.<Number>}
+   */
+  this._matrix = [a, b, c, d, e, f];
+};
 
 
-var UniformRectEditor = L.Editable.RectangleEditor.extend({
+L.Matrix.prototype = {
 
-    lp: function(gp){
-        return this.map.latLngToLayerPoint(gp);
-    },
-    gp: function(lp){
-        return this.map.layerPointToLatLng(lp);
-    },
 
-    onVertexMarkerDragStart: function(e){
-            var index = e.vertex.getIndex(),
-                oppositeIndex = (index + 2) % 4,
-                opposite = e.vertex.latlngs[oppositeIndex];
-        this.oppositePoint = this.lp(opposite);
-        this.originPoint = this.lp(e.vertex.latlng);
-        this.initDist = this.oppositePoint.distanceTo(this.originPoint);
-    },
+  /**
+   * @param  {L.Point} point
+   * @return {L.Point}
+   */
+  transform: function(point) {
+    return this._transform(point.clone());
+  },
 
-    extendBounds: function(e){
 
-            var index = e.vertex.getIndex(),
-                current = e.vertex.latlngs[index],
-                next = e.vertex.getNext(),
-                previous = e.vertex.getPrevious(),
-                oppositeIndex = (index + 2) % 4,
-                opposite = e.vertex.latlngs[oppositeIndex];
+  /**
+   * Destructive
+   *
+   * [ x ] = [ a  b  tx ] [ x ] = [ a * x + b * y + tx ]
+   * [ y ] = [ c  d  ty ] [ y ] = [ c * x + d * y + ty ]
+   *
+   * @param  {L.Point} point
+   * @return {L.Point}
+   */
+  _transform: function(point) {
+    var matrix = this._matrix;
+    var x = point.x, y = point.y;
+    point.x = matrix[0] * x + matrix[1] * y + matrix[4];
+    point.y = matrix[2] * x + matrix[3] * y + matrix[5];
+    return point;
+  },
 
-                
-            var ratio = this.oppositePoint.distanceTo(this.lp(e.latlng)) / this.initDist || 1;
-            var scale = L.point(ratio, ratio);
 
-            var newLatLng = this.gp(this.originPoint.subtract(this.oppositePoint).scaleBy(scale).add(this.oppositePoint));     
-            var bounds = new L.LatLngBounds(newLatLng, opposite);
-            // Update latlngs by hand to preserve order.
-            e.vertex.latlng.update(newLatLng);
-            e.vertex._latlng.update(newLatLng);
-            previous.latlng.update([newLatLng.lat, opposite.lng]);
-            next.latlng.update([opposite.lat, newLatLng.lng]);
-            this.updateBounds(bounds);
-            this.refreshVertexMarkers();
+  /**
+   * @param  {L.Point} point
+   * @return {L.Point}
+   */
+  untransform: function (point) {
+    var matrix = this._matrix;
+    return new L.Point(
+      (point.x / matrix[0] - matrix[4]) / matrix[0],
+      (point.y / matrix[2] - matrix[5]) / matrix[2]
+    );
+  },
+
+
+  /**
+   * @return {L.Matrix}
+   */
+  clone: function() {
+    var matrix = this._matrix;
+    return new L.Matrix(
+      matrix[0], matrix[1], matrix[2],
+      matrix[3], matrix[4], matrix[5]
+    );
+  },
+
+
+  /**
+   * @param {L.Point=|Number=} translate
+   * @return {L.Matrix|L.Point}
+   */
+  translate: function(translate) {
+    if (translate === undefined) {
+      return new L.Point(this._matrix[4], this._matrix[5]);
     }
-});
+
+    var translateX, translateY;
+    if (typeof translate === 'number') {
+      translateX = translateY = translate;
+    } else {
+      translateX = translate.x;
+      translateY = translate.y;
+    }
+
+    return this._add(1, 0, 0, 1, translateX, translateY);
+  },
+
+
+  /**
+   * @param {L.Point=|Number=} scale
+   * @return {L.Matrix|L.Point}
+   */
+  scale: function(scale, origin) {
+    if (scale === undefined) {
+      return new L.Point(this._matrix[0], this._matrix[3]);
+    }
+
+    var scaleX, scaleY;
+    origin = origin || L.point(0, 0);
+    if (typeof scale === 'number') {
+      scaleX = scaleY = scale;
+    } else {
+      scaleX = scale.x;
+      scaleY = scale.y;
+    }
+
+    return this
+      ._add(scaleX, 0, 0, scaleY, origin.x, origin.y)
+      ._add(1, 0, 0, 1, -origin.x, -origin.y);
+  },
+
+
+  /**
+   * m00  m01  x - m00 * x - m01 * y
+   * m10  m11  y - m10 * x - m11 * y
+   * @param {Number}   angle
+   * @param {L.Point=} origin
+   * @return {L.Matrix}
+   */
+  rotate: function(angle, origin) {
+    var cos = Math.cos(angle);
+    var sin = Math.sin(angle);
+
+    origin = origin || new L.Point(0, 0);
+
+    return this
+      ._add(cos, sin, -sin, cos, origin.x, origin.y)
+      ._add(1, 0, 0, 1, -origin.x, -origin.y);
+  },
+
+
+  /**
+   * Invert rotation
+   * @return {L.Matrix}
+   */
+  flip: function() {
+    this._matrix[1] *= -1;
+    this._matrix[2] *= -1;
+    return this;
+  },
+
+
+  /**
+   * @param {Number|L.Matrix} a
+   * @param {Number} b
+   * @param {Number} c
+   * @param {Number} d
+   * @param {Number} e
+   * @param {Number} f
+   */
+  _add: function(a, b, c, d, e, f) {
+    var result = [[], [], []];
+    var src = this._matrix;
+    var m = [
+      [src[0], src[2], src[4]],
+      [src[1], src[3], src[5]],
+      [     0,      0,     1]
+    ];
+    var other = [
+      [a, c, e],
+      [b, d, f],
+      [0, 0, 1]
+    ], val;
+
+
+    if (a && a instanceof L.Matrix) {
+      src = a._matrix;
+      other = [
+        [src[0], src[2], src[4]],
+        [src[1], src[3], src[5]],
+        [     0,      0,     1]];
+    }
+
+    for (var i = 0; i < 3; i++) {
+      for (var j = 0; j < 3; j++) {
+        val = 0;
+        for (var k = 0; k < 3; k++) {
+          val += m[i][k] * other[k][j];
+        }
+        result[i][j] = val;
+      }
+    }
+
+    this._matrix = [
+      result[0][0], result[1][0], result[0][1],
+      result[1][1], result[0][2], result[1][2]
+    ];
+    return this;
+  }
+
+
+};
+
+
+L.matrix = function(a, b, c, d, e, f) {
+  return new L.Matrix(a, b, c, d, e, f);
+};
 
 var _invSvg = null;
 
@@ -1398,9 +1586,15 @@ L.Text = L.Layer.extend({
         this.text = text;
         if(!this._map) return;
         this._path.textContent = this.text;
-        this.bbox = this._getBBox(this._map, this._path);
         if(notupdate) return;
+        var rect = this._path.getBoundingClientRect();
+        var tl = this._map.latLngToLayerPoint(this.topLeft);
+        this.bottomRight = this._map.layerPointToLatLng(tl.add({x: rect.width, y: rect.height}));        
         this._update();
+    },
+
+    getText: function(){
+        return this.text;
     },
 
     setLatLngs: function(latLngs, notupdate){
@@ -1421,7 +1615,6 @@ L.Text = L.Layer.extend({
     setRotate: function(rotate, notupdate){
         this.rotate = rotate;
         if(!this._map) return;
-        this.bbox = this._getBBox(this._map, this._path);        
         if(notupdate) return;
         this._update();
     },
@@ -1439,18 +1632,34 @@ L.Text = L.Layer.extend({
         this._path.setAttribute('x', tl.x);
         this._path.setAttribute('y', br.y);
         var bb = this.bbox;
-        var wTransf = (br.x - tl.x) / (bb.width);
-        var hTransf = (br.y - tl.y) / (bb.height);
+        var wTransf = Math.round((br.x - tl.x) / (bb.width) * 100) / 100;
+        var hTransf = Math.round((br.y - tl.y) / (bb.height) * 100) / 100;
         var dx = -(wTransf-1) * tl.x;
         var dy = -(hTransf-1) * br.y;
-        this._path.setAttribute('transform', 'translate('+dx+','+dy+') scale('+wTransf+ ','+ hTransf +')');        
+        // var transform = 'translate('+dx+' '+dy+') scale('+wTransf+ ' '+ hTransf +')';
+        // this._path.setAttribute('transform', transform);        
+
+        var z = this._map.getZoom();
+        var matrix$$1 = L.matrix(1,0,0,1,0,0);
+        var origin = {x:tl.x, y:br.y};
+        matrix$$1.rotate(this.rotate, L.bounds(tl, br).getCenter(true));
+        matrix$$1.scale({x:wTransf, y:hTransf}, origin);
+        var transform = 'matrix(' + matrix$$1._matrix.join(',') + ')';
+        this._path.setAttribute('transform', transform); 
+
+
+        // if(this.rotate){
+        //     var ce =L.bounds(tl, br).getCenter(true).subtract({x:dx, y:dy})//.scaleBy({x:wTransf, y:hTransf}).add(tl);
+        //     transform += ' rotate('+this.rotate+' '+ce.x+' '+ce.y+')';
+        // }
+        // this._path.setAttribute('transform', transform);        
         // this._path.setAttribute('transform', 'matrix('+wTransf+ ', 0, 0, '+ hTransf +',0 ,0)');        
     },
 
-    _calculateBounds: function(map, bbox, clickPoint){
-        var cp = map.latLngToLayerPoint(clickPoint); 
-        var tl = cp.add({x: 0, y: -bbox.height/2});
-        var br = cp.add({x: bbox.width, y: bbox.height/2});
+    _calculateBounds: function(map, bbox, topLeft){
+        var tl = map.latLngToLayerPoint(topLeft); 
+        // var tl = cp.add({x: 0, y: -bbox.height/2});
+        var br = tl.add({x: bbox.width, y: bbox.height});
         return [map.layerPointToLatLng(tl), map.layerPointToLatLng(br)]        
     },
 
@@ -1468,23 +1677,41 @@ L.Text = L.Layer.extend({
         if(noParent)
             invSvg().removeChild(path);    
         return bbox;    
-    },
+    }
+
+
+});
+
+
+var Text = L.Text;
+
+var EditableText = Text.extend({
 
     _rediectEditorEvents: function(e){
         e.target = this;
         this.fire(e.type, e, true);
     },
 
+    setText: function(text, noupdate){
+        Text.prototype.setText.call(this, text, noupdate);
+        if(this.polygon) {
+            var ll = this.getLatLngs();
+            var latLngs = [ll[0], L.latLng(ll[0].lat, ll[1].lng),ll[1], L.latLng(ll[1].lat, ll[0].lng),ll[0] ];
+            this.polygon.setLatLngs(latLngs);
+            this.polygon.editor.reset();
+        }
+    },
+
     enableEdit: function(map){
         var ll = this.getLatLngs();
         var latLngs = [ll[0], L.latLng(ll[0].lat, ll[1].lng),ll[1], L.latLng(ll[1].lat, ll[0].lng),ll[0] ];
         var style = {fill: true, weight:1, color: 'grey', fillOpacity: 0.1, opacity:0.1, editorClass: UniformRectEditor};
+        
         this.polygon = L.polygon(latLngs, style).addTo(map);
         this.polygon.enableEdit(map);
-        // this.polygon.addEventParent(this);
         this.polygon.on('editable:dragend editable:vertex:dragend contextmenu', this._rediectEditorEvents, this);
         this.polygon.on('editable:vertex:drag editable:drag', this._dragVertex, this);
-        
+        this.editor = this.polygon.editor;
     },
 
     disableEdit: function(){
@@ -1492,31 +1719,61 @@ L.Text = L.Layer.extend({
         this.polygon.disableEdit();
         this.polygon.off('editable:dragend editable:vertex:dragend contextmenu', this._rediectEditorEvents, this);
         this.polygon.off('editable:vertex:drag editable:drag', this._dragVertex, this);
-        
         this._map.removeLayer(this.polygon);
+        this.editor = null;
         this.polygon = null;
     },
 
     _dragVertex: function(e){
         var ll = this.polygon.getLatLngs()[0];        
         this.setLatLngs([ll[0], ll[2]]);
-        // var ll = this.getLatLngs();
-        // ll[1] = e.latlng;
-        // var latLngs = [ll[0], L.latLng(ll[0].lat, ll[1].lng),ll[1], L.latLng(ll[1].lat, ll[0].lng),ll[0] ];
-        // this.polygon.setLatLngs(latLngs);
-        // this.setLatLngs(ll);
-        // // this.polygon.editor.reset()
-        // // e.latlng.lat = this.topLeft.lat;
-        // console.log(e);
-        // L.DomEvent.stopPropagation(e);
     }
-
-
 
 });
 
 
-var Text = L.Text;
+var UniformRectEditor = L.Editable.RectangleEditor.extend({
+
+    lp: function(gp){
+        return this.map.latLngToLayerPoint(gp);
+    },
+    gp: function(lp){
+        return this.map.layerPointToLatLng(lp);
+    },
+
+    onVertexMarkerDragStart: function(e){
+            var index = e.vertex.getIndex(),
+                oppositeIndex = (index + 2) % 4,
+                opposite = e.vertex.latlngs[oppositeIndex];
+        this.oppositePoint = this.lp(opposite);
+        this.originPoint = this.lp(e.vertex.latlng);
+        this.initDist = this.oppositePoint.distanceTo(this.originPoint);
+    },
+
+    extendBounds: function(e){
+
+            var index = e.vertex.getIndex(),
+                current = e.vertex.latlngs[index],
+                next = e.vertex.getNext(),
+                previous = e.vertex.getPrevious(),
+                oppositeIndex = (index + 2) % 4,
+                opposite = e.vertex.latlngs[oppositeIndex];
+
+                
+            var ratio = this.oppositePoint.distanceTo(this.lp(e.latlng)) / this.initDist || 1;
+            var scale = L.point(ratio, ratio);
+
+            var newLatLng = this.gp(this.originPoint.subtract(this.oppositePoint).scaleBy(scale).add(this.oppositePoint));     
+            var bounds = new L.LatLngBounds(newLatLng, opposite);
+            // Update latlngs by hand to preserve order.
+            e.vertex.latlng.update(newLatLng);
+            e.vertex._latlng.update(newLatLng);
+            previous.latlng.update([newLatLng.lat, opposite.lng]);
+            next.latlng.update([opposite.lat, newLatLng.lng]);
+            this.updateBounds(bounds);
+            this.refreshVertexMarkers();
+    }
+});
 
 var OverlayMapView = function(config, store, map)
 {
@@ -1590,14 +1847,9 @@ function toLeafletRect(id, rect, style){
 
 function toText(id, note, style)
 {
-    var layer = new Text(toLatLngs(note.points), note.text, note.rotate, style);
+    var layer = new EditableText(toLatLngs(note.points), note.text, note.rotate, style);
     layer.id = id;
     return layer;
-}
-
-
-function toLatLngs(points) {
-    return points.map(function(p){ return  L.latLng(p[1], p[0])});
 }
 
 var OverlaySelectTools = function(config, store, map, overlayMapView)
@@ -1605,12 +1857,18 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
     var tooltipContent = document.getElementById('overlay-tooltip-template').text;
     var tooltip = L.tooltip({permanent:true, interactive: true}).setContent(tooltipContent);
     var $delete = function() { return tooltip.getElement().getElementsByTagName('i')[0]; };
+    var $roate = function() { return tooltip.getElement().getElementsByTagName('i')[1]; };
 
     var cat2group = overlayMapView.cat2group;
     var cat2layers = overlayMapView.cat2layers;
 
     function onDeleteFeat(){
         store(OVERLAY_FEAT_DELETE);
+    }
+
+    function onRotateFeat(){
+        store(OVERLAY_FEAT_ROTATE);   
+        closeTooltip(tooltip);
     }
 
     function onFeatClick(cat, e){
@@ -1624,15 +1882,19 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
         onFeatClick(cat, e);
         tooltip.setLatLng(e.latlng);
         map.addLayer(tooltip); 
+        $roate().style.display = cat === 'notes' ? '' : 'none';
         L.DomEvent.on($delete(), 'click', onDeleteFeat);
+        L.DomEvent.on($roate(), 'click', onRotateFeat);
     }
 
     function closeTooltip(){
         if(tooltip._map) {
             map.removeLayer(tooltip); 
             L.DomEvent.off($delete(), 'click', onDeleteFeat);
+            L.DomEvent.off($roate(), 'click', onRotateFeat);
         }
     }
+
 
     _.mapObject(cat2group, function(val, cat){
         val.group.on('click', _.partial(onFeatClick, cat));
@@ -1644,12 +1906,13 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
     });
 
     store.on('ui.overlay.feat', closeTooltip);
+    // store.on('ui.overlay.feat', onSelectFeat);
     // map.on('click', closeTooltip);
 
   
 };
 
-var OverlayDrawing = function(config, store, map, overlayMapView)
+var OverlayEditing = function(config, store, map, overlayMapView)
 {
     var editor = null;
     var selectedLayer = null;
@@ -1667,8 +1930,8 @@ var OverlayDrawing = function(config, store, map, overlayMapView)
             var feat =  {points: toPoints(selectedLayer.getLatLngs()), id: selFeat.id};
             store(OVERLAY_FEAT_UPDATE, {feat: feat, cat: selFeat.cat});
         }
-        selectedLayer.disableEdit();
-        selectedLayer.enableEdit(map); 
+        selectedLayer.editor.reset();
+        // selectedLayer.enableEdit(map); 
 
     }
 
@@ -1704,9 +1967,25 @@ var OverlayDrawing = function(config, store, map, overlayMapView)
         }
     }
 
-
     store.on('map.drawMode', onDrawMode);
-    store.on('ui.overlay.feat selectedOverlay', updateSelectedLayer);
+    store.on('ui.overlay.feat', updateSelectedLayer);
+    // store.on('selectedOverlay', onSelectedOverlayChange);
+
+    return {
+        onTextChange: function(text){
+            var feat = selectedOverlayFeat(store);
+            var overlay_id = selectedOverlayId(store);
+            var layer_id = str(overlay_id, '.', feat.id);
+            selectedLayer = cat2layers[feat.cat][layer_id];
+            if(selectedLayer.getText() !== text){
+                selectedLayer.setText(text);
+                store(OVERLAY_FEAT_TEXT, {
+                    text: text,
+                    points: toPoints(selectedLayer.getLatLngs())
+                });
+            }
+        }
+    }
 };
 
 
@@ -1739,7 +2018,7 @@ function editNote(config, store, map)
 {
     function onClick(e){
         var text = selectedOverlayText(store);
-        var type = selectedOverlayNoteType(store);
+        var type = overlayNoteType(store);
         var style = config.overlay.types.notes[type].style;
         var $text = new Text([e.latlng],  text, 0, style).addTo(map);        
         var feat = {
@@ -1770,12 +2049,6 @@ function editNote(config, store, map)
 }
 
 
-
-function toPoints(latLngs){
-    var f = L.Util.formatNum;
-    latLngs = _.flatten(latLngs);
-    return latLngs.map(function(ll){ return [f(ll.lng,2), f(ll.lat,2)] });
-}
 
 function checkGeom(layer){
     var checkDist = 1;
@@ -1817,6 +2090,7 @@ function OverlayView(config, store)
                 }
             },
             type: null,
+            text: null
         },
         methods: { 
             select: function(mode){ 
@@ -1848,6 +2122,7 @@ function OverlayView(config, store)
     store.on('ui.overlay.feat', function(){
         var feat = selectedOverlayFeat(store);
         vm.type = feat ? vm.types[feat.cat] : null;
+        vm.text = feat && feat.cat === 'notes' ? store.state.selectedOverlay.notes[feat.id].text : null; 
     });
 
     vm.$watch('type.sel.$val', function(val){
@@ -1856,13 +2131,21 @@ function OverlayView(config, store)
             store(OVERLAY_TYPE_SELECT, {feat: feat, type_id: val});
         }
     });
+    return vm;
 }
 
 var OverlaysModule = function(config, store, map){
-    OverlayView(config, store);
+    var ov = OverlayView(config, store);
     var omv = OverlayMapView(config, store, map);
     OverlaySelectTools(config, store, map, omv);
-    OverlayDrawing(config, store, map, omv);
+    var oe = OverlayEditing(config, store, map, omv);
+
+    ov.$watch('text', _.debounce(function(text){
+        if(text && text.trim().length > 0) {
+            oe.onTextChange(text);  
+        }
+    },100));
+
 };
 
 initComponents();

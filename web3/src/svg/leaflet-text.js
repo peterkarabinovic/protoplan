@@ -1,5 +1,4 @@
-import {UniformRectEditor} from './leaflet-uniform-rect-editor.js'
-
+import {matrix} from './matrix.js'
 var _invSvg = null;
 
 function invSvg(){
@@ -81,9 +80,15 @@ L.Text = L.Layer.extend({
         this.text = text;
         if(!this._map) return;
         this._path.textContent = this.text;
-        this.bbox = this._getBBox(this._map, this._path);
         if(notupdate) return;
+        var rect = this._path.getBoundingClientRect();
+        var tl = this._map.latLngToLayerPoint(this.topLeft);
+        this.bottomRight = this._map.layerPointToLatLng(tl.add({x: rect.width, y: rect.height}));        
         this._update();
+    },
+
+    getText: function(){
+        return this.text;
     },
 
     setLatLngs: function(latLngs, notupdate){
@@ -104,7 +109,6 @@ L.Text = L.Layer.extend({
     setRotate: function(rotate, notupdate){
         this.rotate = rotate;
         if(!this._map) return;
-        this.bbox = this._getBBox(this._map, this._path);        
         if(notupdate) return;
         this._update();
     },
@@ -122,18 +126,34 @@ L.Text = L.Layer.extend({
         this._path.setAttribute('x', tl.x);
         this._path.setAttribute('y', br.y);
         var bb = this.bbox;
-        var wTransf = (br.x - tl.x) / (bb.width);
-        var hTransf = (br.y - tl.y) / (bb.height);
+        var wTransf = Math.round((br.x - tl.x) / (bb.width) * 100) / 100;
+        var hTransf = Math.round((br.y - tl.y) / (bb.height) * 100) / 100;
         var dx = -(wTransf-1) * tl.x;
         var dy = -(hTransf-1) * br.y;
-        this._path.setAttribute('transform', 'translate('+dx+','+dy+') scale('+wTransf+ ','+ hTransf +')');        
+        // var transform = 'translate('+dx+' '+dy+') scale('+wTransf+ ' '+ hTransf +')';
+        // this._path.setAttribute('transform', transform);        
+
+        var z = this._map.getZoom();
+        var matrix = L.matrix(1,0,0,1,0,0);
+        var origin = {x:tl.x, y:br.y}
+        matrix.rotate(this.rotate, L.bounds(tl, br).getCenter(true));
+        matrix.scale({x:wTransf, y:hTransf}, origin);
+        var transform = 'matrix(' + matrix._matrix.join(',') + ')';
+        this._path.setAttribute('transform', transform); 
+
+
+        // if(this.rotate){
+        //     var ce =L.bounds(tl, br).getCenter(true).subtract({x:dx, y:dy})//.scaleBy({x:wTransf, y:hTransf}).add(tl);
+        //     transform += ' rotate('+this.rotate+' '+ce.x+' '+ce.y+')';
+        // }
+        // this._path.setAttribute('transform', transform);        
         // this._path.setAttribute('transform', 'matrix('+wTransf+ ', 0, 0, '+ hTransf +',0 ,0)');        
     },
 
-    _calculateBounds: function(map, bbox, clickPoint){
-        var cp = map.latLngToLayerPoint(clickPoint); 
-        var tl = cp.add({x: 0, y: -bbox.height/2});
-        var br = cp.add({x: bbox.width, y: bbox.height/2});
+    _calculateBounds: function(map, bbox, topLeft){
+        var tl = map.latLngToLayerPoint(topLeft); 
+        // var tl = cp.add({x: 0, y: -bbox.height/2});
+        var br = tl.add({x: bbox.width, y: bbox.height});
         return [map.layerPointToLatLng(tl), map.layerPointToLatLng(br)]        
     },
 
@@ -151,49 +171,7 @@ L.Text = L.Layer.extend({
         if(noParent)
             invSvg().removeChild(path);    
         return bbox;    
-    },
-
-    _rediectEditorEvents: function(e){
-        e.target = this;
-        this.fire(e.type, e, true);
-    },
-
-    enableEdit: function(map){
-        var ll = this.getLatLngs();
-        var latLngs = [ll[0], L.latLng(ll[0].lat, ll[1].lng),ll[1], L.latLng(ll[1].lat, ll[0].lng),ll[0] ];
-        var style = {fill: true, weight:1, color: 'grey', fillOpacity: 0.1, opacity:0.1, editorClass: UniformRectEditor}
-        this.polygon = L.polygon(latLngs, style).addTo(map);
-        this.polygon.enableEdit(map);
-        // this.polygon.addEventParent(this);
-        this.polygon.on('editable:dragend editable:vertex:dragend contextmenu', this._rediectEditorEvents, this);
-        this.polygon.on('editable:vertex:drag editable:drag', this._dragVertex, this);
-        
-    },
-
-    disableEdit: function(){
-        if(!this.polygon) return;
-        this.polygon.disableEdit();
-        this.polygon.off('editable:dragend editable:vertex:dragend contextmenu', this._rediectEditorEvents, this);
-        this.polygon.off('editable:vertex:drag editable:drag', this._dragVertex, this);
-        
-        this._map.removeLayer(this.polygon);
-        this.polygon = null;
-    },
-
-    _dragVertex: function(e){
-        var ll = this.polygon.getLatLngs()[0];        
-        this.setLatLngs([ll[0], ll[2]]);
-        // var ll = this.getLatLngs();
-        // ll[1] = e.latlng;
-        // var latLngs = [ll[0], L.latLng(ll[0].lat, ll[1].lng),ll[1], L.latLng(ll[1].lat, ll[0].lng),ll[0] ];
-        // this.polygon.setLatLngs(latLngs);
-        // this.setLatLngs(ll);
-        // // this.polygon.editor.reset()
-        // // e.latlng.lat = this.topLeft.lat;
-        // console.log(e);
-        // L.DomEvent.stopPropagation(e);
     }
-
 
 
 });

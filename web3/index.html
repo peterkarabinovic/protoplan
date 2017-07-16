@@ -7,7 +7,7 @@
         <link href="css/w3.css" rel="stylesheet">
         <link href="css/w3-theme-blue-grey.css" rel="stylesheet">
         <link href="css/leaflet.css" rel="stylesheet">
-        <!--<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">-->
+        <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
         <style>
             /* Layout */
             html, body { height: 100%; }            
@@ -85,7 +85,7 @@
                     <folding title="Базовый слой" class="w3-margin-top" v-show='selectedPavilion.$val'>
                         <div id='base-layer'></div>
                     </folding>
-                    <folding title="Дополнительный слой" v-show='hasBase.$val'>
+                    <folding title="Дополнительный слой" open='true' v-show='hasBase.$val'>
                         <div id='overlays-layer'></div>
                     </folding>
                 </div>
@@ -156,6 +156,9 @@
                         <option v-for='(val, key) in type.list' v-bind:value="key">{{val.name}}</option>
                     </select>
                 </div>
+                <div class="w3-section" v-if='text !== null'>
+                    <input class='w3-input' type="text" v-model='text'>
+                </div>
                 <div  v-if="needSave()">
                     <button class='w3-btn w3-light-blue w3-small w3-padding' @click='save'>Сохранить</button>
                     <button class='w3-btn w3-light-blue w3-small w3-padding' @click='rollback'>Отменить</button>
@@ -165,7 +168,10 @@
 
          <script type="text/x-template" id="overlay-tooltip-template">
             <div>
-                <i class='material-icons pointer'>delete</i>
+                <i class='material-icons pointer w3-text-grey'>delete</i>
+            </div>
+            <div>
+                <i class='material-icons pointer w3-text-grey'>rotate_left</i>
             </div>
          </script>
 

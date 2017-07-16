@@ -1,8 +1,8 @@
 
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
-import {str} from '../../utils/utils.js'
-import {selectedOverlayId, selectedOverlayFeat, selectedOverlayText, selectedOverlayNoteType} from '../../state.js'
+import {str, toPoints} from '../../utils/utils.js'
+import {selectedOverlayId, selectedOverlayFeat, selectedOverlayText, overlayNoteType} from '../../state.js'
 import {Text} from '../../svg/leaflet-text.js'
 
 export default function(config, store, map, overlayMapView)
@@ -27,8 +27,8 @@ export default function(config, store, map, overlayMapView)
             var feat =  {points: toPoints(selectedLayer.getLatLngs()), id: selFeat.id};
             store(a.OVERLAY_FEAT_UPDATE, {feat: feat, cat: selFeat.cat});
         }
-        selectedLayer.disableEdit();
-        selectedLayer.enableEdit(map); 
+        selectedLayer.editor.reset();
+        // selectedLayer.enableEdit(map); 
 
     }
 
@@ -64,9 +64,31 @@ export default function(config, store, map, overlayMapView)
         }
     }
 
+    function onSelectedOverlayChange(){
+        if(selectedLayer)
+            selectedLayer.editor.reset();
+    }
+
 
     store.on('map.drawMode', onDrawMode);
-    store.on('ui.overlay.feat selectedOverlay', updateSelectedLayer);
+    store.on('ui.overlay.feat', updateSelectedLayer);
+    // store.on('selectedOverlay', onSelectedOverlayChange);
+
+    return {
+        onTextChange: function(text){
+            var feat = selectedOverlayFeat(store);
+            var overlay_id = selectedOverlayId(store);
+            var layer_id = str(overlay_id, '.', feat.id);
+            selectedLayer = cat2layers[feat.cat][layer_id];
+            if(selectedLayer.getText() !== text){
+                selectedLayer.setText(text);
+                store(a.OVERLAY_FEAT_TEXT, {
+                    text: text,
+                    points: toPoints(selectedLayer.getLatLngs())
+                });
+            }
+        }
+    }
 }
 
 
@@ -99,7 +121,7 @@ function editNote(config, store, map)
 {
     function onClick(e){
         var text = selectedOverlayText(store);
-        var type = selectedOverlayNoteType(store);
+        var type = overlayNoteType(store);
         var style = config.overlay.types.notes[type].style;
         var $text = new Text([e.latlng],  text, 0, style).addTo(map)        
         var feat = {
@@ -130,12 +152,6 @@ function editNote(config, store, map)
 }
 
 
-
-function toPoints(latLngs){
-    var f = L.Util.formatNum;
-    latLngs = _.flatten(latLngs);
-    return latLngs.map(function(ll){ return [f(ll.lng,2), f(ll.lat,2)] });
-}
 
 function checkGeom(layer){
     var checkDist = 1;

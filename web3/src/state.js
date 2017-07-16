@@ -81,7 +81,9 @@ export function selectedOverlayFeat(store) {
     var feat = store.state.ui.overlay.feat;
     if(feat){
         var p = feat.split('.');
-        return {cat: p[0], id: p[1]};
+        var f = {cat: p[0], id: p[1]};
+        feat = store.state.selectedOverlay[f.cat][f.id];
+        return _.extend(f, feat);
     }
     return null; 
 }
@@ -89,6 +91,7 @@ export function selectedOverlayFeat(store) {
 export function selectedOverlayText(store){
     return store.state.ui.overlay.text;
 }
-export function selectedOverlayNoteType(store){
+export function overlayNoteType(store){
     return store.state.ui.overlay.types.notes;
 }
+

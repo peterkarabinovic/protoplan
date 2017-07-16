@@ -144,6 +144,22 @@ var overlayReducer = function(state, action){
             state = Immutable.remove(state, 'selectedOverlay.'+cat+'.'+id);
             return Immutable.remove(state, 'ui.overlay.feat');
 
+        case a.OVERLAY_FEAT_ROTATE:
+            var feat_id = state.ui.overlay.feat,
+                p = feat_id.split('.'),
+                cat = p[0],
+                id = +p[1];
+            var angle = state.selectedOverlay[cat][id].rotate;
+            return Immutable.set(state, str('selectedOverlay.',cat,'.',id,'.rotate'), (angle-45) % 360);
+
+        case a.OVERLAY_FEAT_TEXT:
+            var feat = action.payload;
+            var feat_id = state.ui.overlay.feat,
+                p = feat_id.split('.'),
+                cat = p[0],
+                id = +p[1];
+            return Immutable.extend(state, str('selectedOverlay.',cat,'.',id), feat);
+
         case a.OVERLAY_FEAT_SELECT:
             var feat_id = action.payload;
             if(feat_id) {
@@ -175,7 +191,8 @@ var overlayReducer = function(state, action){
         case a.OVERLAY_ROLLBACK:
             var overlay = state.selectedOverlay;
             overlay = state.entities.overlays[overlay.id];
-            return Immutable.set(state, 'selectedOverlay', overlay);
+            state = Immutable.set(state, 'selectedOverlay', overlay);
+            return Immutable.remove(state, 'ui.overlay.feat');
     }
     return state;
 }
