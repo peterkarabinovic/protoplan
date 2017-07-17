@@ -125,8 +125,8 @@ L.Matrix.prototype = {
    * @return {L.Matrix}
    */
   rotate: function(angle, origin) {
-    var cos = Math.cos(angle);
-    var sin = Math.sin(angle);
+    var cos = Math.round(Math.cos(angle) * 100) / 100;
+    var sin = Math.round(Math.sin(angle) * 100) / 100;
 
     origin = origin || new L.Point(0, 0);
 

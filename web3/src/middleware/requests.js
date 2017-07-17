@@ -1,5 +1,6 @@
 
 import * as a from '../actions.js'
+import {selectedStandsId} from '../state.js'
 
 export default function RequestsMiddleware(store){
     return function(next){
@@ -76,6 +77,23 @@ export default function RequestsMiddleware(store){
                             }
                         });
                     break;
+
+                case a.STAND_ADD:
+                    var stand = action.payload;
+                    var stands_id = selectedStandsId(store);
+                    d3.request('/stands/'+stands_id)
+                      .mimeType("application/json")
+                      .send('POST', JSON.stringify(stand), function(er, xhr){
+                          if(er) store(a.ERROR_SET, er.target.responseText || 'Connection error')
+                          else{
+                              var res = JSON.parse(xhr.responseText);
+                              stand = _.extend({}, stand, res.stand);
+                              store(a.STAND_ADDED, {
+                                  stands_id: res.stands_id,
+                                  stand: stand
+                              });
+                          }
+                      });
 
 
                     

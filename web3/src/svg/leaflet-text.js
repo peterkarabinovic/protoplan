@@ -29,7 +29,33 @@ L.Text = L.Layer.extend({
     },
 
     _project: function(){
-        console.log('Text _project');
+        if(!this.matrix)
+            this.matrix = L.matrix(1,0,0,1,0,0);
+        else {
+            this.matrix._matrix[0] = 1;
+            this.matrix._matrix[1] = 0;
+            this.matrix._matrix[2] = 0;
+            this.matrix._matrix[3] = 1;
+            this.matrix._matrix[4] = 0;
+            this.matrix._matrix[5] = 0;
+        }
+        if(!this._map) return;
+        var tl = this._map.latLngToLayerPoint(this.topLeft);
+        var br = this._map.latLngToLayerPoint(this.bottomRight);
+        this._path.setAttribute('x', tl.x);
+        this._path.setAttribute('y', br.y);
+        var bb = this.bbox;
+        var wTransf = Math.round((br.x - tl.x) / (bb.width) * 100) / 100;
+        var hTransf = Math.round((br.y - tl.y) / (bb.height) * 100) / 100;
+        var dx = -(wTransf-1) * tl.x;
+        var dy = -(hTransf-1) * br.y;
+
+        var origin = {x:tl.x, y:br.y}
+        // var radian = this.rotate * Math.PI / 180
+        this.matrix.rotate(this.rotate, L.bounds(tl, br).getCenter(true));
+        this.matrix.scale({x:wTransf, y:hTransf}, origin);
+        var transform = 'matrix(' + this.matrix._matrix.join(',') + ')';
+        this._path.setAttribute('transform', transform); 
     },
 
     beforeAdd: function (map) {
@@ -54,17 +80,15 @@ L.Text = L.Layer.extend({
             L.DomUtil.addClass(path, 'leaflet-interactive');
         }
         this._renderer._addPath(this);
-        this._update();
+        this._project();
         this._map.on('zoomend', this._update, this);
-        // this._renderer._layers[L.stamp(this)] = this;
+        this._renderer._layers[L.stamp(this)] = this;
     },
+
 
     onRemove: function(){
         this._map.off('zoomend', this._update, this);        
         this._renderer._removePath(this);
-        if(this.polygon) {
-            this.disableEdit();
-        }
     },
 
     setStyle: function(style, notupdate){
@@ -73,7 +97,7 @@ L.Text = L.Layer.extend({
         this._updateStyle();
         this.bbox = this._getBBox(this._map, this._path);
         if(notupdate) return;
-        this._update();
+        this._project();
     },
 
     setText: function(text, notupdate){
@@ -84,7 +108,7 @@ L.Text = L.Layer.extend({
         var rect = this._path.getBoundingClientRect();
         var tl = this._map.latLngToLayerPoint(this.topLeft);
         this.bottomRight = this._map.layerPointToLatLng(tl.add({x: rect.width, y: rect.height}));        
-        this._update();
+        this._project();
     },
 
     getText: function(){
@@ -101,7 +125,7 @@ L.Text = L.Layer.extend({
         }
         if(notupdate) return;
         
-        this._update();
+        this._project();
     },
     getLatLngs: function(){
         return [this.topLeft, this.bottomRight];
@@ -110,7 +134,7 @@ L.Text = L.Layer.extend({
         this.rotate = rotate;
         if(!this._map) return;
         if(notupdate) return;
-        this._update();
+        this._project();
     },
 
     _updateStyle: function(){
@@ -121,25 +145,25 @@ L.Text = L.Layer.extend({
     },
 
     _update: function(){
-        var tl = this._map.latLngToLayerPoint(this.topLeft);
-        var br = this._map.latLngToLayerPoint(this.bottomRight);
-        this._path.setAttribute('x', tl.x);
-        this._path.setAttribute('y', br.y);
-        var bb = this.bbox;
-        var wTransf = Math.round((br.x - tl.x) / (bb.width) * 100) / 100;
-        var hTransf = Math.round((br.y - tl.y) / (bb.height) * 100) / 100;
-        var dx = -(wTransf-1) * tl.x;
-        var dy = -(hTransf-1) * br.y;
-        // var transform = 'translate('+dx+' '+dy+') scale('+wTransf+ ' '+ hTransf +')';
-        // this._path.setAttribute('transform', transform);        
+        // var tl = this._map.latLngToLayerPoint(this.topLeft);
+        // var br = this._map.latLngToLayerPoint(this.bottomRight);
+        // this._path.setAttribute('x', tl.x);
+        // this._path.setAttribute('y', br.y);
+        // var bb = this.bbox;
+        // var wTransf = Math.round((br.x - tl.x) / (bb.width) * 100) / 100;
+        // var hTransf = Math.round((br.y - tl.y) / (bb.height) * 100) / 100;
+        // var dx = -(wTransf-1) * tl.x;
+        // var dy = -(hTransf-1) * br.y;
+        // // var transform = 'translate('+dx+' '+dy+') scale('+wTransf+ ' '+ hTransf +')';
+        // // this._path.setAttribute('transform', transform);        
 
-        var z = this._map.getZoom();
-        var matrix = L.matrix(1,0,0,1,0,0);
-        var origin = {x:tl.x, y:br.y}
-        matrix.rotate(this.rotate, L.bounds(tl, br).getCenter(true));
-        matrix.scale({x:wTransf, y:hTransf}, origin);
-        var transform = 'matrix(' + matrix._matrix.join(',') + ')';
-        this._path.setAttribute('transform', transform); 
+        // var z = this._map.getZoom();
+        // var matrix = L.matrix(1,0,0,1,0,0);
+        // var origin = {x:tl.x, y:br.y}
+        // matrix.rotate(this.rotate, L.bounds(tl, br).getCenter(true));
+        // matrix.scale({x:wTransf, y:hTransf}, origin);
+        // var transform = 'matrix(' + matrix._matrix.join(',') + ')';
+        // this._path.setAttribute('transform', transform); 
 
 
         // if(this.rotate){

@@ -7,6 +7,15 @@ export var EditableText = Text.extend({
         this.fire(e.type, e, true);
     },
 
+    onRemove: function(){
+        Text.prototype.onRemove.call(this);
+        this._map.off('zoomend', this._update, this);        
+        if(this.polygon) {
+            this.disableEdit();
+        }
+    },
+
+
     setText: function(text, noupdate){
         Text.prototype.setText.call(this, text, noupdate);
         if(this.polygon) {

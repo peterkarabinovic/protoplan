@@ -37,12 +37,16 @@ var pavilionReducer = function(state, action)
             if(pavi) {
                 state = Immutable.remove(state, 'pavilions.'+pavi.id);
                 state = Immutable.remove(state, 'entities.bases.'+pavi.id);
+                state = Immutable.remove(state, 'entities.overlays.'+pavi.id);
+                state = Immutable.remove(state, 'entities.stands.'+pavi.id);
             }
             if(state.selectedPavilion && state.selectedPavilion.id == pavi_id) {
                 state = Immutable.set(state, 'selectedPavilion');
                 state = Immutable.set(state, 'selectedBase');
                 state = Immutable.set(state, 'selectedOverlay');
+                state = Immutable.set(state, 'selectedStandsId');
                 state = Immutable.set(state, 'ui.overlay.feat');
+                state = Immutable.set(state, 'ui.stands.feat');
             }
             return state;
 
@@ -51,6 +55,8 @@ var pavilionReducer = function(state, action)
             state = Immutable.set(state, 'pavilions.'+pavi.id, pavi);
             state = Immutable.set(state, 'selectedPavilion', pavi);
             state = Immutable.set(state, 'selectedBase', {id:pavi.id});
+            state = Immutable.set(state, 'selectedStandsId', pavi.id);
+            state = Immutable.extend(state, 'entities.stands.'+pavi.id, {id: pavi.id});
             return state;
 
         case a.PAVILION_SELECT:
@@ -64,6 +70,7 @@ var pavilionReducer = function(state, action)
                 var overlay = state.entities.overlays[pavi.id] || {id:pavi.id};
                 state = Immutable.set(state, 'selectedOverlay', overlay);
                 state = Immutable.set(state, str('entities.overlays.',pavi.id), overlay);
+                state = Immutable.set(state, 'selectedStandsId', pavi.id);
             }
             return state;
             
@@ -150,7 +157,8 @@ var overlayReducer = function(state, action){
                 cat = p[0],
                 id = +p[1];
             var angle = state.selectedOverlay[cat][id].rotate;
-            return Immutable.set(state, str('selectedOverlay.',cat,'.',id,'.rotate'), (angle-45) % 360);
+            var da = Math.PI / 4;
+            return Immutable.set(state, str('selectedOverlay.',cat,'.',id,'.rotate'), (angle-da) % (2*Math.PI));
 
         case a.OVERLAY_FEAT_TEXT:
             var feat = action.payload;
@@ -197,9 +205,17 @@ var overlayReducer = function(state, action){
     return state;
 }
 
+var standsReducer = function(state, action){
+    switch(action.type){
+        case a.STAND_ADDED:
+            var stand = action.payload.stand;
+            var stands_id = action.payload.stands_id;
+            return Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
+    }
+    return state;
+}
 
-
-export default reduceReducers([errorReducer, mapReducer, pavilionReducer, baseReducer, overlayReducer])
+export default reduceReducers([errorReducer, mapReducer, pavilionReducer, baseReducer, overlayReducer, standsReducer])
 
 
 function generateId(state, path){

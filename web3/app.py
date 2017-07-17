@@ -26,6 +26,7 @@ def create_data_file(file_name):
 pavilions_json = create_data_file('pavilions.json')
 base_json = create_data_file('base.json')
 overlay_json = create_data_file('overlay.json')
+stands_json = create_data_file('stands.json')
 
 
 # Model
@@ -111,6 +112,39 @@ def overlay_delete(id):
         with codecs.open(overlay_json, 'w', 'utf-8') as json_file:
             json_file.write(json.dumps(layers, ensure_ascii=False))
 
+@contextmanager
+def stand_layers():
+    with codecs.open(stands_json, 'r', "utf-8") as file:
+        yield json.load(file)   
+
+def stand_update(layer_id, stand):
+    with stand_layers() as layers:
+        stands = layers.get(layer_id, {"id":layer_id})
+        stand_id = stand.get('id')
+        if stand_id is None:
+            stand_id = str(int(max(stands.keys())) + 1) if stands else '1'
+        stand = dict(stand, id=stand_id)
+        stands[stand_id] = stand
+        layers[layer_id] = stands
+        with codecs.open(stands_json, 'w', 'utf-8') as json_file:
+            json_file.write(json.dumps(layers, ensure_ascii=False))
+        return stand
+
+def stand_delete(layer_id, stand_id):
+    if layer_id is None or stand_id is None:
+        return
+    layer_id = str(layer_id)
+    with stand_layers() as layers:
+        stands = layers.get(layer_id, {})
+        stands = {k: v for k, v in stands.items() if k != stand_id }
+        if not stands:
+            if layer_id in layers:
+                layers.pop(layer_id)
+        else:
+            layers[layer_id] = stands
+        with codecs.open(stands_json, 'w', 'utf-8') as json_file:
+            json_file.write(json.dumps(layers, ensure_ascii=False))
+
 app = Flask(__name__, static_folder='')
 
 
@@ -192,6 +226,8 @@ def update_overlay(id):
         return "Pavilion not found {}".format(id), 404
     overlay = overlay_update(id, overlay)
     return flask.jsonify({"id": overlay['id']})
+
+
 
 
 

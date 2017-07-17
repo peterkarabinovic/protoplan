@@ -9,6 +9,7 @@ import Map from './map/map.js'
 import PavilionModule from './modules/pavilion/pavilion-view.js'
 import BaseModule from './modules/base/base-view.js'
 import OverlaysModule from './modules/overlays/overlay-view.js'
+import StandView from './modules/stands/stand-view.js'
 
 initComponents();
 
@@ -23,6 +24,7 @@ var map = Map('map', store);
 PavilionModule(store);
 BaseModule(store, map);
 OverlaysModule(config, store, map);
+StandView(config, store, map);
 
 store("INIT")
 

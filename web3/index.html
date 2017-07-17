@@ -70,6 +70,9 @@
             .text-cusor {
                 cursor: text;
             }
+            .move-cursor {
+                cursor: move;
+            }
            
         </style>
     </head>
@@ -87,6 +90,9 @@
                     </folding>
                     <folding title="Дополнительный слой" open='true' v-show='hasBase.$val'>
                         <div id='overlays-layer'></div>
+                    </folding>
+                    <folding title="Стенды" open='true' v-show='hasBase.$val'>
+                        <div id='stands'></div>
                     </folding>
                 </div>
             </div>
@@ -163,6 +169,15 @@
                     <button class='w3-btn w3-light-blue w3-small w3-padding' @click='save'>Сохранить</button>
                     <button class='w3-btn w3-light-blue w3-small w3-padding' @click='rollback'>Отменить</button>
                 </div>                
+            </div>
+         </script>
+
+         <script type="text/x-template" id="stands-template">
+            <div class="w3-container">
+                <button v-for="(val, index) in ['looks_one', 'looks_two', 'looks_3', 'looks_4']" 
+                    class="w3-btn w3-padding-small" :class="cssClass('stand' + index)" @click='select("stand" + index)' :title='"Стенд " + index'>
+                    <i class="material-icons pointer w3-text-grey" >{{val}}</i>
+                </button>
             </div>
          </script>
 

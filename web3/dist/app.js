@@ -35,6 +35,22 @@ var config = {
                 }
             }
         }
+    },
+    "stands": {
+        "types":{
+            "1": {
+                "name": "Стенд категории 1",
+                "style": {"fillColor": "yellow", "stroke": "green", "fillOpacity": 0.5 }
+            },
+            "2": {
+                "name": "Стенд категории 2",
+                "style": {"fillColor": "lightblue", "stroke": "darkblue", "fillOpacity": 0.5 }
+            },
+            "3": {
+                "name": "Стенд категории 3",
+                "style": {"fillColor": "lightred", "stroke": "red", "fillOpacity": 0.5 }
+            },
+        }
     }
 };
 
@@ -401,12 +417,12 @@ var initState = {
     selectedPavilion: undefined,
     selectedBase: undefined,
     selectedOverlay: undefined,
+    selectedStandsId: undefined,
     entities: {
         bases: {}, // base layers,
         overlays: {}, // additinal layers
         stands: {},
         stand_types: {},
-        stand_categories: {},
         equipments: {} 
     },
     ui: {
@@ -419,6 +435,10 @@ var initState = {
             },
             feat: undefined,
             text: 'Text label'
+        },
+        stands: {
+            type: 1,
+            feat: un
         }
     }
 };
@@ -481,6 +501,10 @@ function overlayNoteType(store){
     return store.state.ui.overlay.types.notes;
 }
 
+function selectedStandsId(store) {
+    return store.state.selectedStandsId;
+}
+
 var INIT = 'INIT';
 
 var PAVILION_ADD = 'PAVILION_ADD';
@@ -512,6 +536,13 @@ var OVERLAY_TYPE_SELECT = 'OVERLAY_TYPE_SELECT';
 var OVERLAY_ROLLBACK = 'OVERLAY_ROLLBACK';
 var OVERLAY_SAVE = 'OVERLAY_SAVE';
 var OVERLAY_SAVED = 'OVERLAY_SAVED';
+
+var STAND_ADD = 'STAND_ADD';
+var STAND_ADDED = 'STAND_ADDED';
+
+
+
+
 
 
 var ERROR_SET = 'ERROR_SET';
@@ -549,12 +580,16 @@ var pavilionReducer = function(state, action)
             if(pavi) {
                 state = Immutable.remove(state, 'pavilions.'+pavi.id);
                 state = Immutable.remove(state, 'entities.bases.'+pavi.id);
+                state = Immutable.remove(state, 'entities.overlays.'+pavi.id);
+                state = Immutable.remove(state, 'entities.stands.'+pavi.id);
             }
             if(state.selectedPavilion && state.selectedPavilion.id == pavi_id) {
                 state = Immutable.set(state, 'selectedPavilion');
                 state = Immutable.set(state, 'selectedBase');
                 state = Immutable.set(state, 'selectedOverlay');
+                state = Immutable.set(state, 'selectedStandsId');
                 state = Immutable.set(state, 'ui.overlay.feat');
+                state = Immutable.set(state, 'ui.stands.feat');
             }
             return state;
 
@@ -563,6 +598,8 @@ var pavilionReducer = function(state, action)
             state = Immutable.set(state, 'pavilions.'+pavi.id, pavi);
             state = Immutable.set(state, 'selectedPavilion', pavi);
             state = Immutable.set(state, 'selectedBase', {id:pavi.id});
+            state = Immutable.set(state, 'selectedStandsId', pavi.id);
+            state = Immutable.extend(state, 'entities.stands.'+pavi.id, {id: pavi.id});
             return state;
 
         case PAVILION_SELECT:
@@ -576,6 +613,7 @@ var pavilionReducer = function(state, action)
                 var overlay = state.entities.overlays[pavi.id] || {id:pavi.id};
                 state = Immutable.set(state, 'selectedOverlay', overlay);
                 state = Immutable.set(state, str('entities.overlays.',pavi.id), overlay);
+                state = Immutable.set(state, 'selectedStandsId', pavi.id);
             }
             return state;
             
@@ -662,7 +700,8 @@ var overlayReducer = function(state, action){
                 cat = p[0],
                 id = +p[1];
             var angle = state.selectedOverlay[cat][id].rotate;
-            return Immutable.set(state, str('selectedOverlay.',cat,'.',id,'.rotate'), (angle-45) % 360);
+            var da = Math.PI / 4;
+            return Immutable.set(state, str('selectedOverlay.',cat,'.',id,'.rotate'), (angle-da) % (2*Math.PI));
 
         case OVERLAY_FEAT_TEXT:
             var feat = action.payload;
@@ -709,9 +748,17 @@ var overlayReducer = function(state, action){
     return state;
 };
 
+var standsReducer = function(state, action){
+    switch(action.type){
+        case STAND_ADDED:
+            var stand = action.payload.stand;
+            var stands_id = action.payload.stands_id;
+            return Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
+    }
+    return state;
+};
 
-
-var reducers = reduceReducers([errorReducer, mapReducer, pavilionReducer, baseReducer, overlayReducer]);
+var reducers = reduceReducers([errorReducer, mapReducer, pavilionReducer, baseReducer, overlayReducer, standsReducer]);
 
 
 function generateId(state, path){
@@ -794,6 +841,23 @@ function RequestsMiddleware(store){
                             }
                         });
                     break;
+
+                case STAND_ADD:
+                    var stand = action.payload;
+                    var stands_id = selectedStandsId(store);
+                    d3.request('/stands/'+stands_id)
+                      .mimeType("application/json")
+                      .send('POST', JSON.stringify(stand), function(er, xhr){
+                          if(er) store(ERROR_SET, er.target.responseText || 'Connection error');
+                          else{
+                              var res = JSON.parse(xhr.responseText);
+                              stand = _.extend({}, stand, res.stand);
+                              store(STAND_ADDED, {
+                                  stands_id: res.stands_id,
+                                  stand: stand
+                              });
+                          }
+                      });
 
 
                     
@@ -1046,6 +1110,10 @@ var DRAW_DISTANCE = 'draw-distance';
 var DRAW_WALL = 'draw-wall';
 var DRAW_RECT = 'draw-rect';
 var DRAW_NOTE = 'draw-note';
+var DRAW_STAND1 = 'draw-stand-1';
+var DRAW_STAND2 = 'draw-stand-2';
+var DRAW_STAND3 = 'draw-stand-3';
+var DRAW_STAND4 = 'draw-stand-4';
 
 var hidenElement = null;
 
@@ -1427,8 +1495,8 @@ L.Matrix.prototype = {
    * @return {L.Matrix}
    */
   rotate: function(angle, origin) {
-    var cos = Math.cos(angle);
-    var sin = Math.sin(angle);
+    var cos = Math.round(Math.cos(angle) * 100) / 100;
+    var sin = Math.round(Math.sin(angle) * 100) / 100;
 
     origin = origin || new L.Point(0, 0);
 
@@ -1535,7 +1603,33 @@ L.Text = L.Layer.extend({
     },
 
     _project: function(){
-        console.log('Text _project');
+        if(!this.matrix)
+            this.matrix = L.matrix(1,0,0,1,0,0);
+        else {
+            this.matrix._matrix[0] = 1;
+            this.matrix._matrix[1] = 0;
+            this.matrix._matrix[2] = 0;
+            this.matrix._matrix[3] = 1;
+            this.matrix._matrix[4] = 0;
+            this.matrix._matrix[5] = 0;
+        }
+        if(!this._map) return;
+        var tl = this._map.latLngToLayerPoint(this.topLeft);
+        var br = this._map.latLngToLayerPoint(this.bottomRight);
+        this._path.setAttribute('x', tl.x);
+        this._path.setAttribute('y', br.y);
+        var bb = this.bbox;
+        var wTransf = Math.round((br.x - tl.x) / (bb.width) * 100) / 100;
+        var hTransf = Math.round((br.y - tl.y) / (bb.height) * 100) / 100;
+        var dx = -(wTransf-1) * tl.x;
+        var dy = -(hTransf-1) * br.y;
+
+        var origin = {x:tl.x, y:br.y};
+        // var radian = this.rotate * Math.PI / 180
+        this.matrix.rotate(this.rotate, L.bounds(tl, br).getCenter(true));
+        this.matrix.scale({x:wTransf, y:hTransf}, origin);
+        var transform = 'matrix(' + this.matrix._matrix.join(',') + ')';
+        this._path.setAttribute('transform', transform); 
     },
 
     beforeAdd: function (map) {
@@ -1560,17 +1654,15 @@ L.Text = L.Layer.extend({
             L.DomUtil.addClass(path, 'leaflet-interactive');
         }
         this._renderer._addPath(this);
-        this._update();
+        this._project();
         this._map.on('zoomend', this._update, this);
-        // this._renderer._layers[L.stamp(this)] = this;
+        this._renderer._layers[L.stamp(this)] = this;
     },
+
 
     onRemove: function(){
         this._map.off('zoomend', this._update, this);        
         this._renderer._removePath(this);
-        if(this.polygon) {
-            this.disableEdit();
-        }
     },
 
     setStyle: function(style, notupdate){
@@ -1579,7 +1671,7 @@ L.Text = L.Layer.extend({
         this._updateStyle();
         this.bbox = this._getBBox(this._map, this._path);
         if(notupdate) return;
-        this._update();
+        this._project();
     },
 
     setText: function(text, notupdate){
@@ -1590,7 +1682,7 @@ L.Text = L.Layer.extend({
         var rect = this._path.getBoundingClientRect();
         var tl = this._map.latLngToLayerPoint(this.topLeft);
         this.bottomRight = this._map.layerPointToLatLng(tl.add({x: rect.width, y: rect.height}));        
-        this._update();
+        this._project();
     },
 
     getText: function(){
@@ -1607,7 +1699,7 @@ L.Text = L.Layer.extend({
         }
         if(notupdate) return;
         
-        this._update();
+        this._project();
     },
     getLatLngs: function(){
         return [this.topLeft, this.bottomRight];
@@ -1616,7 +1708,7 @@ L.Text = L.Layer.extend({
         this.rotate = rotate;
         if(!this._map) return;
         if(notupdate) return;
-        this._update();
+        this._project();
     },
 
     _updateStyle: function(){
@@ -1627,25 +1719,25 @@ L.Text = L.Layer.extend({
     },
 
     _update: function(){
-        var tl = this._map.latLngToLayerPoint(this.topLeft);
-        var br = this._map.latLngToLayerPoint(this.bottomRight);
-        this._path.setAttribute('x', tl.x);
-        this._path.setAttribute('y', br.y);
-        var bb = this.bbox;
-        var wTransf = Math.round((br.x - tl.x) / (bb.width) * 100) / 100;
-        var hTransf = Math.round((br.y - tl.y) / (bb.height) * 100) / 100;
-        var dx = -(wTransf-1) * tl.x;
-        var dy = -(hTransf-1) * br.y;
-        // var transform = 'translate('+dx+' '+dy+') scale('+wTransf+ ' '+ hTransf +')';
-        // this._path.setAttribute('transform', transform);        
+        // var tl = this._map.latLngToLayerPoint(this.topLeft);
+        // var br = this._map.latLngToLayerPoint(this.bottomRight);
+        // this._path.setAttribute('x', tl.x);
+        // this._path.setAttribute('y', br.y);
+        // var bb = this.bbox;
+        // var wTransf = Math.round((br.x - tl.x) / (bb.width) * 100) / 100;
+        // var hTransf = Math.round((br.y - tl.y) / (bb.height) * 100) / 100;
+        // var dx = -(wTransf-1) * tl.x;
+        // var dy = -(hTransf-1) * br.y;
+        // // var transform = 'translate('+dx+' '+dy+') scale('+wTransf+ ' '+ hTransf +')';
+        // // this._path.setAttribute('transform', transform);        
 
-        var z = this._map.getZoom();
-        var matrix$$1 = L.matrix(1,0,0,1,0,0);
-        var origin = {x:tl.x, y:br.y};
-        matrix$$1.rotate(this.rotate, L.bounds(tl, br).getCenter(true));
-        matrix$$1.scale({x:wTransf, y:hTransf}, origin);
-        var transform = 'matrix(' + matrix$$1._matrix.join(',') + ')';
-        this._path.setAttribute('transform', transform); 
+        // var z = this._map.getZoom();
+        // var matrix = L.matrix(1,0,0,1,0,0);
+        // var origin = {x:tl.x, y:br.y}
+        // matrix.rotate(this.rotate, L.bounds(tl, br).getCenter(true));
+        // matrix.scale({x:wTransf, y:hTransf}, origin);
+        // var transform = 'matrix(' + matrix._matrix.join(',') + ')';
+        // this._path.setAttribute('transform', transform); 
 
 
         // if(this.rotate){
@@ -1691,6 +1783,15 @@ var EditableText = Text.extend({
         e.target = this;
         this.fire(e.type, e, true);
     },
+
+    onRemove: function(){
+        Text.prototype.onRemove.call(this);
+        this._map.off('zoomend', this._update, this);        
+        if(this.polygon) {
+            this.disableEdit();
+        }
+    },
+
 
     setText: function(text, noupdate){
         Text.prototype.setText.call(this, text, noupdate);
@@ -2148,6 +2249,183 @@ var OverlaysModule = function(config, store, map){
 
 };
 
+var Stand = L.Polygon.extend({
+    options: {
+        fillColor: 'green',
+        color: 'green',
+        stroke: false,
+        fillOpacity: 0.7,
+    },
+
+    initialize: function (latlngs, options, openWalls){
+        openWalls = openWalls || 1;
+        L.Polygon.prototype.initialize.call(this, latlngs, options);
+        var ll = _.rest(_.flatten(latlngs), openWalls-1);
+        if(ll.length > 1)
+            this.line = new DoubleLine(ll, {color: this.options.fillColor});
+    },
+
+    onAdd: function (map) {
+        L.Polygon.prototype.onAdd.call(this,map);
+        if(this.line) map.addLayer(this.line);               
+    },
+
+    onRemove: function (map) {
+        L.Polygon.prototype.onRemove.call(this, map); 
+        if(this.line) map.removeLayer(this.line);       
+    }
+
+});
+
+var DoubleLine = L.Polyline.extend({
+    options2: {color: 'white', weight: 7, lineCap: "square", lineJoin: "miter", opacity: 1},
+    options1: {color: 'green', lineCap: "square", lineJoin: "miter", opacity: 0.7},
+    // options1: {color: 'white', lineCap: "square", lineJoin: "miter",  weight: 1, opacity:1},
+    // options2: {color: 'white', lineCap: "square", lineJoin: "miter",  weight: 1, opacity:1},
+    
+    initialize: function (latlngs, options1, options2){
+        this.options1 = L.extend(this.options1, options1);
+        this.options2 = L.extend(this.options2, options2);
+        this.line2 = new L.Polyline([], this.options2);
+        L.Polyline.prototype.initialize.call(this, latlngs, this.options1);
+    },
+
+    onAdd: function (map) {
+        this.line2._map = map;
+        this.line2._path = L.SVG.create('path');
+        this._renderer._updateStyle.call(this._renderer, this.line2);
+        this._renderer._addPath.call(this._renderer, this.line2);
+        L.Polyline.prototype.onAdd.call(this, map);
+        // this.line2._path.setAttribute('transform', 'translate(1,1)');
+        // this._path.setAttribute('transform', 'translate(1,1)');
+        
+    },
+
+    onRemove: function (map) {
+        this._renderer._removePath.call(this._renderer, this.line2);
+        L.Polyline.prototype.onRemove.call(this, map);
+    },
+
+    _updatePath: function(){
+        this.line2._parts = this._parts;
+        this._renderer._updatePoly.call(this._renderer, this.line2);
+        L.Polyline.prototype._updatePath.call(this);
+    },
+
+    _project: function(){
+        var w = {
+            0: [3,1],
+            1: [7,3],
+            2: [9,5],
+            3: [11,7],
+            4: [15,11],
+        };
+        var z = this._map.getZoom();
+        var weights = w[z] || w[4];
+        this.line2._path.setAttribute('stroke-width', weights[0]);
+        this._path.setAttribute('stroke-width', weights[1]);
+        L.Polyline.prototype._project.call(this);
+    }
+});
+
+var StandEditing = function(config, store, map){
+
+    var mymodes = [DRAW_STAND1, DRAW_STAND2, DRAW_STAND3, DRAW_STAND4];
+    var editor = edit(store, map);
+
+    function onDrawMode(e){
+        editor.exit();
+        var i = mymodes.indexOf(e.new_val);
+        if(i !== -1){
+            editor.enter(i+1);
+        }
+    }
+
+    store.on('map.drawMode', onDrawMode);
+};
+
+function edit(store, map){
+    var outline = L.polygon([], {color: 'grey', fill: false, opacity: 0.7, weight: 7});
+    var openWalls = 1;
+
+    function move(e){
+        var ce = e.latlng;
+        var ll = [[-10,-10],[10,-10], [10,10], [-10,10], [-10,-10] ].map(function(it){
+            return L.latLng(ce.lat+it[0], ce.lng+it[1]);
+        });
+        outline.setLatLngs(ll);
+    }
+
+    function onClick(e) {
+        move(e);
+        var feat =  { points: toPoints(layer.getLatLngs()), openWalls: openWalls, rotate: 0};
+        store(STAND_ADD, feat);
+        store(DRAWING_MODE_SET);        
+        // new Stand(outline.getLatLngs(), {fillColor: 'red'}, openWallss).addTo(map);
+    }
+
+    function enter(w){
+        openWalls = w;
+        L.DomUtil.addClass(map._container,'move-cursor');
+        move({latlng: map.getCenter()});
+        map.addLayer(outline);
+        map.on('mousemove', move);      
+        map.on('click', onClick);      
+    }
+
+    function exit(){
+        L.DomUtil.removeClass(map._container,'move-cursor');
+        map.removeLayer(outline);
+        map.off('mousemove', move);
+        map.off('click', onClick);      
+        
+    }
+    return {enter: enter, exit: exit}
+}
+
+function StandView(config, store){
+
+    var MODES = {
+        "stand0": DRAW_STAND1,
+        "stand1": DRAW_STAND2,
+        "stand2": DRAW_STAND3,
+        "stand3": DRAW_STAND4
+    };
+
+
+    var vm = new Vue({
+        el: "#stands",
+        template: "#stands-template",
+        data: {
+            mode: null,
+            selectedStandsId: store.prop('selectedStandsId'),
+            types: {
+                sel: store.prop('ui.stands.cat'),
+                list: config.stands.types
+            }
+        },
+        methods: {
+            select: function(mode){
+                var m = MODES[mode];
+                store(DRAWING_MODE_SET, drawMode(store) == m ? undefined : m );
+            },
+            cssClass: function(p){
+                return p == this.mode ? 'w3-border-blue  w3-border'  : '';
+            },            
+        }
+    });
+
+    store.on('map.drawMode', function(e){
+        vm.mode = _.findKey(MODES, function(it) { return it == e.new_val});
+    });
+    
+}
+
+var StandView$1 = function(config, store, map){
+    StandView(config, store);
+    StandEditing(config, store, map);
+};
+
 initComponents();
 
 
@@ -2161,6 +2439,7 @@ var map = Map('map', store);
 PavilionModule(store);
 BaseModule(store, map);
 OverlaysModule(config, store, map);
+StandView$1(config, store, map);
 
 store("INIT");
 

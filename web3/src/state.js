@@ -15,12 +15,12 @@ export default {
     selectedPavilion: undefined,
     selectedBase: undefined,
     selectedOverlay: undefined,
+    selectedStandsId: undefined,
     entities: {
         bases: {}, // base layers,
         overlays: {}, // additinal layers
         stands: {},
         stand_types: {},
-        stand_categories: {},
         equipments: {} 
     },
     ui: {
@@ -33,6 +33,10 @@ export default {
             },
             feat: undefined,
             text: 'Text label'
+        },
+        stands: {
+            type: 1,
+            feat: un
         }
     }
 }
@@ -95,3 +99,6 @@ export function overlayNoteType(store){
     return store.state.ui.overlay.types.notes;
 }
 
+export function selectedStandsId(store) {
+    return store.state.selectedStandsId;
+}

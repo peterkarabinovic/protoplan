@@ -33,5 +33,21 @@ export default
                 }
             }
         }
+    },
+    "stands": {
+        "types":{
+            "1": {
+                "name": "Стенд категории 1",
+                "style": {"fillColor": "yellow", "stroke": "green", "fillOpacity": 0.5 }
+            },
+            "2": {
+                "name": "Стенд категории 2",
+                "style": {"fillColor": "lightblue", "stroke": "darkblue", "fillOpacity": 0.5 }
+            },
+            "3": {
+                "name": "Стенд категории 3",
+                "style": {"fillColor": "lightred", "stroke": "red", "fillOpacity": 0.5 }
+            },
+        }
     }
 }
