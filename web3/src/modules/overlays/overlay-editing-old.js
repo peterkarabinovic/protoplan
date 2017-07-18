@@ -14,7 +14,7 @@ export default function(config, store, map, overlayMapView)
 
     var m2e = {}
     m2e[m.DRAW_WALL] = editFeat('lines', store, map)
-    m2e[m.DRAW_RECT] = editRect(store, map)
+    m2e[m.DRAW_RECT] = editFeat('rects', store, map)
     m2e[m.DRAW_NOTE] = editNote(config, store, map)
 
     function log(e){
@@ -51,7 +51,7 @@ export default function(config, store, map, overlayMapView)
                 selectedLayer.on('editable:vertex:dragend', onSelectedGeometryChanges)
             }
             else 
-                selectedLayer = null;
+            selectedLayer = null;
         }
     }
 
@@ -115,41 +115,6 @@ function editFeat(cat, store, map)
         store(a.DRAWING_MODE_SET);
     }
     return {enter:enter, exit:exit};
-}
-
-function editRect(store, map){
-    var outline = L.polygon([], {color: 'black', fill: false, opacity: 1, weight: 2, dashArray: "5,5"});
-    function move(e){
-        var ce = e.latlng;
-        var ll = [[-20,-20],[20,-20], [20,20], [-20,20], [-20,-20] ].map(function(it){
-            return L.latLng(ce.lat+it[0], ce.lng+it[1]);
-        });
-        outline.setLatLngs(ll);
-    }
-
-    function onClick(e) {
-        move(e);
-        var feat =  { points: toPoints(outline.getLatLngs())};
-        store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'rects'});
-        store(a.DRAWING_MODE_SET);        
-    }
-
-    function enter(w){
-        L.DomUtil.addClass(map._container,'move-cursor');
-        move({latlng: map.getCenter()});
-        map.addLayer(outline);
-        map.on('mousemove', move);      
-        map.on('click', onClick);      
-    }
-
-    function exit(){
-        L.DomUtil.removeClass(map._container,'move-cursor');
-        map.removeLayer(outline);
-        map.off('mousemove', move);
-        map.off('click', onClick);      
-        
-    }
-    return {enter: enter, exit: exit}    
 }
 
 function editNote(config, store, map) 

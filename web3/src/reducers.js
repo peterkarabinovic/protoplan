@@ -207,10 +207,19 @@ var overlayReducer = function(state, action){
 
 var standsReducer = function(state, action){
     switch(action.type){
+        case a.STANDS_LOADED:
+            var stands = action.payload;
+            return Immutable.set(state,'entities.stands', stands);
+
         case a.STAND_ADDED:
             var stand = action.payload.stand;
             var stands_id = action.payload.stands_id;
-            return Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
+            state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
+            return Immutable.set(state, 'ui.stands.sel', stands_id)
+
+        case a.STAND_SELECT:
+            var stand_id = action.payload;
+            return Immutable.set(state, 'ui.stands.sel', stand_id)
     }
     return state;
 }

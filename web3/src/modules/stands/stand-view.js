@@ -1,7 +1,9 @@
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
 import { drawMode} from '../../state.js' 
+import StandMapView from './stand-map-view.js'
 import StandEditing from './stand-editing.js'
+import StandySelectTools from './stand-select-tools.js'
 
 
 function StandView(config, store){
@@ -44,5 +46,7 @@ function StandView(config, store){
 
 export default function(config, store, map){
     StandView(config, store);
-    StandEditing(config, store, map);
+    var smv = StandMapView(config, store, map);
+    StandEditing(config, store, map, smv);
+    StandySelectTools(config, store, map, smv);
 }

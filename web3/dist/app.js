@@ -21,7 +21,7 @@ var config = {
                 },
                 "2": {
                     "name": "Ковер модерн",
-                    "style": {"stroke":false, "fillOpacity": "0.5", "fillColor": "grey  " }
+                    "style": {"stroke":false, "fillOpacity": "1", "fillColor": "blue" }
                 }
             },
             "notes": {
@@ -40,15 +40,15 @@ var config = {
         "types":{
             "1": {
                 "name": "Стенд категории 1",
-                "style": {"fillColor": "yellow", "stroke": "green", "fillOpacity": 0.5 }
+                "style": {"fillColor": "green", "color": "green", "fillOpacity": 0.7 }
             },
             "2": {
                 "name": "Стенд категории 2",
-                "style": {"fillColor": "lightblue", "stroke": "darkblue", "fillOpacity": 0.5 }
+                "style": {"fillColor": "lightblue", "color": "darkblue", "fillOpacity": 0.5 }
             },
             "3": {
                 "name": "Стенд категории 3",
-                "style": {"fillColor": "lightred", "stroke": "red", "fillOpacity": 0.5 }
+                "style": {"fillColor": "lightred", "color": "red", "fillOpacity": 0.5 }
             },
         }
     }
@@ -92,8 +92,9 @@ function Store(reducers, middleware)
         var ids = paths.map(function(p){
             var listener_id = p.trim() + '.' + stamp(fn);
             delete listener_table[listener_id];
+            return listener_id;
         });
-        listeners = _.without(listeners, ids);
+        listeners = _.difference(listeners, ids);
         
     };
 
@@ -104,9 +105,10 @@ function Store(reducers, middleware)
             var ef = events_finder(s.state, old_state);
             listeners.forEach(function(id){
                 var li = listener_table[id];
-                ef(li.path).forEach(function(e){
-                    li.fn(e);
-                });
+                if(li) // the listener may be 'off' in handler function
+                    ef(li.path).forEach(function(e){
+                        li.fn(e);
+                    });
             });
         }
         return s.state;
@@ -438,7 +440,7 @@ var initState = {
         },
         stands: {
             type: 1,
-            feat: un
+            sel: undefined
         }
     }
 };
@@ -455,6 +457,7 @@ function entity(type, store, id)
 
 var baseById = _.partial(entity, 'bases');
 var overlayById = _.partial(entity, 'overlays');
+var standsById = _.partial(entity, 'stands');
 
 function selectedPavilion(store){
     return store.state.selectedPavilion;
@@ -505,6 +508,17 @@ function selectedStandsId(store) {
     return store.state.selectedStandsId;
 }
 
+function selectedStands(store){
+    var id = store.state.selectedStandsId;
+    return standsById(store, id); 
+}
+
+function selectedStand(store){
+    var stands_id = store.state.selectedStandsId;
+    var id = store.state.ui.stands.sel;
+    return standsById(store, stands_id)[id]; 
+}
+
 var INIT = 'INIT';
 
 var PAVILION_ADD = 'PAVILION_ADD';
@@ -537,12 +551,14 @@ var OVERLAY_ROLLBACK = 'OVERLAY_ROLLBACK';
 var OVERLAY_SAVE = 'OVERLAY_SAVE';
 var OVERLAY_SAVED = 'OVERLAY_SAVED';
 
+var STANDS_LOADED = 'STANDS_LOADED';
 var STAND_ADD = 'STAND_ADD';
 var STAND_ADDED = 'STAND_ADDED';
 
 
 
 
+var STAND_SELECT = 'STAND_SELECT';
 
 
 var ERROR_SET = 'ERROR_SET';
@@ -750,10 +766,19 @@ var overlayReducer = function(state, action){
 
 var standsReducer = function(state, action){
     switch(action.type){
+        case STANDS_LOADED:
+            var stands = action.payload;
+            return Immutable.set(state,'entities.stands', stands);
+
         case STAND_ADDED:
             var stand = action.payload.stand;
             var stands_id = action.payload.stands_id;
-            return Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
+            state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
+            return Immutable.set(state, 'ui.stands.sel', stands_id)
+
+        case STAND_SELECT:
+            var stand_id = action.payload;
+            return Immutable.set(state, 'ui.stands.sel', stand_id)
     }
     return state;
 };
@@ -786,6 +811,11 @@ function RequestsMiddleware(store){
                     d3.json('/overlays/')
                       .get(function(bases){
                             store(OVERLAYS_LOADED, bases);
+                      });
+
+                    d3.json('/stands/')
+                      .get(function(stands){
+                            store(STANDS_LOADED, stands);
                       });
 
                     break;
@@ -851,9 +881,9 @@ function RequestsMiddleware(store){
                           if(er) store(ERROR_SET, er.target.responseText || 'Connection error');
                           else{
                               var res = JSON.parse(xhr.responseText);
-                              stand = _.extend({}, stand, res.stand);
+                              stand = _.extend({}, stand, res);
                               store(STAND_ADDED, {
-                                  stands_id: res.stands_id,
+                                  stands_id: stands_id,
                                   stand: stand
                               });
                           }
@@ -1955,7 +1985,7 @@ function toText(id, note, style)
 
 var OverlaySelectTools = function(config, store, map, overlayMapView)
 {
-    var tooltipContent = document.getElementById('overlay-tooltip-template').text;
+    var tooltipContent = document.getElementById('tooltip-template').text;
     var tooltip = L.tooltip({permanent:true, interactive: true}).setContent(tooltipContent);
     var $delete = function() { return tooltip.getElement().getElementsByTagName('i')[0]; };
     var $roate = function() { return tooltip.getElement().getElementsByTagName('i')[1]; };
@@ -1983,7 +2013,8 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
         onFeatClick(cat, e);
         tooltip.setLatLng(e.latlng);
         map.addLayer(tooltip); 
-        $roate().style.display = cat === 'notes' ? '' : 'none';
+        var cl = cat === 'notes' ? L.DomUtil.removeClass : L.DomUtil.addClass; 
+        cl($roate(), 'w3-hide');
         L.DomEvent.on($delete(), 'click', onDeleteFeat);
         L.DomEvent.on($roate(), 'click', onRotateFeat);
     }
@@ -2022,7 +2053,7 @@ var OverlayEditing = function(config, store, map, overlayMapView)
 
     var m2e = {};
     m2e[DRAW_WALL] = editFeat('lines', store, map);
-    m2e[DRAW_RECT] = editFeat('rects', store, map);
+    m2e[DRAW_RECT] = editRect(store, map);
     m2e[DRAW_NOTE] = editNote(config, store, map);
 
     function onSelectedGeometryChanges(e){
@@ -2055,7 +2086,7 @@ var OverlayEditing = function(config, store, map, overlayMapView)
                 selectedLayer.on('editable:vertex:dragend', onSelectedGeometryChanges);
             }
             else 
-            selectedLayer = null;
+                selectedLayer = null;
         }
     }
 
@@ -2113,6 +2144,41 @@ function editFeat(cat, store, map)
         store(DRAWING_MODE_SET);
     }
     return {enter:enter, exit:exit};
+}
+
+function editRect(store, map){
+    var outline = L.polygon([], {color: 'black', fill: false, opacity: 1, weight: 2, dashArray: "5,5"});
+    function move(e){
+        var ce = e.latlng;
+        var ll = [[-20,-20],[20,-20], [20,20], [-20,20], [-20,-20] ].map(function(it){
+            return L.latLng(ce.lat+it[0], ce.lng+it[1]);
+        });
+        outline.setLatLngs(ll);
+    }
+
+    function onClick(e) {
+        move(e);
+        var feat =  { points: toPoints(outline.getLatLngs())};
+        store(OVERLAY_FEAT_ADD, {feat: feat, cat: 'rects'});
+        store(DRAWING_MODE_SET);        
+    }
+
+    function enter(w){
+        L.DomUtil.addClass(map._container,'move-cursor');
+        move({latlng: map.getCenter()});
+        map.addLayer(outline);
+        map.on('mousemove', move);      
+        map.on('click', onClick);      
+    }
+
+    function exit(){
+        L.DomUtil.removeClass(map._container,'move-cursor');
+        map.removeLayer(outline);
+        map.off('mousemove', move);
+        map.off('click', onClick);      
+        
+    }
+    return {enter: enter, exit: exit}    
 }
 
 function editNote(config, store, map) 
@@ -2249,30 +2315,37 @@ var OverlaysModule = function(config, store, map){
 
 };
 
-var Stand = L.Polygon.extend({
+var Stand = L.Rectangle.extend({
     options: {
         fillColor: 'green',
         color: 'green',
         stroke: false,
         fillOpacity: 0.7,
     },
+    
 
     initialize: function (latlngs, options, openWalls){
         openWalls = openWalls || 1;
-        L.Polygon.prototype.initialize.call(this, latlngs, options);
-        var ll = _.rest(_.flatten(latlngs), openWalls-1);
+        L.Rectangle.prototype.initialize.call(this, latlngs, options);
+        var ll = this.getLatLngs();
+        ll = _.rest(_.flatten(ll), openWalls-1);
         if(ll.length > 1)
             this.line = new DoubleLine(ll, {color: this.options.fillColor});
     },
 
     onAdd: function (map) {
-        L.Polygon.prototype.onAdd.call(this,map);
+        L.Rectangle.prototype.onAdd.call(this,map);
         if(this.line) map.addLayer(this.line);               
     },
 
     onRemove: function (map) {
-        L.Polygon.prototype.onRemove.call(this, map); 
+        L.Rectangle.prototype.onRemove.call(this, map); 
         if(this.line) map.removeLayer(this.line);       
+    },
+
+    redraw: function(){
+        L.Rectangle.prototype.redraw.call(this); 
+        if(this.line) this.line.redraw();
     }
 
 });
@@ -2328,8 +2401,60 @@ var DoubleLine = L.Polyline.extend({
     }
 });
 
-var StandEditing = function(config, store, map){
+var StandMapView = function(config, store, map){
+    var standsGroup = L.featureGroup().addTo(map);
+    var stands = {};
 
+    function onStandChanges(e)
+    {
+        var stands_id = selectedStandsId(store);
+        if(e.new_val && !e.old_val) {
+            var s = e.new_val;
+            var style = config.stands.types[s.type].style;
+            var $stand = new Stand(toLatLngs(s.points), style, s.openWalls);
+            $stand.id = s.id;
+            $stand.stands_id = stands_id;
+            standsGroup.addLayer($stand);
+            stands[s.id] = $stand;
+        }
+        else if(!e.new_val && e.old_val) {
+            var id = _.last(e.path);
+            var stand = stands[id];
+            standsGroup.removeLayer(stand);
+            delete stands[id];
+        }
+        else {
+            var id = _.last(e.path);
+            var $stand = stands[id];
+            var s = e.new_val;
+            var style = config.stands.types[s.type].style;
+            $stand.update(toLatLngs(s.points), style, s.openWalls);
+        }
+    }
+     
+
+    function onSelectedStandsId(e){
+        if(e.old_val){
+            store.off('entities.stands.'+e.old_val+".*", onSelectedStandsId);
+            standsGroup.clearLayers();
+            stands = {};
+        }
+        if(e.new_val){
+            store.on('entities.stands.'+e.new_val+".*", onSelectedStandsId);
+            _.each(selectedStands(store), function(s){
+                onStandChanges({new_val:s});
+            });
+        }
+    }
+
+    store.on('selectedStandsId', onSelectedStandsId );
+
+    return {stands:stands, standsGroup:standsGroup}
+ };
+
+var StandEditing = function(config, store, map, standMapView){
+    var $stand = null;
+    var $stands = standMapView.stands;
     var mymodes = [DRAW_STAND1, DRAW_STAND2, DRAW_STAND3, DRAW_STAND4];
     var editor = edit(store, map);
 
@@ -2341,11 +2466,39 @@ var StandEditing = function(config, store, map){
         }
     }
 
+    function onSelectedGeometryChange(){
+
+    }
+
+    function onStandSelect(){
+        if($stand) {
+            $stand.off('editable:dragend', onSelectedGeometryChange);
+            $stand.off('editable:vertex:dragend', onSelectedGeometryChange);
+            $stand.disableEdit();
+            store.off('entities.stands.'+$stand.stands_id+'.'+$stand.id, onStandSelect);            
+            $stand = null;
+        }
+        var stand = selectedStand(store);
+        if(stand){
+            $stand = $stands[stand.id];
+            if($stand) {
+                L.setOptions(map.editTools, {skipMiddleMarkers: true, draggable: true});
+                $stand.enableEdit(map);   
+                $stand.on('editable:dragend', onSelectedGeometryChange);
+                $stand.on('editable:vertex:dragend', onSelectedGeometryChange);
+                store.on('entities.stands.'+$stand.stands_id+'.'+$stand.id, onStandSelect);
+            }
+            
+        }
+    }
+
     store.on('map.drawMode', onDrawMode);
+    store.on('ui.stands.sel', onStandSelect);
+
 };
 
 function edit(store, map){
-    var outline = L.polygon([], {color: 'grey', fill: false, opacity: 0.7, weight: 7});
+    var outline = L.polygon([], {color: 'black', fill: false, opacity: 1, weight: 2, dashArray: "5,5"});
     var openWalls = 1;
 
     function move(e){
@@ -2358,7 +2511,8 @@ function edit(store, map){
 
     function onClick(e) {
         move(e);
-        var feat =  { points: toPoints(layer.getLatLngs()), openWalls: openWalls, rotate: 0};
+        var type = store.state.ui.stands.type;
+        var feat =  { points: toPoints(outline.getLatLngs()), openWalls: openWalls, rotate: 0, type: type};
         store(STAND_ADD, feat);
         store(DRAWING_MODE_SET);        
         // new Stand(outline.getLatLngs(), {fillColor: 'red'}, openWallss).addTo(map);
@@ -2382,6 +2536,59 @@ function edit(store, map){
     }
     return {enter: enter, exit: exit}
 }
+
+var StandySelectTools = function(config, store, map, standMapView)
+{
+    var tooltipContent = document.getElementById('tooltip-template').text;
+    var tooltip = L.tooltip({permanent:true, interactive: true}).setContent(tooltipContent);
+    var $delete = function() { return tooltip.getElement().getElementsByTagName('i')[0]; };
+    var $roate = function() { return tooltip.getElement().getElementsByTagName('i')[1]; };
+    var $edit = function() { return tooltip.getElement().getElementsByTagName('i')[2]; };
+
+
+    function onStandClick(e){
+        store(STAND_SELECT, e.layer.id);
+        closeTooltip(tooltip);         
+
+    }
+
+    function onStandContext(e){
+        onStandClick(e);
+        tooltip.setLatLng(e.latlng);
+        map.addLayer(tooltip); 
+        L.DomUtil.removeClass($roate(), 'w3-hide');
+        L.DomUtil.removeClass($edit(), 'w3-hide');
+        L.DomEvent.on($delete(), 'click', onStandDelete);
+        L.DomEvent.on($roate(), 'click', onStandRotate);
+        L.DomEvent.on($edit(), 'click', onStandEdit);
+        
+    }
+
+    function onStandDelete(){
+
+    }
+
+    function onStandRotate(){
+
+    }
+
+    function onStandEdit(){
+
+    }
+
+    function closeTooltip(){
+        if(tooltip._map) {
+            map.removeLayer(tooltip); 
+            L.DomEvent.off($delete(), 'click', onStandDelete);
+            L.DomEvent.off($roate(), 'click', onStandRotate);
+            L.DomEvent.off($edit(), 'click', onStandEdit);
+        }
+    }
+
+
+    standMapView.standsGroup.on('click', onStandClick);
+    standMapView.standsGroup.on('contextmenu', onStandContext);
+};
 
 function StandView(config, store){
 
@@ -2423,7 +2630,9 @@ function StandView(config, store){
 
 var StandView$1 = function(config, store, map){
     StandView(config, store);
-    StandEditing(config, store, map);
+    var smv = StandMapView(config, store, map);
+    StandEditing(config, store, map, smv);
+    StandySelectTools(config, store, map, smv);
 };
 
 initComponents();

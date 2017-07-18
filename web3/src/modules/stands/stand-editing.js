@@ -1,12 +1,14 @@
 
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
+import {selectedStand, selectedStandsId} from '../../state.js'
 import {str, toPoints} from '../../utils/utils.js'
 import {Stand} from '../../svg/leaflet-stand.js'
 
 
-export default function(config, store, map){
-
+export default function(config, store, map, standMapView){
+    var $stand = null;
+    var $stands = standMapView.stands;
     var mymodes = [m.DRAW_STAND1, m.DRAW_STAND2, m.DRAW_STAND3, m.DRAW_STAND4];
     var editor = edit(store, map);
 
@@ -18,11 +20,39 @@ export default function(config, store, map){
         }
     }
 
+    function onSelectedGeometryChange(){
+
+    }
+
+    function onStandSelect(){
+        if($stand) {
+            $stand.off('editable:dragend', onSelectedGeometryChange)
+            $stand.off('editable:vertex:dragend', onSelectedGeometryChange)
+            $stand.disableEdit();
+            store.off('entities.stands.'+$stand.stands_id+'.'+$stand.id, onStandSelect);            
+            $stand = null;
+        }
+        var stand = selectedStand(store);
+        if(stand){
+            $stand = $stands[stand.id];
+            if($stand) {
+                L.setOptions(map.editTools, {skipMiddleMarkers: true, draggable: true});
+                $stand.enableEdit(map);   
+                $stand.on('editable:dragend', onSelectedGeometryChange)
+                $stand.on('editable:vertex:dragend', onSelectedGeometryChange)
+                store.on('entities.stands.'+$stand.stands_id+'.'+$stand.id, onStandSelect);
+            }
+            
+        }
+    }
+
     store.on('map.drawMode', onDrawMode);
+    store.on('ui.stands.sel', onStandSelect);
+
 }
 
 function edit(store, map){
-    var outline = L.polygon([], {color: 'grey', fill: false, opacity: 0.7, weight: 7});
+    var outline = L.polygon([], {color: 'black', fill: false, opacity: 1, weight: 2, dashArray: "5,5"});
     var openWalls = 1;
 
     function move(e){
@@ -35,7 +65,8 @@ function edit(store, map){
 
     function onClick(e) {
         move(e);
-        var feat =  { points: toPoints(layer.getLatLngs()), openWalls: openWalls, rotate: 0};
+        var type = store.state.ui.stands.type;
+        var feat =  { points: toPoints(outline.getLatLngs()), openWalls: openWalls, rotate: 0, type: type};
         store(a.STAND_ADD, feat);
         store(a.DRAWING_MODE_SET);        
         // new Stand(outline.getLatLngs(), {fillColor: 'red'}, openWallss).addTo(map);

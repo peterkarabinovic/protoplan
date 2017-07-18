@@ -37,8 +37,9 @@ export function Store(reducers, middleware)
         var ids = paths.map(function(p){
             var listener_id = p.trim() + '.' + stamp(fn);
             delete listener_table[listener_id];
+            return listener_id;
         });
-        listeners = _.without(listeners, ids);
+        listeners = _.difference(listeners, ids);
         
     };
 
@@ -49,9 +50,10 @@ export function Store(reducers, middleware)
             var ef = events_finder(s.state, old_state);
             listeners.forEach(function(id){
                 var li = listener_table[id];
-                ef(li.path).forEach(function(e){
-                    li.fn(e);
-                })
+                if(li) // the listener may be 'off' in handler function
+                    ef(li.path).forEach(function(e){
+                        li.fn(e);
+                    });
             })
         }
         return s.state;

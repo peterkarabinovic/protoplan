@@ -119,7 +119,7 @@ def stand_layers():
 
 def stand_update(layer_id, stand):
     with stand_layers() as layers:
-        stands = layers.get(layer_id, {"id":layer_id})
+        stands = layers.get(layer_id, {})
         stand_id = stand.get('id')
         if stand_id is None:
             stand_id = str(int(max(stands.keys())) + 1) if stands else '1'
@@ -132,7 +132,7 @@ def stand_update(layer_id, stand):
 
 def stand_delete(layer_id, stand_id):
     if layer_id is None or stand_id is None:
-        return
+        return False
     layer_id = str(layer_id)
     with stand_layers() as layers:
         stands = layers.get(layer_id, {})
@@ -144,6 +144,7 @@ def stand_delete(layer_id, stand_id):
             layers[layer_id] = stands
         with codecs.open(stands_json, 'w', 'utf-8') as json_file:
             json_file.write(json.dumps(layers, ensure_ascii=False))
+            return True
 
 app = Flask(__name__, static_folder='')
 
@@ -226,6 +227,25 @@ def update_overlay(id):
         return "Pavilion not found {}".format(id), 404
     overlay = overlay_update(id, overlay)
     return flask.jsonify({"id": overlay['id']})
+
+
+@app.route('/stands/')
+def stands():
+    with stand_layers() as stands:
+        return flask.jsonify(stands)
+    
+@app.route('/stands/<stands_id>', methods=['POST'])
+def update_stand(stands_id):
+    stand = json.loads(request.data)
+    stand = stand_update(stands_id, stand)
+    return flask.jsonify(stand)
+
+@app.route('/stands/<stands_id>/<stand_id>', methods=['POST'])
+def delete_stand(stands_id, stand_id):
+    stand_delete(stands_id, stand_id)
+    return "Ok"
+
+
 
 
 

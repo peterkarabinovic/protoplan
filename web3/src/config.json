@@ -19,7 +19,7 @@ export default
                 },
                 "2": {
                     "name": "Ковер модерн",
-                    "style": {"stroke":false, "fillOpacity": "0.5", "fillColor": "grey  " }
+                    "style": {"stroke":false, "fillOpacity": "1", "fillColor": "blue" }
                 }
             },
             "notes": {
@@ -38,15 +38,15 @@ export default
         "types":{
             "1": {
                 "name": "Стенд категории 1",
-                "style": {"fillColor": "yellow", "stroke": "green", "fillOpacity": 0.5 }
+                "style": {"fillColor": "green", "color": "green", "fillOpacity": 0.7 }
             },
             "2": {
                 "name": "Стенд категории 2",
-                "style": {"fillColor": "lightblue", "stroke": "darkblue", "fillOpacity": 0.5 }
+                "style": {"fillColor": "lightblue", "color": "darkblue", "fillOpacity": 0.5 }
             },
             "3": {
                 "name": "Стенд категории 3",
-                "style": {"fillColor": "lightred", "stroke": "red", "fillOpacity": 0.5 }
+                "style": {"fillColor": "lightred", "color": "red", "fillOpacity": 0.5 }
             },
         }
     }

@@ -24,6 +24,11 @@ export default function RequestsMiddleware(store){
                             store(a.OVERLAYS_LOADED, bases);
                       });
 
+                    d3.json('/stands/')
+                      .get(function(stands){
+                            store(a.STANDS_LOADED, stands);
+                      });
+
                     break;
 
                 case a.PAVILION_ADD:
@@ -87,9 +92,9 @@ export default function RequestsMiddleware(store){
                           if(er) store(a.ERROR_SET, er.target.responseText || 'Connection error')
                           else{
                               var res = JSON.parse(xhr.responseText);
-                              stand = _.extend({}, stand, res.stand);
+                              stand = _.extend({}, stand, res);
                               store(a.STAND_ADDED, {
-                                  stands_id: res.stands_id,
+                                  stands_id: stands_id,
                                   stand: stand
                               });
                           }

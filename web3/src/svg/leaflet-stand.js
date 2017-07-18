@@ -1,28 +1,35 @@
 
-export var Stand = L.Polygon.extend({
+export var Stand = L.Rectangle.extend({
     options: {
         fillColor: 'green',
         color: 'green',
         stroke: false,
         fillOpacity: 0.7,
     },
+    
 
     initialize: function (latlngs, options, openWalls){
         openWalls = openWalls || 1;
-        L.Polygon.prototype.initialize.call(this, latlngs, options);
-        var ll = _.rest(_.flatten(latlngs), openWalls-1);
+        L.Rectangle.prototype.initialize.call(this, latlngs, options);
+        var ll = this.getLatLngs();
+        ll = _.rest(_.flatten(ll), openWalls-1);
         if(ll.length > 1)
             this.line = new DoubleLine(ll, {color: this.options.fillColor});
     },
 
     onAdd: function (map) {
-        L.Polygon.prototype.onAdd.call(this,map);
+        L.Rectangle.prototype.onAdd.call(this,map);
         if(this.line) map.addLayer(this.line);               
     },
 
     onRemove: function (map) {
-        L.Polygon.prototype.onRemove.call(this, map); 
+        L.Rectangle.prototype.onRemove.call(this, map); 
         if(this.line) map.removeLayer(this.line);       
+    },
+
+    redraw: function(){
+        L.Rectangle.prototype.redraw.call(this); 
+        if(this.line) this.line.redraw();
     }
 
 });

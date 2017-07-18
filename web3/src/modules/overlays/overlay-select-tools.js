@@ -5,7 +5,7 @@ import {str} from '../../utils/utils.js'
 
 export default function(config, store, map, overlayMapView)
 {
-    var tooltipContent = document.getElementById('overlay-tooltip-template').text;
+    var tooltipContent = document.getElementById('tooltip-template').text;
     var tooltip = L.tooltip({permanent:true, interactive: true}).setContent(tooltipContent);
     var $delete = function() { return tooltip.getElement().getElementsByTagName('i')[0]; }
     var $roate = function() { return tooltip.getElement().getElementsByTagName('i')[1]; }
@@ -33,7 +33,8 @@ export default function(config, store, map, overlayMapView)
         onFeatClick(cat, e);
         tooltip.setLatLng(e.latlng);
         map.addLayer(tooltip); 
-        $roate().style.display = cat === 'notes' ? '' : 'none';
+        var cl = cat === 'notes' ? L.DomUtil.removeClass : L.DomUtil.addClass; 
+        cl($roate(), 'w3-hide')
         L.DomEvent.on($delete(), 'click', onDeleteFeat);
         L.DomEvent.on($roate(), 'click', onRotateFeat);
     }

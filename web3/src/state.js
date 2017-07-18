@@ -36,7 +36,7 @@ export default {
         },
         stands: {
             type: 1,
-            feat: un
+            sel: undefined
         }
     }
 }
@@ -53,6 +53,7 @@ function entity(type, store, id)
 
 export var baseById = _.partial(entity, 'bases');
 export var overlayById = _.partial(entity, 'overlays');
+export var standsById = _.partial(entity, 'stands');
 
 export function selectedPavilion(store){
     return store.state.selectedPavilion;
@@ -101,4 +102,15 @@ export function overlayNoteType(store){
 
 export function selectedStandsId(store) {
     return store.state.selectedStandsId;
+}
+
+export function selectedStands(store){
+    var id = store.state.selectedStandsId;
+    return standsById(store, id); 
+}
+
+export function selectedStand(store){
+    var stands_id = store.state.selectedStandsId;
+    var id = store.state.ui.stands.sel;
+    return standsById(store, stands_id)[id]; 
 }
