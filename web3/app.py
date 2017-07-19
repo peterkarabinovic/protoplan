@@ -240,10 +240,10 @@ def update_stand(stands_id):
     stand = stand_update(stands_id, stand)
     return flask.jsonify(stand)
 
-@app.route('/stands/<stands_id>/<stand_id>', methods=['POST'])
+@app.route('/stands/<stands_id>/<stand_id>|delete', methods=['GET'])
 def delete_stand(stands_id, stand_id):
     stand_delete(stands_id, stand_id)
-    return "Ok"
+    return flask.jsonify({"stands_id":stands_id, "stand_id":stand_id})
 
 
 

@@ -558,8 +558,8 @@ var STAND_ADD = 'STAND_ADD';
 var STAND_ADDED = 'STAND_ADDED';
 
 var STAND_UPDATED = 'STAND_UPDATED';
-
-
+var STAND_DELETE = 'STAND_DELETE';
+var STAND_DELETED = 'STAND_DELETED';
 var STAND_SELECT = 'STAND_SELECT';
 var STAND_EDIT = 'STAND_EDIT';
 var STAND_TYPE_UPDATE = 'STAND_TYPE_UPDATE';
@@ -970,6 +970,23 @@ function RequestsMiddleware(store){
                               });
                           }
                     });
+                    break;
+
+                case STAND_DELETE:
+                    var stand = action.payload;
+                    var stands_id = selectedStandsId(store);
+                    d3.request('/stands/'+stands_id+'/'+stand.id+'|delete')
+                      .mimeType("application/json")
+                      .get(function(er, xhr){
+                            if(er) store(ERROR_SET, er);
+                            else {
+                                var res = JSON.parse(xhr.responseText);
+                                store(STAND_DELETED, {
+                                    stands_id: res.stands_id,
+                                    stand: res.stand_id
+                                });
+                            }
+                      });
                     break;
 
 
@@ -2689,8 +2706,9 @@ var StandySelectTools = function(config, store, map, standMapView)
         
     }
 
-    function onStandDelete(){
-        alert('Not implemented yet');
+    function onStandDelete(e){
+        store(STAND_DELETE, selectedStand(store));
+        closeTooltip();
     }
 
     function onStandRotate(){

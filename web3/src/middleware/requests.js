@@ -142,6 +142,23 @@ export default function RequestsMiddleware(store){
                     });
                     break;
 
+                case a.STAND_DELETE:
+                    var stand = action.payload;
+                    var stands_id = selectedStandsId(store);
+                    d3.request('/stands/'+stands_id+'/'+stand.id+'|delete')
+                      .mimeType("application/json")
+                      .get(function(er, xhr){
+                            if(er) store(a.ERROR_SET, er);
+                            else {
+                                var res = JSON.parse(xhr.responseText);
+                                store(a.STAND_DELETED, {
+                                    stands_id: res.stands_id,
+                                    stand: res.stand_id
+                                });
+                            }
+                      });
+                    break;
+
 
                     
             }

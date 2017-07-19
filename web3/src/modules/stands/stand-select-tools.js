@@ -1,5 +1,6 @@
 
 import * as a from '../../actions.js'
+import {selectedStand} from '../../state.js'
 import {str} from '../../utils/utils.js'
 
 
@@ -30,8 +31,9 @@ export default function(config, store, map, standMapView)
         
     }
 
-    function onStandDelete(){
-        alert('Not implemented yet');
+    function onStandDelete(e){
+        store(a.STAND_DELETE, selectedStand(store))
+        closeTooltip()
     }
 
     function onStandRotate(){
