@@ -1,6 +1,6 @@
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
-import { drawMode} from '../../state.js' 
+import {drawMode, selectedStand} from '../../state.js' 
 import StandMapView from './stand-map-view.js'
 import StandEditing from './stand-editing.js'
 import StandySelectTools from './stand-select-tools.js'
@@ -22,10 +22,6 @@ function StandView(config, store){
         data: {
             mode: null,
             selectedStandsId: store.prop('selectedStandsId'),
-            types: {
-                sel: store.prop('ui.stands.cat'),
-                list: config.stands.types
-            }
         },
         methods: {
             select: function(mode){
@@ -40,6 +36,28 @@ function StandView(config, store){
 
     store.on('map.drawMode', function(e){
         vm.mode = _.findKey(MODES, function(it) { return it == e.new_val});
+    });
+
+    var editVM = new Vue({
+        el: "#stand-edit",
+        data: {
+            edit: store.prop('ui.stands.edit'),
+            type: store.prop('ui.stands.type'),
+            list: config.stands.types
+        },
+        methods: {
+            close: function(){
+                store(a.STAND_EDIT)
+            }
+        }
+    });
+
+    editVM.$watch('type.$val', function(val){
+        if(val) {
+            var stand = selectedStand(store);
+            if(stand.type != val)
+                store(a.STAND_TYPE_UPDATE, {stand: stand, type: val});
+        }
     });
     
 }

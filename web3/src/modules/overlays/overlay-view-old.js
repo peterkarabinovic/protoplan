@@ -25,6 +25,22 @@ function OverlayView(config, store)
         data: {
             mode: null,
             selectedOverlay: store.prop('selectedOverlay'),
+            types: {
+                lines: {
+                    sel: store.prop('ui.overlay.types.lines'),
+                    list: config.overlay.types.lines 
+                },
+                rects: {
+                    sel: store.prop('ui.overlay.types.rects'),
+                    list: config.overlay.types.rects 
+                },
+                notes: {
+                    sel: store.prop('ui.overlay.types.notes'),
+                    list: config.overlay.types.notes
+                }
+            },
+            type: null,
+            text: null
         },
         methods: { 
             select: function(mode){ 
@@ -53,48 +69,19 @@ function OverlayView(config, store)
         vm.mode = _.findKey(MODES, function(it) { return it == e.new_val});
     });
 
-    var editVM = new Vue({
-        el: "#overlay-edit",
-        data: {
-            edit: store.prop('ui.overlay.edit'),
-            types: {
-                lines: {
-                    sel: store.prop('ui.overlay.types.lines'),
-                    list: config.overlay.types.lines 
-                },
-                rects: {
-                    sel: store.prop('ui.overlay.types.rects'),
-                    list: config.overlay.types.rects 
-                },
-                notes: {
-                    sel: store.prop('ui.overlay.types.notes'),
-                    list: config.overlay.types.notes
-                }
-            },
-            type: null,
-            text: null
-        },
-        methods: {
-            close: function(){
-                store(a.OVERLAY_EDIT)
-            }
-        }
-    });
-
-
     store.on('ui.overlay.feat', function(){
         var feat = selectedOverlayFeat(store);
-        editVM.type = feat ? editVM.types[feat.cat] : null;
-        editVM.text = feat && feat.cat === 'notes' ? store.state.selectedOverlay.notes[feat.id].text : null; 
+        vm.type = feat ? vm.types[feat.cat] : null;
+        vm.text = feat && feat.cat === 'notes' ? store.state.selectedOverlay.notes[feat.id].text : null; 
     })
 
-    editVM.$watch('type.sel.$val', function(val){
+    vm.$watch('type.sel.$val', function(val){
         if(val) {
             var feat = selectedOverlayFeat(store);
             store(a.OVERLAY_TYPE_SELECT, {feat: feat, type_id: val});
         }
     });
-    return editVM;
+    return vm;
 }
 
 export default function(config, store, map){

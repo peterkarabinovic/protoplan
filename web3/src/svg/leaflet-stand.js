@@ -19,7 +19,7 @@ export var Stand = L.Rectangle.extend({
 
     onAdd: function (map) {
         L.Rectangle.prototype.onAdd.call(this,map);
-        if(this.line) map.addLayer(this.line);               
+        if(this.line) map.addLayer(this.line);     
     },
 
     onRemove: function (map) {
@@ -30,6 +30,21 @@ export var Stand = L.Rectangle.extend({
     redraw: function(){
         L.Rectangle.prototype.redraw.call(this); 
         if(this.line) this.line.redraw();
+    },
+
+    update: function(latlngs, options, openWalls){
+        this.setStyle(options);
+        this.setLatLngs(latlngs);
+        var ll = this.getLatLngs();
+        ll = _.rest(_.flatten(ll), openWalls-1);
+        if(this.line && this._map) 
+            this._map.removeLayer(this.line);       
+        if(ll.length > 1) {
+            this.line = new DoubleLine(ll, {color: this.options.fillColor});
+            if(this._map)
+                this._map.addLayer(this.line);     
+        }
+        
     }
 
 });

@@ -135,6 +135,7 @@ var overlayReducer = function(state, action){
                 id: generateId(state, 'selectedOverlay.'+cat),
                 type: state.ui.overlay.types[cat]
             });
+            state = Immutable.remove(state, 'ui.stands.sel');
             state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat.id));
             return Immutable.set(state, str('selectedOverlay.',cat,'.',feat.id), feat);
 
@@ -175,9 +176,16 @@ var overlayReducer = function(state, action){
                    cat = p[0],
                    id = +p[1];
                 var feat = state.selectedOverlay[cat][id];
+                state = Immutable.remove(state, 'ui.stands.sel');
                 state = Immutable.set(state, str('ui.overlay.types.',cat), feat.type);
             }
+            else
+                return Immutable.set(state, 'ui.overlay.edit')    
             return Immutable.set(state, 'ui.overlay.feat', feat_id);
+
+        case a.OVERLAY_EDIT:
+            var edit = action.payload;
+            return Immutable.set(state, 'ui.overlay.edit', edit)
         
         case a.OVERLAY_TYPE_SELECT:
             var p = action.payload;
@@ -190,6 +198,7 @@ var overlayReducer = function(state, action){
                 state = Immutable.set(state, 'entities.overlays.'+overlay.id, overlay);
                 if(state.selectedPavilion && overlay.id == state.selectedPavilion.id)
                     state = Immutable.extend(state, 'selectedOverlay', overlay)
+                state = Immutable.remove(state, 'ui.overlay.feat');
             }
             else {
                 state = Immutable.remove(state, 'entities.overlays.'+overlay.id);
@@ -201,6 +210,7 @@ var overlayReducer = function(state, action){
             overlay = state.entities.overlays[overlay.id];
             state = Immutable.set(state, 'selectedOverlay', overlay);
             return Immutable.remove(state, 'ui.overlay.feat');
+
     }
     return state;
 }
@@ -217,9 +227,36 @@ var standsReducer = function(state, action){
             state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
             return Immutable.set(state, 'ui.stands.sel', stands_id)
 
+        case a.STAND_UPDATED:
+            var stand = action.payload.stand;
+            var stands_id = action.payload.stands_id;
+            if(state.entities.stands[stands_id]) {
+                state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
+                state = Immutable.set(state, 'ui.stands.sel', stand.id)
+            }
+            return state;
+        
+
         case a.STAND_SELECT:
             var stand_id = action.payload;
-            return Immutable.set(state, 'ui.stands.sel', stand_id)
+            if(stand_id) {
+                var stands_id = state.selectedStandsId;
+                var stand = state.entities.stands[stands_id][stand_id]
+                state = Immutable.set(state, 'ui.stands.type', stand.type);
+            }
+            state = Immutable.remove(state, 'ui.overlay.feat');
+            return Immutable.set(state, 'ui.stands.sel', stand_id);
+        
+        case a.STAND_EDIT:
+            var edit = action.payload;
+            return Immutable.set(state, 'ui.stands.edit', edit);
+
+        case a.STAND_TYPE_UPDATE:
+            var type = action.payload.type;
+            return Immutable.set(state, 'state.ui.stands.type', type);
+
+        
+            
     }
     return state;
 }

@@ -1,6 +1,7 @@
 
 import * as a from '../actions.js'
 import {selectedStandsId} from '../state.js'
+import {Immutable} from "../utils/fp.js"
 
 export default function RequestsMiddleware(store){
     return function(next){
@@ -99,6 +100,47 @@ export default function RequestsMiddleware(store){
                               });
                           }
                       });
+                    break;
+
+                case a.STAND_TYPE_UPDATE:
+                    var type = action.payload.type;
+                    var stand = action.payload.stand;
+                    stand = Immutable.set(stand, 'type', type);
+                    var stands_id = selectedStandsId(store);
+                    d3.request('/stands/'+stands_id)
+                      .mimeType("application/json")
+                      .send('POST', JSON.stringify(stand), function(er, xhr){
+                          if(er) store(a.ERROR_SET, er.target.responseText || 'Connection error')
+                          else{
+                              var res = JSON.parse(xhr.responseText);
+                              stand = _.extend({}, stand, res);
+                              store(a.STAND_UPDATED, {
+                                  stands_id: stands_id,
+                                  stand: stand
+                              });
+                          }
+                    });
+                    break;
+                
+                case a.STAND_POINTS_UPDATE:
+                    var stand = action.payload.stand;
+                    var points = action.payload.points;
+                    stand = Immutable.set(stand, 'points', points);
+                    var stands_id = selectedStandsId(store);
+                    d3.request('/stands/'+stands_id)
+                      .mimeType("application/json")
+                      .send('POST', JSON.stringify(stand), function(er, xhr){
+                          if(er) store(a.ERROR_SET, er.target.responseText || 'Connection error')
+                          else{
+                              var res = JSON.parse(xhr.responseText);
+                              stand = _.extend({}, stand, res);
+                              store(a.STAND_UPDATED, {
+                                  stands_id: stands_id,
+                                  stand: stand
+                              });
+                          }
+                    });
+                    break;
 
 
                     

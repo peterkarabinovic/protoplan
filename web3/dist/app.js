@@ -7,7 +7,7 @@ var config = {
             "lines": {
                 "1": {
                     "name": "Тонкая стена",
-                    "style": {"weight":5, "color": "green"}
+                    "style": {"weight":5, "color": "red"}
                 },
                 "2": {
                     "name": "Толстая стена",
@@ -436,11 +436,13 @@ var initState = {
                 notes: 1
             },
             feat: undefined,
-            text: 'Text label'
+            text: 'Text label',
+            edit: false
         },
         stands: {
             type: 1,
-            sel: undefined
+            sel: undefined,
+            edit: false
         }
     }
 };
@@ -543,22 +545,25 @@ var OVERLAY_FEAT_ADD = 'OVERLAY_FEAT_ADD';
 var OVERLAYS_LOADED = 'OVERLAYS_LOADED';
 var OVERLAY_FEAT_UPDATE = 'OVERLAY_FEAT_UPDATE';
 var OVERLAY_FEAT_DELETE = 'OVERLAY_FEAT_DELETE';
-var OVERLAY_FEAT_SELECT = 'OVERLAY_FEAT_SELECT';
 var OVERLAY_FEAT_ROTATE = 'OVERLAY_FEAT_ROTATE';
 var OVERLAY_FEAT_TEXT = 'OVERLAY_FEAT_TEXT';
-var OVERLAY_TYPE_SELECT = 'OVERLAY_TYPE_SELECT';
 var OVERLAY_ROLLBACK = 'OVERLAY_ROLLBACK';
 var OVERLAY_SAVE = 'OVERLAY_SAVE';
 var OVERLAY_SAVED = 'OVERLAY_SAVED';
+var OVERLAY_FEAT_SELECT = 'OVERLAY_FEAT_SELECT';
+var OVERLAY_EDIT = 'OVERLAY_EDIT';
 
 var STANDS_LOADED = 'STANDS_LOADED';
 var STAND_ADD = 'STAND_ADD';
 var STAND_ADDED = 'STAND_ADDED';
 
-
+var STAND_UPDATED = 'STAND_UPDATED';
 
 
 var STAND_SELECT = 'STAND_SELECT';
+var STAND_EDIT = 'STAND_EDIT';
+var STAND_TYPE_UPDATE = 'STAND_TYPE_UPDATE';
+var STAND_POINTS_UPDATE = 'STAND_POINTS_UPDATE';
 
 
 var ERROR_SET = 'ERROR_SET';
@@ -694,6 +699,7 @@ var overlayReducer = function(state, action){
                 id: generateId(state, 'selectedOverlay.'+cat),
                 type: state.ui.overlay.types[cat]
             });
+            state = Immutable.remove(state, 'ui.stands.sel');
             state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat.id));
             return Immutable.set(state, str('selectedOverlay.',cat,'.',feat.id), feat);
 
@@ -734,11 +740,18 @@ var overlayReducer = function(state, action){
                    cat = p[0],
                    id = +p[1];
                 var feat = state.selectedOverlay[cat][id];
+                state = Immutable.remove(state, 'ui.stands.sel');
                 state = Immutable.set(state, str('ui.overlay.types.',cat), feat.type);
             }
+            else
+                return Immutable.set(state, 'ui.overlay.edit')    
             return Immutable.set(state, 'ui.overlay.feat', feat_id);
+
+        case OVERLAY_EDIT:
+            var edit = action.payload;
+            return Immutable.set(state, 'ui.overlay.edit', edit)
         
-        case OVERLAY_TYPE_SELECT:
+        case undefined:
             var p = action.payload;
             state = Immutable.set(state, str('ui.overlay.types.',p.feat.cat), p.type_id);
             return Immutable.set(state, str('selectedOverlay.',p.feat.cat,'.',p.feat.id, '.type'),  p.type_id)
@@ -749,6 +762,7 @@ var overlayReducer = function(state, action){
                 state = Immutable.set(state, 'entities.overlays.'+overlay.id, overlay);
                 if(state.selectedPavilion && overlay.id == state.selectedPavilion.id)
                     state = Immutable.extend(state, 'selectedOverlay', overlay);
+                state = Immutable.remove(state, 'ui.overlay.feat');
             }
             else {
                 state = Immutable.remove(state, 'entities.overlays.'+overlay.id);
@@ -760,6 +774,7 @@ var overlayReducer = function(state, action){
             overlay = state.entities.overlays[overlay.id];
             state = Immutable.set(state, 'selectedOverlay', overlay);
             return Immutable.remove(state, 'ui.overlay.feat');
+
     }
     return state;
 };
@@ -776,9 +791,36 @@ var standsReducer = function(state, action){
             state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
             return Immutable.set(state, 'ui.stands.sel', stands_id)
 
+        case STAND_UPDATED:
+            var stand = action.payload.stand;
+            var stands_id = action.payload.stands_id;
+            if(state.entities.stands[stands_id]) {
+                state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
+                state = Immutable.set(state, 'ui.stands.sel', stand.id);
+            }
+            return state;
+        
+
         case STAND_SELECT:
             var stand_id = action.payload;
-            return Immutable.set(state, 'ui.stands.sel', stand_id)
+            if(stand_id) {
+                var stands_id = state.selectedStandsId;
+                var stand = state.entities.stands[stands_id][stand_id];
+                state = Immutable.set(state, 'ui.stands.type', stand.type);
+            }
+            state = Immutable.remove(state, 'ui.overlay.feat');
+            return Immutable.set(state, 'ui.stands.sel', stand_id);
+        
+        case STAND_EDIT:
+            var edit = action.payload;
+            return Immutable.set(state, 'ui.stands.edit', edit);
+
+        case STAND_TYPE_UPDATE:
+            var type = action.payload.type;
+            return Immutable.set(state, 'state.ui.stands.type', type);
+
+        
+            
     }
     return state;
 };
@@ -888,6 +930,47 @@ function RequestsMiddleware(store){
                               });
                           }
                       });
+                    break;
+
+                case STAND_TYPE_UPDATE:
+                    var type = action.payload.type;
+                    var stand = action.payload.stand;
+                    stand = Immutable.set(stand, 'type', type);
+                    var stands_id = selectedStandsId(store);
+                    d3.request('/stands/'+stands_id)
+                      .mimeType("application/json")
+                      .send('POST', JSON.stringify(stand), function(er, xhr){
+                          if(er) store(ERROR_SET, er.target.responseText || 'Connection error');
+                          else{
+                              var res = JSON.parse(xhr.responseText);
+                              stand = _.extend({}, stand, res);
+                              store(STAND_UPDATED, {
+                                  stands_id: stands_id,
+                                  stand: stand
+                              });
+                          }
+                    });
+                    break;
+                
+                case STAND_POINTS_UPDATE:
+                    var stand = action.payload.stand;
+                    var points = action.payload.points;
+                    stand = Immutable.set(stand, 'points', points);
+                    var stands_id = selectedStandsId(store);
+                    d3.request('/stands/'+stands_id)
+                      .mimeType("application/json")
+                      .send('POST', JSON.stringify(stand), function(er, xhr){
+                          if(er) store(ERROR_SET, er.target.responseText || 'Connection error');
+                          else{
+                              var res = JSON.parse(xhr.responseText);
+                              stand = _.extend({}, stand, res);
+                              store(STAND_UPDATED, {
+                                  stands_id: stands_id,
+                                  stand: stand
+                              });
+                          }
+                    });
+                    break;
 
 
                     
@@ -1989,12 +2072,18 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
     var tooltip = L.tooltip({permanent:true, interactive: true}).setContent(tooltipContent);
     var $delete = function() { return tooltip.getElement().getElementsByTagName('i')[0]; };
     var $roate = function() { return tooltip.getElement().getElementsByTagName('i')[1]; };
+    var $edit = function() { return tooltip.getElement().getElementsByTagName('i')[2]; };
 
     var cat2group = overlayMapView.cat2group;
     var cat2layers = overlayMapView.cat2layers;
 
     function onDeleteFeat(){
         store(OVERLAY_FEAT_DELETE);
+    }
+
+    function onEditFeat(){
+        store(OVERLAY_EDIT, true);
+        closeTooltip(tooltip);
     }
 
     function onRotateFeat(){
@@ -2015,8 +2104,10 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
         map.addLayer(tooltip); 
         var cl = cat === 'notes' ? L.DomUtil.removeClass : L.DomUtil.addClass; 
         cl($roate(), 'w3-hide');
+        L.DomUtil.removeClass($edit(), 'w3-hide');
         L.DomEvent.on($delete(), 'click', onDeleteFeat);
         L.DomEvent.on($roate(), 'click', onRotateFeat);
+        L.DomEvent.on($edit(), 'click', onEditFeat);
     }
 
     function closeTooltip(){
@@ -2024,6 +2115,7 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
             map.removeLayer(tooltip); 
             L.DomEvent.off($delete(), 'click', onDeleteFeat);
             L.DomEvent.off($roate(), 'click', onRotateFeat);
+            L.DomEvent.off($edit(), 'click', onEditFeat);
         }
     }
 
@@ -2140,6 +2232,7 @@ function editFeat(cat, store, map)
         {
             var feat =  { points: toPoints(layer.getLatLngs())};
             store(OVERLAY_FEAT_ADD, {feat: feat, cat: cat});
+            store(OVERLAY_EDIT, true);
         }
         store(DRAWING_MODE_SET);
     }
@@ -2160,6 +2253,7 @@ function editRect(store, map){
         move(e);
         var feat =  { points: toPoints(outline.getLatLngs())};
         store(OVERLAY_FEAT_ADD, {feat: feat, cat: 'rects'});
+        store(OVERLAY_EDIT, true);
         store(DRAWING_MODE_SET);        
     }
 
@@ -2196,6 +2290,7 @@ function editNote(config, store, map)
         };
         map.removeLayer($text);
         store(OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
+        store(OVERLAY_EDIT, true);
         store(DRAWING_MODE_SET);
         // var style = {"fill": "red", "fontFamily":"Verdana", "fontSize": "large", "fontStyle":"italic"};
         // new Text([e.latlng],  "Kino i nimci", 0, style).addTo(map)
@@ -2242,22 +2337,6 @@ function OverlayView(config, store)
         data: {
             mode: null,
             selectedOverlay: store.prop('selectedOverlay'),
-            types: {
-                lines: {
-                    sel: store.prop('ui.overlay.types.lines'),
-                    list: config.overlay.types.lines 
-                },
-                rects: {
-                    sel: store.prop('ui.overlay.types.rects'),
-                    list: config.overlay.types.rects 
-                },
-                notes: {
-                    sel: store.prop('ui.overlay.types.notes'),
-                    list: config.overlay.types.notes
-                }
-            },
-            type: null,
-            text: null
         },
         methods: { 
             select: function(mode){ 
@@ -2286,19 +2365,48 @@ function OverlayView(config, store)
         vm.mode = _.findKey(MODES, function(it) { return it == e.new_val});
     });
 
-    store.on('ui.overlay.feat', function(){
-        var feat = selectedOverlayFeat(store);
-        vm.type = feat ? vm.types[feat.cat] : null;
-        vm.text = feat && feat.cat === 'notes' ? store.state.selectedOverlay.notes[feat.id].text : null; 
-    });
-
-    vm.$watch('type.sel.$val', function(val){
-        if(val) {
-            var feat = selectedOverlayFeat(store);
-            store(OVERLAY_TYPE_SELECT, {feat: feat, type_id: val});
+    var editVM = new Vue({
+        el: "#overlay-edit",
+        data: {
+            edit: store.prop('ui.overlay.edit'),
+            types: {
+                lines: {
+                    sel: store.prop('ui.overlay.types.lines'),
+                    list: config.overlay.types.lines 
+                },
+                rects: {
+                    sel: store.prop('ui.overlay.types.rects'),
+                    list: config.overlay.types.rects 
+                },
+                notes: {
+                    sel: store.prop('ui.overlay.types.notes'),
+                    list: config.overlay.types.notes
+                }
+            },
+            type: null,
+            text: null
+        },
+        methods: {
+            close: function(){
+                store(OVERLAY_EDIT);
+            }
         }
     });
-    return vm;
+
+
+    store.on('ui.overlay.feat', function(){
+        var feat = selectedOverlayFeat(store);
+        editVM.type = feat ? editVM.types[feat.cat] : null;
+        editVM.text = feat && feat.cat === 'notes' ? store.state.selectedOverlay.notes[feat.id].text : null; 
+    });
+
+    editVM.$watch('type.sel.$val', function(val){
+        if(val) {
+            var feat = selectedOverlayFeat(store);
+            store(undefined, {feat: feat, type_id: val});
+        }
+    });
+    return editVM;
 }
 
 var OverlaysModule = function(config, store, map){
@@ -2335,7 +2443,7 @@ var Stand = L.Rectangle.extend({
 
     onAdd: function (map) {
         L.Rectangle.prototype.onAdd.call(this,map);
-        if(this.line) map.addLayer(this.line);               
+        if(this.line) map.addLayer(this.line);     
     },
 
     onRemove: function (map) {
@@ -2346,6 +2454,21 @@ var Stand = L.Rectangle.extend({
     redraw: function(){
         L.Rectangle.prototype.redraw.call(this); 
         if(this.line) this.line.redraw();
+    },
+
+    update: function(latlngs, options, openWalls){
+        this.setStyle(options);
+        this.setLatLngs(latlngs);
+        var ll = this.getLatLngs();
+        ll = _.rest(_.flatten(ll), openWalls-1);
+        if(this.line && this._map) 
+            this._map.removeLayer(this.line);       
+        if(ll.length > 1) {
+            this.line = new DoubleLine(ll, {color: this.options.fillColor});
+            if(this._map)
+                this._map.addLayer(this.line);     
+        }
+        
     }
 
 });
@@ -2435,12 +2558,12 @@ var StandMapView = function(config, store, map){
 
     function onSelectedStandsId(e){
         if(e.old_val){
-            store.off('entities.stands.'+e.old_val+".*", onSelectedStandsId);
+            store.off('entities.stands.'+e.old_val+".*", onStandChanges);
             standsGroup.clearLayers();
             stands = {};
         }
         if(e.new_val){
-            store.on('entities.stands.'+e.new_val+".*", onSelectedStandsId);
+            store.on('entities.stands.'+e.new_val+".*", onStandChanges);
             _.each(selectedStands(store), function(s){
                 onStandChanges({new_val:s});
             });
@@ -2466,8 +2589,10 @@ var StandEditing = function(config, store, map, standMapView){
         }
     }
 
-    function onSelectedGeometryChange(){
-
+    function onSelectedGeometryChange(e){
+        var stand = selectedStand(store);
+        var points = toPoints($stand.getLatLngs());
+        store(STAND_POINTS_UPDATE, {stand: stand, points:points});
     }
 
     function onStandSelect(){
@@ -2565,15 +2690,16 @@ var StandySelectTools = function(config, store, map, standMapView)
     }
 
     function onStandDelete(){
-
+        alert('Not implemented yet');
     }
 
     function onStandRotate(){
-
+        alert('Not implemented yet');
     }
 
     function onStandEdit(){
-
+        store(STAND_EDIT, true);
+        closeTooltip();
     }
 
     function closeTooltip(){
@@ -2606,10 +2732,6 @@ function StandView(config, store){
         data: {
             mode: null,
             selectedStandsId: store.prop('selectedStandsId'),
-            types: {
-                sel: store.prop('ui.stands.cat'),
-                list: config.stands.types
-            }
         },
         methods: {
             select: function(mode){
@@ -2624,6 +2746,28 @@ function StandView(config, store){
 
     store.on('map.drawMode', function(e){
         vm.mode = _.findKey(MODES, function(it) { return it == e.new_val});
+    });
+
+    var editVM = new Vue({
+        el: "#stand-edit",
+        data: {
+            edit: store.prop('ui.stands.edit'),
+            type: store.prop('ui.stands.type'),
+            list: config.stands.types
+        },
+        methods: {
+            close: function(){
+                store(STAND_EDIT);
+            }
+        }
+    });
+
+    editVM.$watch('type.$val', function(val){
+        if(val) {
+            var stand = selectedStand(store);
+            if(stand.type != val)
+                store(STAND_TYPE_UPDATE, {stand: stand, type: val});
+        }
     });
     
 }

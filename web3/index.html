@@ -85,13 +85,13 @@
                 </div>
                 <div id="pavilion"></div>
                 <div id='pavilion-layers'>
-                    <folding title="Базовый слой" class="w3-margin-top" v-show='selectedPavilion.$val'>
+                    <folding title="Базовый слой:" class="w3-margin-top" v-show='selectedPavilion.$val'>
                         <div id='base-layer'></div>
                     </folding>
-                    <folding title="Дополнительный слой" open='true' v-show='hasBase.$val'>
+                    <folding title="Дополнительный слой:" open='true' v-show='hasBase.$val'>
                         <div id='overlays-layer'></div>
                     </folding>
-                    <folding title="Стенды" open='true' v-show='hasBase.$val'>
+                    <folding title="Стенды:" open='true' v-show='hasBase.$val'>
                         <div id='stands'></div>
                     </folding>
                 </div>
@@ -100,7 +100,44 @@
             <div id="map" class="w3-card"></div>
         </div>
 
+        <!-- Edit forms -->    
+        <div id="overlay-edit" class="w3-modal" style='display: block; z-index: 2002' v-if='edit.$val'>
+            <div class="w3-modal-content " style='max-width:300px'>
+                <div class="w3-container ">
+                    <span @click='close()' class="w3-button w3-display-topright">&times;</span>
+                    <div class='w3-section' v-if='type'>
+                        <p class="w3-text-grey">Тип:</p>
+                        <select v-model='type.sel.$val' class="w3-select">
+                            <option v-for='(val, key) in type.list' v-bind:value="key">{{val.name}}</option>
+                        </select>
+                    </div>
+                    <div class="w3-section" v-if='text !== null'>
+                        <input class='w3-input' type="text" v-model='text'>
+                    </div>
+                    <div class='w3-bar w3-section w3-tiny w3-right-align'>
+                        <button class="w3-btn w3-blue"  @click='close()' >Закрыть</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <div id="stand-edit" class="w3-modal" style='display: block; z-index: 2002' v-if='edit.$val'>
+            <div class="w3-modal-content " style='max-width:300px'>
+                <div class="w3-container ">
+                    <span @click='close()' class="w3-button w3-display-topright">&times;</span>
+                    <div class='w3-section'>
+                        <p class="w3-text-grey">Категория стенда:</p>
+                        <select v-model='type.$val' class="w3-select">
+                            <option v-for='(val, key) in list' v-bind:value="key">{{val.name}}</option>
+                        </select>
+                    </div>
+                    <div class='w3-bar w3-section w3-tiny w3-right-align'>
+                        <button class="w3-btn w3-blue"  @click='close()' >Закрыть</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
 
         <!-- Vue Templates -->
         <script type="text/x-template" id="pavilion-template">
@@ -157,17 +194,11 @@
                         <i class="material-icons pointer w3-text-grey">note</i>
                     </button>
                 </div>
-                <div class='w3-section' v-if='type'>
-                    <select v-model='type.sel.$val' class="w3-select">
-                        <option v-for='(val, key) in type.list' v-bind:value="key">{{val.name}}</option>
-                    </select>
-                </div>
-                <div class="w3-section" v-if='text !== null'>
-                    <input class='w3-input' type="text" v-model='text'>
-                </div>
-                <div  v-if="needSave()">
-                    <button class='w3-btn w3-light-blue w3-small w3-padding' @click='save'>Сохранить</button>
-                    <button class='w3-btn w3-light-blue w3-small w3-padding' @click='rollback'>Отменить</button>
+                <div class='w3-tiny' v-if="needSave()">
+                    <button title="Сохронить изменения в дополнительном слое"
+                            class='w3-btn w3-light-blue w3-padding' @click='save'>Сохранить</button>
+                    <button title="Отменить изменения в дополнительном слое"
+                            class='w3-btn w3-light-blue w3-padding' @click='rollback'>Отменить</button>
                 </div>                
             </div>
          </script>

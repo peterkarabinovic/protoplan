@@ -111,6 +111,7 @@ function editFeat(cat, store, map)
         {
             var feat =  { points: toPoints(layer.getLatLngs())};
             store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: cat});
+            store(a.OVERLAY_EDIT, true)
         }
         store(a.DRAWING_MODE_SET);
     }
@@ -131,6 +132,7 @@ function editRect(store, map){
         move(e);
         var feat =  { points: toPoints(outline.getLatLngs())};
         store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'rects'});
+        store(a.OVERLAY_EDIT, true)
         store(a.DRAWING_MODE_SET);        
     }
 
@@ -167,6 +169,7 @@ function editNote(config, store, map)
         };
         map.removeLayer($text);
         store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
+        store(a.OVERLAY_EDIT, true)
         store(a.DRAWING_MODE_SET);
         // var style = {"fill": "red", "fontFamily":"Verdana", "fontSize": "large", "fontStyle":"italic"};
         // new Text([e.latlng],  "Kino i nimci", 0, style).addTo(map)

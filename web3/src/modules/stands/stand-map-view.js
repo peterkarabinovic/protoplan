@@ -53,12 +53,12 @@ import {Stand} from '../../svg/leaflet-stand.js'
 
     function onSelectedStandsId(e){
         if(e.old_val){
-            store.off('entities.stands.'+e.old_val+".*", onSelectedStandsId);
+            store.off('entities.stands.'+e.old_val+".*", onStandChanges);
             standsGroup.clearLayers();
             stands = {};
         }
         if(e.new_val){
-            store.on('entities.stands.'+e.new_val+".*", onSelectedStandsId);
+            store.on('entities.stands.'+e.new_val+".*", onStandChanges);
             _.each(selectedStands(store), function(s){
                 onStandChanges({new_val:s});
             });

@@ -32,11 +32,13 @@ export default {
                 notes: 1
             },
             feat: undefined,
-            text: 'Text label'
+            text: 'Text label',
+            edit: false
         },
         stands: {
             type: 1,
-            sel: undefined
+            sel: undefined,
+            edit: false
         }
     }
 }

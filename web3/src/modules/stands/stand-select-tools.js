@@ -31,15 +31,16 @@ export default function(config, store, map, standMapView)
     }
 
     function onStandDelete(){
-
+        alert('Not implemented yet');
     }
 
     function onStandRotate(){
-
+        alert('Not implemented yet');
     }
 
     function onStandEdit(){
-
+        store(a.STAND_EDIT, true)
+        closeTooltip()
     }
 
     function closeTooltip(){

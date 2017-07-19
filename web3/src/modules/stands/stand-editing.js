@@ -20,8 +20,10 @@ export default function(config, store, map, standMapView){
         }
     }
 
-    function onSelectedGeometryChange(){
-
+    function onSelectedGeometryChange(e){
+        var stand = selectedStand(store);
+        var points = toPoints($stand.getLatLngs())
+        store(a.STAND_POINTS_UPDATE, {stand: stand, points:points})
     }
 
     function onStandSelect(){
