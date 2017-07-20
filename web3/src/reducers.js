@@ -236,6 +236,12 @@ var standsReducer = function(state, action){
             }
             return state;
         
+        case a.STAND_DELETED:
+            var stand_id = action.payload.stand_id;
+            var stands_id = action.payload.stands_id;
+            if(stand_id == state.ui.stands.sel)
+                state = Immutable.remove(state, 'ui.stands.sel')
+            return Immutable.remove(state,str('entities.stands.',stands_id,'.',stand_id));
 
         case a.STAND_SELECT:
             var stand_id = action.payload;
@@ -254,6 +260,8 @@ var standsReducer = function(state, action){
         case a.STAND_TYPE_UPDATE:
             var type = action.payload.type;
             return Immutable.set(state, 'state.ui.stands.type', type);
+        
+            
 
         
             

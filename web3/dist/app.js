@@ -188,11 +188,6 @@ function events_finder(new_obj, old_obj)
     }
 }
 
-/**
- * find the properties that is not equals
- * @param {Object} obj1  
- * @param {Object} obj2 
- */
 function diffs(new_obj, old_obj, keys)
 {
     return keys.reduce(function(diffs, key){
@@ -333,12 +328,6 @@ var Immutable = (function(){
     };
     return i;
 })();
-
-/**
- * Add method `prop` for store instance to track changes of properties and store in changable object {$val: <value>} 
- * need for work with Vue.js
- * @param {*} store of redux.js 
- */
 
 function bindProp(store)
 {
@@ -812,6 +801,12 @@ var standsReducer = function(state, action){
             }
             return state;
         
+        case STAND_DELETED:
+            var stand_id = action.payload.stand_id;
+            var stands_id = action.payload.stands_id;
+            if(stand_id == state.ui.stands.sel)
+                state = Immutable.remove(state, 'ui.stands.sel');
+            return Immutable.remove(state,str('entities.stands.',stands_id,'.',stand_id));
 
         case STAND_SELECT:
             var stand_id = action.payload;
@@ -830,6 +825,8 @@ var standsReducer = function(state, action){
         case STAND_TYPE_UPDATE:
             var type = action.payload.type;
             return Immutable.set(state, 'state.ui.stands.type', type);
+        
+            
 
         
             
@@ -995,7 +992,7 @@ function RequestsMiddleware(store){
                                 var res = JSON.parse(xhr.responseText);
                                 store(STAND_DELETED, {
                                     stands_id: res.stands_id,
-                                    stand: res.stand_id
+                                    stand_id: res.stand_id
                                 });
                             }
                       });
@@ -1047,9 +1044,11 @@ function maxZoom(img_size, min_width){
 }
 
 /**
- * As LatLngBounds with its SouthNorthWestEast stuff mislead with planar metric space
- * Envelope seems more convenient 
- * @param {LatLngBounds} bounds 
+ * Constructor of Envelope
+ * @param {*} min_x 
+ * @param {*} min_y 
+ * @param {*} max_x 
+ * @param {*} max_y 
  */
 
 function GridPanel(map){
@@ -2016,28 +2015,6 @@ var UniformRectEditor = L.Editable.RectangleEditor.extend({
     }
 });
 
-/**
- * 
- *  overlay state 
- * {
- *      id: overlayId,
- *      lines: {
- *          "id1": { points: [], type: {} },
- *          "id2": { points: [], type: {} },
- *      },
- *      rects: {
- *          "id1": { points: [], type: {} },
- *          "id2": { points: [], type: {} },
- *      },
- *      notes: {
- *          "id1": { points: [], rotate: number, text: string, type: {} },
- *          "id2": { points: [], rotate: number, text: string, type: {} }
- *      }
- * }
- * 
- *  
- */
-
 var OverlayMapView = function(config, store, map)
 {
     var lineGroup = L.featureGroup().addTo(map);
@@ -2573,24 +2550,7 @@ var DoubleLine = L.Polyline.extend({
     }
 });
 
-/**
- * 
- *  stands state 
- * {
- *      "standsId": {
- *          "id1": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
- *          "id2": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
- *          "id3": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
- *          "id4": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
- *          "id5": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
- *          "id6": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
- *      }
- * }
- * 
- *  
- */
-
- var StandMapView = function(config, store, map){
+var StandMapView = function(config, store, map){
     var standsGroup = L.featureGroup().addTo(map);
     var stands = {};
 

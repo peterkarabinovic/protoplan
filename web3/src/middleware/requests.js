@@ -153,7 +153,7 @@ export default function RequestsMiddleware(store){
                                 var res = JSON.parse(xhr.responseText);
                                 store(a.STAND_DELETED, {
                                     stands_id: res.stands_id,
-                                    stand: res.stand_id
+                                    stand_id: res.stand_id
                                 });
                             }
                       });
