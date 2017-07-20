@@ -133,12 +133,13 @@ function editRect(store, map){
         var feat =  { points: toPoints(outline.getLatLngs())};
         store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'rects'});
         store(a.OVERLAY_EDIT, true)
-        store(a.DRAWING_MODE_SET);        
+        store(a.DRAWING_MODE_SET);    
+        L.DomEvent.stopPropagation(e);    
     }
 
     function enter(w){
         L.DomUtil.addClass(map._container,'move-cursor');
-        move({latlng: map.getCenter()});
+        outline.setLatLngs([]);
         map.addLayer(outline);
         map.on('mousemove', move);      
         map.on('click', onClick);      
@@ -171,8 +172,7 @@ function editNote(config, store, map)
         store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
         store(a.OVERLAY_EDIT, true)
         store(a.DRAWING_MODE_SET);
-        // var style = {"fill": "red", "fontFamily":"Verdana", "fontSize": "large", "fontStyle":"italic"};
-        // new Text([e.latlng],  "Kino i nimci", 0, style).addTo(map)
+        L.DomEvent.stopPropagation(e);
     }
 
     function enter() 

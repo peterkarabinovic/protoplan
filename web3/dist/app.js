@@ -523,6 +523,8 @@ function selectedStand(store){
 
 var INIT = 'INIT';
 
+var UNSELECT_ALL = 'UNSELECT_ALL';
+
 var PAVILION_ADD = 'PAVILION_ADD';
 var PAVILION_DELETE = 'PAVILION_DELETE';
 var PAVILION_DELETED = 'PAVILION_DELETED';
@@ -584,6 +586,11 @@ var mapReducer = function(state, action)
         case DRAWING_MODE_SET:
             var mode = action.payload;
             return Immutable.set(state, 'map.drawMode', mode);
+        
+        case UNSELECT_ALL:
+            state = Immutable.remove(state, 'ui.overlay.feat');
+            state = Immutable.remove(state, 'ui.stands.sel');
+            return state;
 
     }
     return state;
@@ -621,7 +628,7 @@ var pavilionReducer = function(state, action)
             state = Immutable.set(state, 'selectedPavilion', pavi);
             state = Immutable.set(state, 'selectedBase', {id:pavi.id});
             state = Immutable.set(state, 'selectedStandsId', pavi.id);
-            state = Immutable.extend(state, 'entities.stands.'+pavi.id, {id: pavi.id});
+            // state = Immutable.extend(state, 'entities.stands.'+pavi.id, {id: pavi.id});
             return state;
 
         case PAVILION_SELECT:
@@ -1148,9 +1155,13 @@ var Map = function(el, store)
         attributionControl: false,
         editable: true
     });
+    window.map = map$1;
 
     gridPanel = GridPanel(map$1);
 
+    map$1.on('click', function(){
+        store(UNSELECT_ALL);
+    });
     // State changes
     store.on('map.size_m', function(e) { updateMapSize(e.new_val); });
     return map$1;
@@ -1438,7 +1449,7 @@ function BaseView(store) {
                                 store(BASE_LAYER_SET, {
                                     raw_svg: e.raw_svg,
                                     url: e.data_uri,
-                                    size_m: {x: e.width, y: e.height},
+                                    size_m: {x: Math.round(e.width), y: Math.round(e.height)},
                                     size_px: {x: e.width, y: e.height}
                                 });
                             }
@@ -2120,9 +2131,11 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
     function onFeatClick(cat, e){
         var layer_id = e.layer.id.split('.'),
             feat_id = str(cat,'.',layer_id[1]);
-        store(OVERLAY_FEAT_SELECT, feat_id);
+        store(OVERLAY_FEAT_SELECT, feat_id);        
         closeTooltip(tooltip);         
+        L.DomEvent.stopPropagation(e);
     }
+
 
     function onFeatContext(cat, e){
         onFeatClick(cat, e);
@@ -2136,7 +2149,7 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
         L.DomEvent.on($edit(), 'click', onEditFeat);
     }
 
-    function closeTooltip(){
+    function closeTooltip(){        
         if(tooltip._map) {
             map.removeLayer(tooltip); 
             L.DomEvent.off($delete(), 'click', onDeleteFeat);
@@ -2280,12 +2293,13 @@ function editRect(store, map){
         var feat =  { points: toPoints(outline.getLatLngs())};
         store(OVERLAY_FEAT_ADD, {feat: feat, cat: 'rects'});
         store(OVERLAY_EDIT, true);
-        store(DRAWING_MODE_SET);        
+        store(DRAWING_MODE_SET);    
+        L.DomEvent.stopPropagation(e);    
     }
 
     function enter(w){
         L.DomUtil.addClass(map._container,'move-cursor');
-        move({latlng: map.getCenter()});
+        outline.setLatLngs([]);
         map.addLayer(outline);
         map.on('mousemove', move);      
         map.on('click', onClick);      
@@ -2318,8 +2332,7 @@ function editNote(config, store, map)
         store(OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
         store(OVERLAY_EDIT, true);
         store(DRAWING_MODE_SET);
-        // var style = {"fill": "red", "fontFamily":"Verdana", "fontSize": "large", "fontStyle":"italic"};
-        // new Text([e.latlng],  "Kino i nimci", 0, style).addTo(map)
+        L.DomEvent.stopPropagation(e);
     }
 
     function enter() 
@@ -2459,12 +2472,15 @@ var Stand = L.Rectangle.extend({
     
 
     initialize: function (latlngs, options, openWalls){
+        options = _.extend(options, {editorClass: StandEditor});
         openWalls = openWalls || 1;
         L.Rectangle.prototype.initialize.call(this, latlngs, options);
         var ll = this.getLatLngs();
         ll = _.rest(_.flatten(ll), openWalls-1);
-        if(ll.length > 1)
+        if(ll.length > 1) {
             this.line = new DoubleLine(ll, {color: this.options.fillColor});
+
+        }
     },
 
     onAdd: function (map) {
@@ -2479,7 +2495,8 @@ var Stand = L.Rectangle.extend({
 
     redraw: function(){
         L.Rectangle.prototype.redraw.call(this); 
-        if(this.line) this.line.redraw();
+        if(this.line) {
+            this.line.redraw();}
     },
 
     update: function(latlngs, options, openWalls){
@@ -2499,9 +2516,36 @@ var Stand = L.Rectangle.extend({
 
 });
 
+/**
+ * Editor that preserver order of point in rectangle
+ */
+var StandEditor = L.Editable.RectangleEditor.extend({
+        extendBounds: function (e) {
+            var index = e.vertex.getIndex(),
+                next = e.vertex.getNext(),
+                previous = e.vertex.getPrevious(),
+                oppositeIndex = (index + 2) % 4,
+                opposite = e.vertex.latlngs[oppositeIndex],
+                bounds = new L.LatLngBounds(e.latlng, opposite);
+            // Update latlngs by hand to preserve order.
+            if(next.latlng.lat !==  opposite.lat)
+                previous = [next, next=previous][0];
+            var lat = Math.floor(e.latlng.lat / 0.5) * 0.5; 
+            var lng = Math.floor(e.latlng.lng / 0.5) * 0.5; 
+            previous.latlng.update([lat, opposite.lng]);
+            next.latlng.update([opposite.lat, lng]);
+
+            e.vertex.latlng.update({lat:lat, lng:lng});
+            e.vertex._latlng.update({lat:lat, lng:lng});
+            
+            this.updateBounds(bounds);
+            this.refreshVertexMarkers();
+        },
+});
+
 var DoubleLine = L.Polyline.extend({
-    options2: {color: 'white', weight: 7, lineCap: "square", lineJoin: "miter", opacity: 1},
-    options1: {color: 'green', lineCap: "square", lineJoin: "miter", opacity: 0.7},
+    options2: {color: 'lightgrey', weight: 7, lineCap: "butt", lineJoin: "miter", opacity: 1},
+    options1: {color: 'green', lineCap: "butt", lineJoin: "miter", opacity: 0.7},
     // options1: {color: 'white', lineCap: "square", lineJoin: "miter",  weight: 1, opacity:1},
     // options2: {color: 'white', lineCap: "square", lineJoin: "miter",  weight: 1, opacity:1},
     
@@ -2538,9 +2582,9 @@ var DoubleLine = L.Polyline.extend({
         var w = {
             0: [3,1],
             1: [7,3],
-            2: [9,5],
-            3: [11,7],
-            4: [15,11],
+            2: [10,6],
+            3: [14,10],
+            4: [18,14],
         };
         var z = this._map.getZoom();
         var weights = w[z] || w[4];
@@ -2665,14 +2709,15 @@ function edit(store, map){
         var type = store.state.ui.stands.type;
         var feat =  { points: toPoints(outline.getLatLngs()), openWalls: openWalls, rotate: 0, type: type};
         store(STAND_ADD, feat);
-        store(DRAWING_MODE_SET);        
-        // new Stand(outline.getLatLngs(), {fillColor: 'red'}, openWallss).addTo(map);
+        store(DRAWING_MODE_SET);  
+        L.DomEvent.stopPropagation(e);      
     }
 
     function enter(w){
         openWalls = w;
         L.DomUtil.addClass(map._container,'move-cursor');
-        move({latlng: map.getCenter()});
+        outline.setLatLngs([]);
+        // move({latlng: map.getCenter()});
         map.addLayer(outline);
         map.on('mousemove', move);      
         map.on('click', onClick);      
@@ -2700,7 +2745,7 @@ var StandySelectTools = function(config, store, map, standMapView)
     function onStandClick(e){
         store(STAND_SELECT, e.layer.id);
         closeTooltip(tooltip);         
-
+        L.DomEvent.stopPropagation(e);
     }
 
     function onStandContext(e){

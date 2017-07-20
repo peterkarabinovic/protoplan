@@ -1,5 +1,7 @@
 export var INIT = 'INIT';
 
+export var UNSELECT_ALL = 'UNSELECT_ALL';
+
 export var PAVILION_ADD = 'PAVILION_ADD';
 export var PAVILION_DELETE = 'PAVILION_DELETE';
 export var PAVILION_DELETED = 'PAVILION_DELETED';

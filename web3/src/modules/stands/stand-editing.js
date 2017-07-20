@@ -70,14 +70,15 @@ function edit(store, map){
         var type = store.state.ui.stands.type;
         var feat =  { points: toPoints(outline.getLatLngs()), openWalls: openWalls, rotate: 0, type: type};
         store(a.STAND_ADD, feat);
-        store(a.DRAWING_MODE_SET);        
-        // new Stand(outline.getLatLngs(), {fillColor: 'red'}, openWallss).addTo(map);
+        store(a.DRAWING_MODE_SET);  
+        L.DomEvent.stopPropagation(e);      
     }
 
     function enter(w){
         openWalls = w;
         L.DomUtil.addClass(map._container,'move-cursor');
-        move({latlng: map.getCenter()});
+        outline.setLatLngs([]);
+        // move({latlng: map.getCenter()});
         map.addLayer(outline);
         map.on('mousemove', move);      
         map.on('click', onClick);      

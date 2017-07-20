@@ -130,6 +130,13 @@ def stand_update(layer_id, stand):
             json_file.write(json.dumps(layers, ensure_ascii=False))
         return stand
 
+def stands_delete(id):
+    id = str(id)
+    with stand_layers() as layers:
+        layers = {k: v for k, v in layers.items() if k != id }
+        with codecs.open(stands_json, 'w', 'utf-8') as json_file:
+            json_file.write(json.dumps(layers, ensure_ascii=False))
+
 def stand_delete(layer_id, stand_id):
     if layer_id is None or stand_id is None:
         return False
@@ -197,6 +204,7 @@ def update_pavilion(id):
 def delete_pavilion(id):
     base_layers_delete(id)
     overlay_delete(id)
+    stands_delete(id)
     pavilion_delete(id)
     return "ok"
 

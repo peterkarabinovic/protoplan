@@ -19,6 +19,11 @@ var mapReducer = function(state, action)
         case a.DRAWING_MODE_SET:
             var mode = action.payload;
             return Immutable.set(state, 'map.drawMode', mode);
+        
+        case a.UNSELECT_ALL:
+            state = Immutable.remove(state, 'ui.overlay.feat')
+            state = Immutable.remove(state, 'ui.stands.sel');
+            return state;
 
     }
     return state;
@@ -56,7 +61,7 @@ var pavilionReducer = function(state, action)
             state = Immutable.set(state, 'selectedPavilion', pavi);
             state = Immutable.set(state, 'selectedBase', {id:pavi.id});
             state = Immutable.set(state, 'selectedStandsId', pavi.id);
-            state = Immutable.extend(state, 'entities.stands.'+pavi.id, {id: pavi.id});
+            // state = Immutable.extend(state, 'entities.stands.'+pavi.id, {id: pavi.id});
             return state;
 
         case a.PAVILION_SELECT:

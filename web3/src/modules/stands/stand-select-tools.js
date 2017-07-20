@@ -16,7 +16,7 @@ export default function(config, store, map, standMapView)
     function onStandClick(e){
         store(a.STAND_SELECT, e.layer.id);
         closeTooltip(tooltip);         
-
+        L.DomEvent.stopPropagation(e);
     }
 
     function onStandContext(e){

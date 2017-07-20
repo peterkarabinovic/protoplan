@@ -133,6 +133,7 @@ function editNote(config, store, map)
         map.removeLayer($text);
         store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
         store(a.DRAWING_MODE_SET);
+        L.DomEvent.stopPropagation(e);
         // var style = {"fill": "red", "fontFamily":"Verdana", "fontSize": "large", "fontStyle":"italic"};
         // new Text([e.latlng],  "Kino i nimci", 0, style).addTo(map)
     }

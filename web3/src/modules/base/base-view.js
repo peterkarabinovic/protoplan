@@ -38,7 +38,7 @@ function BaseView(store) {
                                 store(BASE_LAYER_SET, {
                                     raw_svg: e.raw_svg,
                                     url: e.data_uri,
-                                    size_m: {x: e.width, y: e.height},
+                                    size_m: {x: Math.round(e.width), y: Math.round(e.height)},
                                     size_px: {x: e.width, y: e.height}
                                 })
                             }

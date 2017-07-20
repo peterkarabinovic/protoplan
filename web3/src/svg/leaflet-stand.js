@@ -9,12 +9,15 @@ export var Stand = L.Rectangle.extend({
     
 
     initialize: function (latlngs, options, openWalls){
+        options = _.extend(options, {editorClass: StandEditor});
         openWalls = openWalls || 1;
         L.Rectangle.prototype.initialize.call(this, latlngs, options);
         var ll = this.getLatLngs();
         ll = _.rest(_.flatten(ll), openWalls-1);
-        if(ll.length > 1)
+        if(ll.length > 1) {
             this.line = new DoubleLine(ll, {color: this.options.fillColor});
+
+        }
     },
 
     onAdd: function (map) {
@@ -29,7 +32,8 @@ export var Stand = L.Rectangle.extend({
 
     redraw: function(){
         L.Rectangle.prototype.redraw.call(this); 
-        if(this.line) this.line.redraw();
+        if(this.line) {
+            this.line.redraw();}
     },
 
     update: function(latlngs, options, openWalls){
@@ -49,9 +53,36 @@ export var Stand = L.Rectangle.extend({
 
 });
 
+/**
+ * Editor that preserver order of point in rectangle
+ */
+var StandEditor = L.Editable.RectangleEditor.extend({
+        extendBounds: function (e) {
+            var index = e.vertex.getIndex(),
+                next = e.vertex.getNext(),
+                previous = e.vertex.getPrevious(),
+                oppositeIndex = (index + 2) % 4,
+                opposite = e.vertex.latlngs[oppositeIndex],
+                bounds = new L.LatLngBounds(e.latlng, opposite);
+            // Update latlngs by hand to preserve order.
+            if(next.latlng.lat !==  opposite.lat)
+                previous = [next, next=previous][0]
+            var lat = Math.floor(e.latlng.lat / 0.5) * 0.5; 
+            var lng = Math.floor(e.latlng.lng / 0.5) * 0.5; 
+            previous.latlng.update([lat, opposite.lng]);
+            next.latlng.update([opposite.lat, lng]);
+
+            e.vertex.latlng.update({lat:lat, lng:lng})
+            e.vertex._latlng.update({lat:lat, lng:lng})
+            
+            this.updateBounds(bounds);
+            this.refreshVertexMarkers();
+        },
+})
+
 export var DoubleLine = L.Polyline.extend({
-    options2: {color: 'white', weight: 7, lineCap: "square", lineJoin: "miter", opacity: 1},
-    options1: {color: 'green', lineCap: "square", lineJoin: "miter", opacity: 0.7},
+    options2: {color: 'lightgrey', weight: 7, lineCap: "butt", lineJoin: "miter", opacity: 1},
+    options1: {color: 'green', lineCap: "butt", lineJoin: "miter", opacity: 0.7},
     // options1: {color: 'white', lineCap: "square", lineJoin: "miter",  weight: 1, opacity:1},
     // options2: {color: 'white', lineCap: "square", lineJoin: "miter",  weight: 1, opacity:1},
     
@@ -88,9 +119,9 @@ export var DoubleLine = L.Polyline.extend({
         var w = {
             0: [3,1],
             1: [7,3],
-            2: [9,5],
-            3: [11,7],
-            4: [15,11],
+            2: [10,6],
+            3: [14,10],
+            4: [18,14],
         }
         var z = this._map.getZoom();
         var weights = w[z] || w[4];

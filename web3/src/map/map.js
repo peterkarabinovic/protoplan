@@ -1,4 +1,5 @@
 import * as math from './math.js'
+import * as a from '../actions.js'
 import {GridPanel} from './grid-panel.js'
 
 import {handle} from '../utils/redux.js'
@@ -14,9 +15,13 @@ export default function(el, store)
         attributionControl: false,
         editable: true
     });
+    window.map = map;
 
     gridPanel = GridPanel(map);
 
+    map.on('click', function(){
+        store(a.UNSELECT_ALL);
+    })
     // State changes
     store.on('map.size_m', function(e) { updateMapSize(e.new_val); });
     return map;

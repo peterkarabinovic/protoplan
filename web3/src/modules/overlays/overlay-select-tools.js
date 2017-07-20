@@ -31,9 +31,11 @@ export default function(config, store, map, overlayMapView)
     function onFeatClick(cat, e){
         var layer_id = e.layer.id.split('.'),
             feat_id = str(cat,'.',layer_id[1]);
-        store(a.OVERLAY_FEAT_SELECT, feat_id);
+        store(a.OVERLAY_FEAT_SELECT, feat_id);        
         closeTooltip(tooltip);         
+        L.DomEvent.stopPropagation(e);
     }
+
 
     function onFeatContext(cat, e){
         onFeatClick(cat, e);
@@ -47,7 +49,7 @@ export default function(config, store, map, overlayMapView)
         L.DomEvent.on($edit(), 'click', onEditFeat);
     }
 
-    function closeTooltip(){
+    function closeTooltip(){        
         if(tooltip._map) {
             map.removeLayer(tooltip); 
             L.DomEvent.off($delete(), 'click', onDeleteFeat);
