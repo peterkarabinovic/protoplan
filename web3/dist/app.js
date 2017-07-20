@@ -188,6 +188,11 @@ function events_finder(new_obj, old_obj)
     }
 }
 
+/**
+ * find the properties that is not equals
+ * @param {Object} obj1  
+ * @param {Object} obj2 
+ */
 function diffs(new_obj, old_obj, keys)
 {
     return keys.reduce(function(diffs, key){
@@ -328,6 +333,12 @@ var Immutable = (function(){
     };
     return i;
 })();
+
+/**
+ * Add method `prop` for store instance to track changes of properties and store in changable object {$val: <value>} 
+ * need for work with Vue.js
+ * @param {*} store of redux.js 
+ */
 
 function bindProp(store)
 {
@@ -552,6 +563,7 @@ var OVERLAY_SAVE = 'OVERLAY_SAVE';
 var OVERLAY_SAVED = 'OVERLAY_SAVED';
 var OVERLAY_FEAT_SELECT = 'OVERLAY_FEAT_SELECT';
 var OVERLAY_EDIT = 'OVERLAY_EDIT';
+var OVERLAY_TYPE_SELECT = 'OVERLAY_TYPE_SELECT';
 
 var STANDS_LOADED = 'STANDS_LOADED';
 var STAND_ADD = 'STAND_ADD';
@@ -751,7 +763,7 @@ var overlayReducer = function(state, action){
             var edit = action.payload;
             return Immutable.set(state, 'ui.overlay.edit', edit)
         
-        case undefined:
+        case OVERLAY_TYPE_SELECT:
             var p = action.payload;
             state = Immutable.set(state, str('ui.overlay.types.',p.feat.cat), p.type_id);
             return Immutable.set(state, str('selectedOverlay.',p.feat.cat,'.',p.feat.id, '.type'),  p.type_id)
@@ -840,22 +852,22 @@ function RequestsMiddleware(store){
             switch(action.type)
             {
                 case INIT:
-                    d3.json('/pavilions/')
+                    d3.json('pavilions/')
                       .get(function(pavilions){
                             store(PAVILIONS_LOADED, pavilions);
                       }); 
 
-                    d3.json('/bases/')
+                    d3.json('bases/')
                       .get(function(bases){
                             store(BASES_LOADED, bases);
                       });
 
-                    d3.json('/overlays/')
+                    d3.json('overlays/')
                       .get(function(bases){
                             store(OVERLAYS_LOADED, bases);
                       });
 
-                    d3.json('/stands/')
+                    d3.json('stands/')
                       .get(function(stands){
                             store(STANDS_LOADED, stands);
                       });
@@ -864,7 +876,7 @@ function RequestsMiddleware(store){
 
                 case PAVILION_ADD:
                     var pavi = action.payload;
-                    d3.request('/pavilions/0')
+                    d3.request('pavilions/0')
                            .mimeType("application/json")
                            .on("error", function(error) { store(ERROR_SET, error); })
                            .on("load", function(xhr) { 
@@ -877,7 +889,7 @@ function RequestsMiddleware(store){
 
                 case PAVILION_DELETE:
                     var id = action.payload.id;
-                    d3.request('/pavilions/'+id+'|delete')
+                    d3.request('pavilions/'+id+'|delete')
                       .post(function(er, xhr){
                             if(er) store(ERROR_SET, er);
                             else store(PAVILION_DELETED, id);
@@ -888,7 +900,7 @@ function RequestsMiddleware(store){
                     var base_layer = _.clone(action.payload.base);
                     delete base_layer['distance'];
                     delete base_layer['raw_svg'];
-                    d3.request('/pavilions/'+base_layer.id+'/base/')
+                    d3.request('pavilions/'+base_layer.id+'/base/')
                         .mimeType("application/json")
                         .send('POST', JSON.stringify(base_layer), function(er, xhr){
                             if(er) store(ERROR_SET, er.target.responseText);
@@ -902,7 +914,7 @@ function RequestsMiddleware(store){
 
                 case OVERLAY_SAVE:
                     var overlay = action.payload;
-                    d3.request('/pavilions/'+overlay.id+'/overlay/')
+                    d3.request('pavilions/'+overlay.id+'/overlay/')
                         .mimeType("application/json")
                         .send('POST', JSON.stringify(overlay), function(er, xhr){
                             if(er) store(ERROR_SET, er.target.responseText || 'Connection error');
@@ -917,7 +929,7 @@ function RequestsMiddleware(store){
                 case STAND_ADD:
                     var stand = action.payload;
                     var stands_id = selectedStandsId(store);
-                    d3.request('/stands/'+stands_id)
+                    d3.request('stands/'+stands_id)
                       .mimeType("application/json")
                       .send('POST', JSON.stringify(stand), function(er, xhr){
                           if(er) store(ERROR_SET, er.target.responseText || 'Connection error');
@@ -937,7 +949,7 @@ function RequestsMiddleware(store){
                     var stand = action.payload.stand;
                     stand = Immutable.set(stand, 'type', type);
                     var stands_id = selectedStandsId(store);
-                    d3.request('/stands/'+stands_id)
+                    d3.request('stands/'+stands_id)
                       .mimeType("application/json")
                       .send('POST', JSON.stringify(stand), function(er, xhr){
                           if(er) store(ERROR_SET, er.target.responseText || 'Connection error');
@@ -957,7 +969,7 @@ function RequestsMiddleware(store){
                     var points = action.payload.points;
                     stand = Immutable.set(stand, 'points', points);
                     var stands_id = selectedStandsId(store);
-                    d3.request('/stands/'+stands_id)
+                    d3.request('stands/'+stands_id)
                       .mimeType("application/json")
                       .send('POST', JSON.stringify(stand), function(er, xhr){
                           if(er) store(ERROR_SET, er.target.responseText || 'Connection error');
@@ -975,7 +987,7 @@ function RequestsMiddleware(store){
                 case STAND_DELETE:
                     var stand = action.payload;
                     var stands_id = selectedStandsId(store);
-                    d3.request('/stands/'+stands_id+'/'+stand.id+'|delete')
+                    d3.request('stands/'+stands_id+'/'+stand.id+'|delete')
                       .mimeType("application/json")
                       .get(function(er, xhr){
                             if(er) store(ERROR_SET, er);
@@ -1035,11 +1047,9 @@ function maxZoom(img_size, min_width){
 }
 
 /**
- * Constructor of Envelope
- * @param {*} min_x 
- * @param {*} min_y 
- * @param {*} max_x 
- * @param {*} max_y 
+ * As LatLngBounds with its SouthNorthWestEast stuff mislead with planar metric space
+ * Envelope seems more convenient 
+ * @param {LatLngBounds} bounds 
  */
 
 function GridPanel(map){
@@ -2006,6 +2016,28 @@ var UniformRectEditor = L.Editable.RectangleEditor.extend({
     }
 });
 
+/**
+ * 
+ *  overlay state 
+ * {
+ *      id: overlayId,
+ *      lines: {
+ *          "id1": { points: [], type: {} },
+ *          "id2": { points: [], type: {} },
+ *      },
+ *      rects: {
+ *          "id1": { points: [], type: {} },
+ *          "id2": { points: [], type: {} },
+ *      },
+ *      notes: {
+ *          "id1": { points: [], rotate: number, text: string, type: {} },
+ *          "id2": { points: [], rotate: number, text: string, type: {} }
+ *      }
+ * }
+ * 
+ *  
+ */
+
 var OverlayMapView = function(config, store, map)
 {
     var lineGroup = L.featureGroup().addTo(map);
@@ -2420,7 +2452,7 @@ function OverlayView(config, store)
     editVM.$watch('type.sel.$val', function(val){
         if(val) {
             var feat = selectedOverlayFeat(store);
-            store(undefined, {feat: feat, type_id: val});
+            store(OVERLAY_TYPE_SELECT, {feat: feat, type_id: val});
         }
     });
     return editVM;
@@ -2541,7 +2573,24 @@ var DoubleLine = L.Polyline.extend({
     }
 });
 
-var StandMapView = function(config, store, map){
+/**
+ * 
+ *  stands state 
+ * {
+ *      "standsId": {
+ *          "id1": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *          "id2": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *          "id3": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *          "id4": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *          "id5": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *          "id6": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *      }
+ * }
+ * 
+ *  
+ */
+
+ var StandMapView = function(config, store, map){
     var standsGroup = L.featureGroup().addTo(map);
     var stands = {};
 
