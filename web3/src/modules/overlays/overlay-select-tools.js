@@ -18,9 +18,10 @@ export default function(config, store, map, overlayMapView)
         store(a.OVERLAY_FEAT_DELETE);
     }
 
-    function onEditFeat(){
+    function onEditFeat(e){
         store(a.OVERLAY_EDIT, true)
         closeTooltip(tooltip);
+        L.DomEvent.stopPropagation(e);
     }
 
     function onRotateFeat(){
@@ -47,6 +48,7 @@ export default function(config, store, map, overlayMapView)
         L.DomEvent.on($delete(), 'click', onDeleteFeat);
         L.DomEvent.on($roate(), 'click', onRotateFeat);
         L.DomEvent.on($edit(), 'click', onEditFeat);
+        // 
     }
 
     function closeTooltip(){        

@@ -58,7 +58,7 @@ function edit(store, map){
     var openWalls = 1;
 
     function move(e){
-        var ce = e.latlng;
+        var ce = map.snap(e.latlng);
         var ll = [[-10,-10],[10,-10], [10,10], [-10,10], [-10,-10] ].map(function(it){
             return L.latLng(ce.lat+it[0], ce.lng+it[1]);
         });

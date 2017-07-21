@@ -28,7 +28,7 @@ export default function(config, store, map, standMapView)
         L.DomEvent.on($delete(), 'click', onStandDelete);
         L.DomEvent.on($roate(), 'click', onStandRotate);
         L.DomEvent.on($edit(), 'click', onStandEdit);
-        
+        L.DomEvent.stopPropagation(e);
     }
 
     function onStandDelete(e){
@@ -40,9 +40,10 @@ export default function(config, store, map, standMapView)
         alert('Not implemented yet');
     }
 
-    function onStandEdit(){
+    function onStandEdit(e){
         store(a.STAND_EDIT, true)
         closeTooltip()
+        L.DomEvent.stopPropagation(e);
     }
 
     function closeTooltip(){

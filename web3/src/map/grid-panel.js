@@ -16,7 +16,7 @@ export function GridPanel(map){
             .style('height', (map_size.height + margin.top + margin.bottom) + 'px')
             .style('width', (map_size.width + margin.left + margin.right) + 'px')
             .style('pointer-events', 'none')
-            .style('z-index', "2001")
+            .style('z-index', "399")
 
     // Axis X
     var $axisX = $graphPanel.append('g')

@@ -229,8 +229,8 @@ var standsReducer = function(state, action){
         case a.STAND_ADDED:
             var stand = action.payload.stand;
             var stands_id = action.payload.stands_id;
-            state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
-            return Immutable.set(state, 'ui.stands.sel', stands_id)
+            return Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
+            // return Immutable.set(state, 'ui.stands.sel', stand.id)
 
         case a.STAND_UPDATED:
             var stand = action.payload.stand;

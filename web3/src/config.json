@@ -38,15 +38,15 @@ export default
         "types":{
             "1": {
                 "name": "Стенд категории 1",
-                "style": {"fillColor": "green", "color": "green", "fillOpacity": 0.7 }
+                "style": {"fillColor": "green", "color": "green", "fillOpacity": 1 }
             },
             "2": {
                 "name": "Стенд категории 2",
-                "style": {"fillColor": "lightblue", "color": "darkblue", "fillOpacity": 0.5 }
+                "style": {"fillColor": "lightblue", "color": "darkblue", "fillOpacity": 1}
             },
             "3": {
                 "name": "Стенд категории 3",
-                "style": {"fillColor": "lightred", "color": "red", "fillOpacity": 0.5 }
+                "style": {"fillColor": "red", "color": "red", "fillOpacity": 1 }
             },
         }
     }

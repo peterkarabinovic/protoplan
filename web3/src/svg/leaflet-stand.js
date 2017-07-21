@@ -66,14 +66,13 @@ var StandEditor = L.Editable.RectangleEditor.extend({
                 bounds = new L.LatLngBounds(e.latlng, opposite);
             // Update latlngs by hand to preserve order.
             if(next.latlng.lat !==  opposite.lat)
-                previous = [next, next=previous][0]
-            var lat = Math.floor(e.latlng.lat / 0.5) * 0.5; 
-            var lng = Math.floor(e.latlng.lng / 0.5) * 0.5; 
-            previous.latlng.update([lat, opposite.lng]);
-            next.latlng.update([opposite.lat, lng]);
+                previous = [next, next=previous][0];
+            e.latlng = this.map.snap(e.latlng);
+            previous.latlng.update([e.latlng.lat, opposite.lng]);
+            next.latlng.update([opposite.lat, e.latlng.lng]);
 
-            e.vertex.latlng.update({lat:lat, lng:lng})
-            e.vertex._latlng.update({lat:lat, lng:lng})
+            e.vertex.latlng.update(e.latlng)
+            e.vertex._latlng.update(e.latlng)
             
             this.updateBounds(bounds);
             this.refreshVertexMarkers();

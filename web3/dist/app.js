@@ -40,15 +40,15 @@ var config = {
         "types":{
             "1": {
                 "name": "Стенд категории 1",
-                "style": {"fillColor": "green", "color": "green", "fillOpacity": 0.7 }
+                "style": {"fillColor": "green", "color": "green", "fillOpacity": 1 }
             },
             "2": {
                 "name": "Стенд категории 2",
-                "style": {"fillColor": "lightblue", "color": "darkblue", "fillOpacity": 0.5 }
+                "style": {"fillColor": "lightblue", "color": "darkblue", "fillOpacity": 1}
             },
             "3": {
                 "name": "Стенд категории 3",
-                "style": {"fillColor": "lightred", "color": "red", "fillOpacity": 0.5 }
+                "style": {"fillColor": "red", "color": "red", "fillOpacity": 1 }
             },
         }
     }
@@ -796,8 +796,8 @@ var standsReducer = function(state, action){
         case STAND_ADDED:
             var stand = action.payload.stand;
             var stands_id = action.payload.stands_id;
-            state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
-            return Immutable.set(state, 'ui.stands.sel', stands_id)
+            return Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
+            // return Immutable.set(state, 'ui.stands.sel', stand.id)
 
         case STAND_UPDATED:
             var stand = action.payload.stand;
@@ -1058,6 +1058,21 @@ function maxZoom(img_size, min_width){
  * @param {*} max_y 
  */
 
+function Snapper(map){
+    var gradation = 0.5;
+
+    map.on("zoomend", function(){
+        var dz = map.getMaxZoom() - map.getZoom();
+        gradation = dz * 0.5 + 0.5;
+    });
+
+    map.snap = function(latlng){
+        latlng.lat = Math.round(latlng.lat / gradation) * gradation; 
+        latlng.lng = Math.round(latlng.lng / gradation) * gradation; 
+        return latlng;
+    };
+}
+
 function GridPanel(map){
 
     var map_size = map._container.getBoundingClientRect();
@@ -1074,7 +1089,7 @@ function GridPanel(map){
             .style('height', (map_size.height + margin.top + margin.bottom) + 'px')
             .style('width', (map_size.width + margin.left + margin.right) + 'px')
             .style('pointer-events', 'none')
-            .style('z-index', "2001");
+            .style('z-index', "399");
 
     // Axis X
     var $axisX = $graphPanel.append('g')
@@ -1155,6 +1170,7 @@ var Map = function(el, store)
         attributionControl: false,
         editable: true
     });
+    Snapper(map$1);
     window.map = map$1;
 
     gridPanel = GridPanel(map$1);
@@ -2118,9 +2134,10 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
         store(OVERLAY_FEAT_DELETE);
     }
 
-    function onEditFeat(){
+    function onEditFeat(e){
         store(OVERLAY_EDIT, true);
         closeTooltip(tooltip);
+        L.DomEvent.stopPropagation(e);
     }
 
     function onRotateFeat(){
@@ -2147,6 +2164,7 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
         L.DomEvent.on($delete(), 'click', onDeleteFeat);
         L.DomEvent.on($roate(), 'click', onRotateFeat);
         L.DomEvent.on($edit(), 'click', onEditFeat);
+        // 
     }
 
     function closeTooltip(){        
@@ -2530,13 +2548,12 @@ var StandEditor = L.Editable.RectangleEditor.extend({
             // Update latlngs by hand to preserve order.
             if(next.latlng.lat !==  opposite.lat)
                 previous = [next, next=previous][0];
-            var lat = Math.floor(e.latlng.lat / 0.5) * 0.5; 
-            var lng = Math.floor(e.latlng.lng / 0.5) * 0.5; 
-            previous.latlng.update([lat, opposite.lng]);
-            next.latlng.update([opposite.lat, lng]);
+            e.latlng = this.map.snap(e.latlng);
+            previous.latlng.update([e.latlng.lat, opposite.lng]);
+            next.latlng.update([opposite.lat, e.latlng.lng]);
 
-            e.vertex.latlng.update({lat:lat, lng:lng});
-            e.vertex._latlng.update({lat:lat, lng:lng});
+            e.vertex.latlng.update(e.latlng);
+            e.vertex._latlng.update(e.latlng);
             
             this.updateBounds(bounds);
             this.refreshVertexMarkers();
@@ -2697,7 +2714,7 @@ function edit(store, map){
     var openWalls = 1;
 
     function move(e){
-        var ce = e.latlng;
+        var ce = map.snap(e.latlng);
         var ll = [[-10,-10],[10,-10], [10,10], [-10,10], [-10,-10] ].map(function(it){
             return L.latLng(ce.lat+it[0], ce.lng+it[1]);
         });
@@ -2757,7 +2774,7 @@ var StandySelectTools = function(config, store, map, standMapView)
         L.DomEvent.on($delete(), 'click', onStandDelete);
         L.DomEvent.on($roate(), 'click', onStandRotate);
         L.DomEvent.on($edit(), 'click', onStandEdit);
-        
+        L.DomEvent.stopPropagation(e);
     }
 
     function onStandDelete(e){
@@ -2769,9 +2786,10 @@ var StandySelectTools = function(config, store, map, standMapView)
         alert('Not implemented yet');
     }
 
-    function onStandEdit(){
+    function onStandEdit(e){
         store(STAND_EDIT, true);
         closeTooltip();
+        L.DomEvent.stopPropagation(e);
     }
 
     function closeTooltip(){

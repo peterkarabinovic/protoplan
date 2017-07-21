@@ -1,7 +1,7 @@
 import * as math from './math.js'
 import * as a from '../actions.js'
+import {Snapper} from '../svg/snapper.js'
 import {GridPanel} from './grid-panel.js'
-
 import {handle} from '../utils/redux.js'
 
 L.Browser.touch = false;
@@ -15,6 +15,7 @@ export default function(el, store)
         attributionControl: false,
         editable: true
     });
+    Snapper(map);
     window.map = map;
 
     gridPanel = GridPanel(map);
