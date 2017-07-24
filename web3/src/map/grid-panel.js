@@ -49,6 +49,15 @@ export function GridPanel(map){
                                    .tickSize(map_size.width, 0, 0)
                                    .tickFormat('');
 
+    var gradation = 0.5;
+
+    map.snap = function(latlng){
+        latlng.lat = Math.round(latlng.lat / gradation) * gradation; 
+        latlng.lng = Math.round(latlng.lng / gradation) * gradation; 
+        return latlng;
+    }
+    
+
     var get_grid_ticks = memorize(function(){
         var domainX = scaleX.domain();
         var domainY = scaleY.domain();     
@@ -76,6 +85,9 @@ export function GridPanel(map){
         gridAxisY.ticks(ticks[1]);
         $gridX.call(gridAxisX);
         $gridY.call(gridAxisY);
+        
+        gradation = Math.max(d3.tickStep(b.getWest(), b.getEast(), ticks[0]) / 2, 0.5)
+        console.log('gradation', gradation)
     } 
 
     map.on('move', render);

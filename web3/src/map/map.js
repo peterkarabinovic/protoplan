@@ -15,7 +15,7 @@ export default function(el, store)
         attributionControl: false,
         editable: true
     });
-    Snapper(map);
+    // Snapper(map);
     window.map = map;
 
     gridPanel = GridPanel(map);

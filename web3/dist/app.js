@@ -1059,21 +1059,6 @@ function maxZoom(img_size, min_width){
  * @param {*} max_y 
  */
 
-function Snapper(map){
-    var gradation = 0.5;
-
-    map.on("zoomend", function(){
-        var dz = map.getMaxZoom() - map.getZoom();
-        gradation = dz * 0.5 + 0.5;
-    });
-
-    map.snap = function(latlng){
-        latlng.lat = Math.round(latlng.lat / gradation) * gradation; 
-        latlng.lng = Math.round(latlng.lng / gradation) * gradation; 
-        return latlng;
-    };
-}
-
 function GridPanel(map){
 
     var map_size = map._container.getBoundingClientRect();
@@ -1123,6 +1108,15 @@ function GridPanel(map){
                                    .tickSize(map_size.width, 0, 0)
                                    .tickFormat('');
 
+    var gradation = 0.5;
+
+    map.snap = function(latlng){
+        latlng.lat = Math.round(latlng.lat / gradation) * gradation; 
+        latlng.lng = Math.round(latlng.lng / gradation) * gradation; 
+        return latlng;
+    };
+    
+
     var get_grid_ticks = memorize(function(){
         var domainX = scaleX.domain();
         var domainY = scaleY.domain();     
@@ -1150,6 +1144,9 @@ function GridPanel(map){
         gridAxisY.ticks(ticks[1]);
         $gridX.call(gridAxisX);
         $gridY.call(gridAxisY);
+        
+        gradation = Math.max(d3.tickStep(b.getWest(), b.getEast(), ticks[0]) / 2, 0.5);
+        console.log('gradation', gradation);
     }; 
 
     map.on('move', render);
@@ -1171,7 +1168,7 @@ var Map = function(el, store)
         attributionControl: false,
         editable: true
     });
-    Snapper(map$1);
+    // Snapper(map);
     window.map = map$1;
 
     gridPanel = GridPanel(map$1);
@@ -2765,6 +2762,7 @@ function edit(store, map){
         var ll = [[-10,-10],[10,-10], [10,10], [-10,10], [-10,-10] ].map(function(it){
             return L.latLng(ce.lat+it[0], ce.lng+it[1]);
         });
+        console.log('move', ll.map( it => it.lat).join(','));
         outline.setLatLngs(ll);
     }
 

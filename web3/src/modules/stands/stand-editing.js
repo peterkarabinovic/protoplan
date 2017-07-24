@@ -65,6 +65,7 @@ function edit(store, map){
         var ll = [[-10,-10],[10,-10], [10,10], [-10,10], [-10,-10] ].map(function(it){
             return L.latLng(ce.lat+it[0], ce.lng+it[1]);
         });
+        console.log('move', ll.map( it => it.lat).join(','))
         outline.setLatLngs(ll);
     }
 
