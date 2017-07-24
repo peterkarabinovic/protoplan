@@ -10,25 +10,47 @@ export var Stand = L.Rectangle.extend({
 
     initialize: function (latlngs, options, openWalls){
         options = _.extend(options, {editorClass: StandEditor});
-        openWalls = openWalls || 1;
+        this.openWalls = openWalls || 1;
         L.Rectangle.prototype.initialize.call(this, latlngs, options);
-        var ll = this.getLatLngs();
-        ll = _.rest(_.flatten(ll), openWalls-1);
-        if(ll.length > 1) {
-            this.line = new DoubleLine(ll, {color: this.options.fillColor});
+        this._createDecorations();
+    },
 
-        }
+    _createDecorations: function(){
+        var ll = this.getLatLngs();
+        ll = _.rest(_.flatten(ll), this.openWalls-1);
+        if(ll.length > 1)
+            this.line = new DoubleLine(ll, {color: this.options.fillColor});
     },
 
     onAdd: function (map) {
         L.Rectangle.prototype.onAdd.call(this,map);
-        if(this.line) map.addLayer(this.line);     
+        if(this.line) map.addLayer(this.line); 
+        this.on('editable:shape:dragstart', this._onDragStart, this)    
+        this.on('editable:shape:dragend', this._onDragEnd, this)    
     },
 
     onRemove: function (map) {
         L.Rectangle.prototype.onRemove.call(this, map); 
         if(this.line) map.removeLayer(this.line);       
+        this.off('editable:shape:dragstart', this._onDragStart, this)    
+        this.off('editable:shape:dragend', this._onDragEnd, this)    
     },
+
+    _onDragStart: function(){
+        if(this.line) {
+            this._map.removeLayer(this.line);
+            this.line = null;
+        }
+    },
+
+    _onDragEnd: function(){
+        if(!this.line) {
+            this._createDecorations();
+            this._map.addLayer(this.line);
+        }
+    },
+    
+
 
     redraw: function(){
         L.Rectangle.prototype.redraw.call(this); 
@@ -38,19 +60,24 @@ export var Stand = L.Rectangle.extend({
 
     update: function(latlngs, options, openWalls){
         this.setStyle(options);
-        this.setLatLngs(latlngs);
+        // if it's edit mode
+        this.openWalls = openWalls || this.openWalls;
         var ll = this.getLatLngs();
-        ll = _.rest(_.flatten(ll), openWalls-1);
-        if(this.line && this._map) 
-            this._map.removeLayer(this.line);       
-        if(ll.length > 1) {
-            this.line = new DoubleLine(ll, {color: this.options.fillColor});
-            if(this._map)
-                this._map.addLayer(this.line);     
+        if(ll[0][0].update) {
+            _.each(latlngs, function(new_latlng, i){
+                ll[0][i].update(new_latlng);
+            })
         }
-        
+        else { 
+            this.setLatLngs(latlngs);
+            ll = this.getLatLngs();
+        }
+        ll = _.rest(_.flatten(ll), this.openWalls-1);
+        if(this.line && this._map && ll.length > 1) {
+            this.line.setLatLngs(ll);
+            this.line.setStyle({color: this.options.fillColor});
+        } 
     }
-
 });
 
 /**
@@ -64,12 +91,16 @@ var StandEditor = L.Editable.RectangleEditor.extend({
                 oppositeIndex = (index + 2) % 4,
                 opposite = e.vertex.latlngs[oppositeIndex],
                 bounds = new L.LatLngBounds(e.latlng, opposite);
-            // Update latlngs by hand to preserve order.
-            if(next.latlng.lat !==  opposite.lat)
-                previous = [next, next=previous][0];
+
             e.latlng = this.map.snap(e.latlng);
-            previous.latlng.update([e.latlng.lat, opposite.lng]);
-            next.latlng.update([opposite.lat, e.latlng.lng]);
+            // Update latlngs by hand to preserve order.
+            var fact = next.latlng.lat >  previous.latlng.lat;
+            var nnext = [opposite.lat, e.latlng.lng];
+            var nprevious = [e.latlng.lat, opposite.lng]
+            if( (nnext[0] > nprevious[0]) !== fact )
+                previous = [next, next=previous][0];
+            previous.latlng.update(nprevious);
+            next.latlng.update(nnext);
 
             e.vertex.latlng.update(e.latlng)
             e.vertex._latlng.update(e.latlng)
@@ -90,6 +121,13 @@ export var DoubleLine = L.Polyline.extend({
         this.options2 = L.extend(this.options2, options2);
         this.line2 = new L.Polyline([], this.options2);
         L.Polyline.prototype.initialize.call(this, latlngs, this.options1);
+    },
+
+    setStyle: function(options1, options2) {
+        this.options1 = L.extend(this.options1, options1);
+        this.options2 = L.extend(this.options2, options2);
+        this.line2.setStyle(this.options2)
+        L.Polyline.prototype.setStyle.call(this, this.options1);
     },
 
     onAdd: function (map) {
@@ -116,7 +154,7 @@ export var DoubleLine = L.Polyline.extend({
 
     _project: function(){
         var w = {
-            0: [3,1],
+            0: [6,2],
             1: [7,3],
             2: [10,6],
             3: [14,10],
@@ -127,7 +165,12 @@ export var DoubleLine = L.Polyline.extend({
         this.line2._path.setAttribute('stroke-width', weights[0]);
         this._path.setAttribute('stroke-width', weights[1]);
         L.Polyline.prototype._project.call(this);
+    },
+    _transform: function(matrix){
+        L.Path.prototype._transform.call(this, matrix);
+        this.line2._transform(matrix);
     }
+    
 });
 
  

@@ -529,6 +529,7 @@
         onClick: function (e) {
             e.vertex = this;
             this.editor.onVertexMarkerClick(e);
+            L.DomEvent.stopPropagation(e);
         },
 
         onMouseup: function (e) {

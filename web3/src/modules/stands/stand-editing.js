@@ -32,6 +32,7 @@ export default function(config, store, map, standMapView){
             $stand.off('editable:vertex:dragend', onSelectedGeometryChange)
             $stand.disableEdit();
             store.off('entities.stands.'+$stand.stands_id+'.'+$stand.id, onStandSelect);            
+            console.log('disableEdit', $stand.id);
             $stand = null;
         }
         var stand = selectedStand(store);
@@ -40,6 +41,8 @@ export default function(config, store, map, standMapView){
             if($stand) {
                 L.setOptions(map.editTools, {skipMiddleMarkers: true, draggable: true});
                 $stand.enableEdit(map);   
+                console.log('enableEdit', $stand.id);
+                
                 $stand.on('editable:dragend', onSelectedGeometryChange)
                 $stand.on('editable:vertex:dragend', onSelectedGeometryChange)
                 store.on('entities.stands.'+$stand.stands_id+'.'+$stand.id, onStandSelect);
