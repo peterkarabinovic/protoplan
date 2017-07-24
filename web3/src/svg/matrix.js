@@ -137,12 +137,11 @@ L.Matrix.prototype = {
 
 
   /**
-   * Invert rotation
+   * reflection in y-axis 
    * @return {L.Matrix}
    */
   flip: function() {
-    this._matrix[1] *= -1;
-    this._matrix[2] *= -1;
+    this._matrix[0] *= -1;
     return this;
   },
 

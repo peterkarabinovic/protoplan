@@ -7,9 +7,13 @@ export default function(config, store, map, overlayMapView)
 {
     var tooltipContent = document.getElementById('tooltip-template').text;
     var tooltip = L.tooltip({permanent:true, interactive: true}).setContent(tooltipContent);
-    var $delete = function() { return tooltip.getElement().getElementsByTagName('i')[0]; }
-    var $roate = function() { return tooltip.getElement().getElementsByTagName('i')[1]; }
-    var $edit = function() { return tooltip.getElement().getElementsByTagName('i')[2]; }
+
+    var $edit = function() { return tooltip.getElement().getElementsByTagName('i')[0]; }
+    var $rotate = function() { return tooltip.getElement().getElementsByTagName('i')[1]; }
+    var $flip = function() { return tooltip.getElement().getElementsByTagName('i')[2]; }
+    var $delete = function() { return tooltip.getElement().getElementsByTagName('i')[3]; }
+
+
 
     var cat2group = overlayMapView.cat2group;
     var cat2layers = overlayMapView.cat2layers;
@@ -43,10 +47,10 @@ export default function(config, store, map, overlayMapView)
         tooltip.setLatLng(e.latlng);
         map.addLayer(tooltip); 
         var cl = cat === 'notes' ? L.DomUtil.removeClass : L.DomUtil.addClass; 
-        cl($roate(), 'w3-hide')
+        cl($rotate(), 'w3-hide')
         L.DomUtil.removeClass($edit(), 'w3-hide')
         L.DomEvent.on($delete(), 'click', onDeleteFeat);
-        L.DomEvent.on($roate(), 'click', onRotateFeat);
+        L.DomEvent.on($rotate(), 'click', onRotateFeat);
         L.DomEvent.on($edit(), 'click', onEditFeat);
         // 
     }
@@ -55,7 +59,7 @@ export default function(config, store, map, overlayMapView)
         if(tooltip._map) {
             map.removeLayer(tooltip); 
             L.DomEvent.off($delete(), 'click', onDeleteFeat);
-            L.DomEvent.off($roate(), 'click', onRotateFeat);
+            L.DomEvent.off($rotate(), 'click', onRotateFeat);
             L.DomEvent.off($edit(), 'click', onEditFeat);
         }
     }

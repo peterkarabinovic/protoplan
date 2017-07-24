@@ -1,5 +1,6 @@
+import {matrix} from './matrix.js'
 
-export var Stand = L.Rectangle.extend({
+export var Stand = L.Polygon.extend({
     options: {
         fillColor: 'green',
         color: 'green',
@@ -11,7 +12,7 @@ export var Stand = L.Rectangle.extend({
     initialize: function (latlngs, options, openWalls){
         options = _.extend(options, {editorClass: StandEditor});
         this.openWalls = openWalls || 1;
-        L.Rectangle.prototype.initialize.call(this, latlngs, options);
+        L.Polygon.prototype.initialize.call(this, latlngs, options);
         this._createDecorations();
     },
 
@@ -23,14 +24,14 @@ export var Stand = L.Rectangle.extend({
     },
 
     onAdd: function (map) {
-        L.Rectangle.prototype.onAdd.call(this,map);
+        L.Polygon.prototype.onAdd.call(this,map);
         if(this.line) map.addLayer(this.line); 
         this.on('editable:shape:dragstart', this._onDragStart, this)    
         this.on('editable:shape:dragend', this._onDragEnd, this)    
     },
 
     onRemove: function (map) {
-        L.Rectangle.prototype.onRemove.call(this, map); 
+        L.Polygon.prototype.onRemove.call(this, map); 
         if(this.line) map.removeLayer(this.line);       
         this.off('editable:shape:dragstart', this._onDragStart, this)    
         this.off('editable:shape:dragend', this._onDragEnd, this)    
@@ -50,10 +51,38 @@ export var Stand = L.Rectangle.extend({
         }
     },
     
+    rotate: function(radians){
+        radians = radians || (Math.PI / 2);
+        var m = matrix(1,0,0,1,0,0);
+        var ce = this.getBounds().getCenter();  
+        ce = L.point(ce.lng, ce.lat);
+        m.rotate(radians);
+        _.each(this.getLatLngs()[0], function(ll){
+            var p = L.point(ll.lng, ll.lat)
+            var tll = m.transform(p.subtract(ce)).add(ce);
+            ll.lng = tll.x;
+            ll.lat = tll.y;
+        });
+        this.redraw();
+    },
+
+    flip: function(){
+        var m = matrix(1,0,0,1,0,0);
+        var ce = this.getBounds().getCenter();  
+        ce = L.point(ce.lng, ce.lat);
+        m.flip();
+        _.each(this.getLatLngs()[0], function(ll){
+            var p = L.point(ll.lng, ll.lat)
+            var tll = m.transform(p.subtract(ce)).add(ce);
+            ll.lng = tll.x;
+            ll.lat = tll.y;
+        });
+        this.redraw();
+    },
 
 
     redraw: function(){
-        L.Rectangle.prototype.redraw.call(this); 
+        L.Polygon.prototype.redraw.call(this); 
         if(this.line) {
             this.line.redraw();}
     },

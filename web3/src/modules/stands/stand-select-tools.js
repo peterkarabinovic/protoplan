@@ -6,11 +6,15 @@ import {str} from '../../utils/utils.js'
 
 export default function(config, store, map, standMapView)
 {
+    var $stands = standMapView.stands;
     var tooltipContent = document.getElementById('tooltip-template').text;
     var tooltip = L.tooltip({permanent:true, interactive: true}).setContent(tooltipContent);
-    var $delete = function() { return tooltip.getElement().getElementsByTagName('i')[0]; }
-    var $roate = function() { return tooltip.getElement().getElementsByTagName('i')[1]; }
-    var $edit = function() { return tooltip.getElement().getElementsByTagName('i')[2]; }
+    
+    var $edit = function() { return tooltip.getElement().getElementsByTagName('i')[0]; }
+    var $rotate = function() { return tooltip.getElement().getElementsByTagName('i')[1]; }
+    var $flip = function() { return tooltip.getElement().getElementsByTagName('i')[2]; }
+    var $delete = function() { return tooltip.getElement().getElementsByTagName('i')[3]; }
+    
 
 
     function onStandClick(e){
@@ -23,10 +27,12 @@ export default function(config, store, map, standMapView)
         onStandClick(e);
         tooltip.setLatLng(e.latlng);
         map.addLayer(tooltip); 
-        L.DomUtil.removeClass($roate(), 'w3-hide')
+        L.DomUtil.removeClass($rotate(), 'w3-hide')
+        L.DomUtil.removeClass($flip(), 'w3-hide')
         L.DomUtil.removeClass($edit(), 'w3-hide')
         L.DomEvent.on($delete(), 'click', onStandDelete);
-        L.DomEvent.on($roate(), 'click', onStandRotate);
+        L.DomEvent.on($rotate(), 'click', onStandRotate);
+        L.DomEvent.on($flip(), 'click', onStandFlip);
         L.DomEvent.on($edit(), 'click', onStandEdit);
         L.DomEvent.stopPropagation(e);
     }
@@ -36,9 +42,19 @@ export default function(config, store, map, standMapView)
         closeTooltip()
     }
 
-    function onStandRotate(){
-        alert('Not implemented yet');
+    function onStandTransform(method){
+        var stand = selectedStand(store);
+        var $stand = $stands[stand.id];
+        if($stand) {
+            $stand[method]();
+            var points = map.toPoints($stand.getLatLngs())
+            store(a.STAND_POINTS_UPDATE, {stand: stand, points:points});
+        }
+        closeTooltip(tooltip);
     }
+
+    var onStandRotate = _.partial(onStandTransform, 'rotate');
+    var onStandFlip = _.partial(onStandTransform, 'flip');
 
     function onStandEdit(e){
         store(a.STAND_EDIT, true)
@@ -50,7 +66,8 @@ export default function(config, store, map, standMapView)
         if(tooltip._map) {
             map.removeLayer(tooltip); 
             L.DomEvent.off($delete(), 'click', onStandDelete);
-            L.DomEvent.off($roate(), 'click', onStandRotate);
+            L.DomEvent.off($rotate(), 'click', onStandRotate);
+            L.DomEvent.on($flip(), 'click', onStandFlip);
             L.DomEvent.off($edit(), 'click', onStandEdit);
         }
     }
