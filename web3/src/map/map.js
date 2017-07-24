@@ -18,6 +18,13 @@ export default function(el, store)
 
     gridPanel = GridPanel(map);
 
+    // we sore on server as array [lng, lat]
+    map.toPoints = function(latLngs){
+        latLngs = _.flatten(latLngs);
+        return latLngs.map(map.snap).map(function(ll){ return [ll.lng, ll.lat] });
+    }
+
+
     map.on('click', function(){
         store(a.UNSELECT_ALL);
     })

@@ -362,11 +362,6 @@ function toLatLngs(points) {
     return points.map(function(p){ return  L.latLng(p[1], p[0])});
 }
 
-function toPoints(latLngs){
-    var f = L.Util.formatNum;
-    latLngs = _.flatten(latLngs);
-    return latLngs.map(function(ll){ return [f(ll.lng,2), f(ll.lat,2)] });
-}
 
 
 /*
@@ -442,7 +437,8 @@ var initState = {
         stands: {
             type: 1,
             sel: undefined,
-            edit: false
+            edit: false,
+            size: {x:10, y:10}
         }
     }
 };
@@ -805,8 +801,9 @@ var standsReducer = function(state, action){
             if(state.entities.stands[stands_id]) {
                 state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
                 state = Immutable.set(state, 'ui.stands.sel', stand.id);
+                var size = L.bounds(stand.points).getSize();
+                state = Immutable.set(state, 'ui.stands.size', size);
             }
-            console.log('STAND_UPDATED');
             return state;
         
         case STAND_DELETED:
@@ -1115,6 +1112,11 @@ function GridPanel(map){
         latlng.lng = Math.round(latlng.lng / gradation) * gradation; 
         return latlng;
     };
+
+    map.snapContainerPoint = function(cp){
+        var ll = map.containerPointToLatLng(cp);
+        return map.latLngToContainerPoint(map.snap(ll));
+    };
     
 
     var get_grid_ticks = memorize(function(){
@@ -1146,7 +1148,6 @@ function GridPanel(map){
         $gridY.call(gridAxisY);
         
         // gradation = d3.tickStep(b.getWest(), b.getEast(), ticks[0]) 
-        // console.log('gradation', gradation)
     }; 
 
     map.on('move', render);
@@ -1171,6 +1172,13 @@ var Map = function(el, store)
     window.map = map$1;
 
     gridPanel = GridPanel(map$1);
+
+    // we sore on server as array [lng, lat]
+    map$1.toPoints = function(latLngs){
+        latLngs = _.flatten(latLngs);
+        return latLngs.map(map$1.snap).map(function(ll){ return [ll.lng, ll.lat] });
+    };
+
 
     map$1.on('click', function(){
         store(UNSELECT_ALL);
@@ -1430,7 +1438,6 @@ var BaseMapDistance = function(store, map){
                 
     }
 
-    
 };
 
 function BaseView(store) {
@@ -2184,10 +2191,7 @@ var OverlaySelectTools = function(config, store, map, overlayMapView)
     });
 
     store.on('ui.overlay.feat', closeTooltip);
-    // store.on('ui.overlay.feat', onSelectFeat);
-    // map.on('click', closeTooltip);
-
-  
+   
 };
 
 var OverlayEditing = function(config, store, map, overlayMapView)
@@ -2202,10 +2206,11 @@ var OverlayEditing = function(config, store, map, overlayMapView)
     m2e[DRAW_RECT] = editRect(store, map);
     m2e[DRAW_NOTE] = editNote(config, store, map);
 
+
     function onSelectedGeometryChanges(e){
         if(checkGeom(selectedLayer)){
             var selFeat = selectedOverlayFeat(store);
-            var feat =  {points: toPoints(selectedLayer.getLatLngs()), id: selFeat.id};
+            var feat =  {points: map.toPoints(selectedLayer.getLatLngs()), id: selFeat.id};
             store(OVERLAY_FEAT_UPDATE, {feat: feat, cat: selFeat.cat});
         }
         selectedLayer.editor.reset();
@@ -2259,7 +2264,7 @@ var OverlayEditing = function(config, store, map, overlayMapView)
                 selectedLayer.setText(text);
                 store(OVERLAY_FEAT_TEXT, {
                     text: text,
-                    points: toPoints(selectedLayer.getLatLngs())
+                    points: map.toPoints(selectedLayer.getLatLngs())
                 });
             }
         }
@@ -2284,7 +2289,7 @@ function editFeat(cat, store, map)
     function onCommit(){
         if(checkGeom(layer))
         {
-            var feat =  { points: toPoints(layer.getLatLngs())};
+            var feat =  { points: map.toPoints(layer.getLatLngs())};
             store(OVERLAY_FEAT_ADD, {feat: feat, cat: cat});
             store(OVERLAY_EDIT, true);
         }
@@ -2305,7 +2310,7 @@ function editRect(store, map){
 
     function onClick(e) {
         move(e);
-        var feat =  { points: toPoints(outline.getLatLngs())};
+        var feat =  { points: map.toPoints(outline.getLatLngs())};
         store(OVERLAY_FEAT_ADD, {feat: feat, cat: 'rects'});
         store(OVERLAY_EDIT, true);
         store(DRAWING_MODE_SET);    
@@ -2338,7 +2343,7 @@ function editNote(config, store, map)
         var style = config.overlay.types.notes[type].style;
         var $text = new Text([e.latlng],  text, 0, style).addTo(map);        
         var feat = {
-            points: toPoints($text.getLatLngs()),
+            points: map.toPoints($text.getLatLngs()),
             rotate: 0,
             text: text,
             type: type         
@@ -2631,15 +2636,15 @@ var DoubleLine = L.Polyline.extend({
     },
 
     _project: function(){
-        var w = {
-            0: [6,2],
-            1: [7,3],
-            2: [10,6],
-            3: [14,10],
-            4: [18,14],
-        };
-        var z = this._map.getZoom();
-        var weights = w[z] || w[4];
+        // var w = {
+        //     0: [6,2],
+        //     1: [7,3],
+        //     2: [10,6],
+        //     3: [14,10],
+        //     4: [18,14],
+        // }
+        // var z = this._map.getZoom();
+        var weights = [7,3];//w[z] || w[4];
         this.line2._path.setAttribute('stroke-width', weights[0]);
         this._path.setAttribute('stroke-width', weights[1]);
         L.Polyline.prototype._project.call(this);
@@ -2718,7 +2723,7 @@ var StandEditing = function(config, store, map, standMapView){
 
     function onSelectedGeometryChange(e){
         var stand = selectedStand(store);
-        var points = toPoints($stand.getLatLngs());
+        var points = map.toPoints($stand.getLatLngs());
         store(STAND_POINTS_UPDATE, {stand: stand, points:points});
     }
 
@@ -2728,7 +2733,6 @@ var StandEditing = function(config, store, map, standMapView){
             $stand.off('editable:vertex:dragend', onSelectedGeometryChange);
             $stand.disableEdit();
             store.off('entities.stands.'+$stand.stands_id+'.'+$stand.id, onStandSelect);            
-            console.log('disableEdit', $stand.id);
             $stand = null;
         }
         var stand = selectedStand(store);
@@ -2737,7 +2741,6 @@ var StandEditing = function(config, store, map, standMapView){
             if($stand) {
                 L.setOptions(map.editTools, {skipMiddleMarkers: true, draggable: true});
                 $stand.enableEdit(map);   
-                console.log('enableEdit', $stand.id);
                 
                 $stand.on('editable:dragend', onSelectedGeometryChange);
                 $stand.on('editable:vertex:dragend', onSelectedGeometryChange);
@@ -2757,18 +2760,26 @@ function edit(store, map){
     var openWalls = 1;
 
     function move(e){
-        var ce = map.snap(e.latlng);
-        var ll = [[-10,-10],[10,-10], [10,10], [-10,10], [-10,-10] ].map(function(it){
-            return L.latLng(ce.lat+it[0], ce.lng+it[1]);
-        });
-        console.log('move', ll.map( it => it.lat).join(','));
+        var ce = e.latlng;
+        var size = store.state.ui.stands.size;
+        var dx = size.x / 2, dy = size.y / 2;
+        var ll = [[
+            L.latLng(ce.lat - dy, ce.lng - dx),
+            L.latLng(ce.lat - dy, ce.lng + dx),
+            L.latLng(ce.lat + dy, ce.lng + dx),
+            L.latLng(ce.lat + dy, ce.lng - dx),
+            L.latLng(ce.lat - dy, ce.lng - dx)
+        ].map(map.snap)];
+        // var ll = [[-10,-10],[10,-10], [10,10], [-10,10], [-10,-10] ].map(function(it){
+        //     return L.latLng(ce.lat+it[0], ce.lng+it[1]);
+        // });
         outline.setLatLngs(ll);
     }
 
     function onClick(e) {
         move(e);
         var type = store.state.ui.stands.type;
-        var feat =  { points: toPoints(outline.getLatLngs()), openWalls: openWalls, rotate: 0, type: type};
+        var feat =  { points: map.toPoints(outline.getLatLngs()), openWalls: openWalls, rotate: 0, type: type};
         store(STAND_ADD, feat);
         store(DRAWING_MODE_SET);  
         L.DomEvent.stopPropagation(e);      

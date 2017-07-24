@@ -71,7 +71,4 @@ export default function(store, map){
                 
     }
 
-    function log(name, event){
-        console.log(name, event.type, event);
-    }
 }

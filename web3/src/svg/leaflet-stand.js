@@ -153,15 +153,15 @@ export var DoubleLine = L.Polyline.extend({
     },
 
     _project: function(){
-        var w = {
-            0: [6,2],
-            1: [7,3],
-            2: [10,6],
-            3: [14,10],
-            4: [18,14],
-        }
-        var z = this._map.getZoom();
-        var weights = w[z] || w[4];
+        // var w = {
+        //     0: [6,2],
+        //     1: [7,3],
+        //     2: [10,6],
+        //     3: [14,10],
+        //     4: [18,14],
+        // }
+        // var z = this._map.getZoom();
+        var weights = [7,3];//w[z] || w[4];
         this.line2._path.setAttribute('stroke-width', weights[0]);
         this._path.setAttribute('stroke-width', weights[1]);
         L.Polyline.prototype._project.call(this);

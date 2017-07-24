@@ -56,6 +56,11 @@ export function GridPanel(map){
         latlng.lng = Math.round(latlng.lng / gradation) * gradation; 
         return latlng;
     }
+
+    map.snapContainerPoint = function(cp){
+        var ll = map.containerPointToLatLng(cp)
+        return map.latLngToContainerPoint(map.snap(ll));
+    }
     
 
     var get_grid_ticks = memorize(function(){
@@ -87,7 +92,6 @@ export function GridPanel(map){
         $gridY.call(gridAxisY);
         
         // gradation = d3.tickStep(b.getWest(), b.getEast(), ticks[0]) 
-        // console.log('gradation', gradation)
     } 
 
     map.on('move', render);

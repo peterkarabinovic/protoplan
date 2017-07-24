@@ -130,9 +130,10 @@ L.Handler.PathDrag = L.Handler.extend( /** @lends  L.Path.Drag.prototype */ {
   _onDragStart: function(evt) {
     var eventType = evt.originalEvent._simulated ? 'touchstart' : evt.originalEvent.type;
 
+    var cp = this._path._map.snapContainerPoint(evt.containerPoint);
     this._mapDraggingWasEnabled = false;
-    this._startPoint = evt.containerPoint.clone();
-    this._dragStartPoint = evt.containerPoint.clone();
+    this._startPoint = cp.clone();
+    this._dragStartPoint = cp.clone();
     this._matrix = [1, 0, 0, 1, 0, 0];
     L.DomEvent.stop(evt.originalEvent);
 
@@ -167,8 +168,9 @@ L.Handler.PathDrag = L.Handler.extend( /** @lends  L.Path.Drag.prototype */ {
     var first = (evt.touches && evt.touches.length >= 1 ? evt.touches[0] : evt);
     var containerPoint = this._path._map.mouseEventToContainerPoint(first);
 
-    var x = containerPoint.x;
-    var y = containerPoint.y;
+    var cp = this._path._map.snapContainerPoint(containerPoint);
+    var x = cp.x;
+    var y = cp.y;
 
     var dx = x - this._startPoint.x;
     var dy = y - this._startPoint.y;

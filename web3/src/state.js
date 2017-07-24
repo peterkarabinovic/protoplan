@@ -38,7 +38,8 @@ export default {
         stands: {
             type: 1,
             sel: undefined,
-            edit: false
+            edit: false,
+            size: {x:10, y:10}
         }
     }
 }

@@ -17,9 +17,6 @@ export default function(config, store, map, overlayMapView)
     m2e[m.DRAW_RECT] = editFeat('rects', store, map)
     m2e[m.DRAW_NOTE] = editNote(config, store, map)
 
-    function log(e){
-        console.log(e);
-    }
 
     function onSelectedGeometryChanges(e){
         if(checkGeom(selectedLayer)){

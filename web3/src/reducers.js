@@ -238,8 +238,9 @@ var standsReducer = function(state, action){
             if(state.entities.stands[stands_id]) {
                 state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
                 state = Immutable.set(state, 'ui.stands.sel', stand.id)
+                var size = L.bounds(stand.points).getSize();
+                state = Immutable.set(state, 'ui.stands.size', size)
             }
-            console.log('STAND_UPDATED')
             return state;
         
         case a.STAND_DELETED:

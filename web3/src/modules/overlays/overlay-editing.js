@@ -1,7 +1,7 @@
 
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
-import {str, toPoints} from '../../utils/utils.js'
+import {str} from '../../utils/utils.js'
 import {selectedOverlayId, selectedOverlayFeat, selectedOverlayText, overlayNoteType} from '../../state.js'
 import {Text} from '../../svg/leaflet-text.js'
 
@@ -17,14 +17,11 @@ export default function(config, store, map, overlayMapView)
     m2e[m.DRAW_RECT] = editRect(store, map)
     m2e[m.DRAW_NOTE] = editNote(config, store, map)
 
-    function log(e){
-        console.log(e);
-    }
 
     function onSelectedGeometryChanges(e){
         if(checkGeom(selectedLayer)){
             var selFeat = selectedOverlayFeat(store);
-            var feat =  {points: toPoints(selectedLayer.getLatLngs()), id: selFeat.id};
+            var feat =  {points: map.toPoints(selectedLayer.getLatLngs()), id: selFeat.id};
             store(a.OVERLAY_FEAT_UPDATE, {feat: feat, cat: selFeat.cat});
         }
         selectedLayer.editor.reset();
@@ -84,7 +81,7 @@ export default function(config, store, map, overlayMapView)
                 selectedLayer.setText(text);
                 store(a.OVERLAY_FEAT_TEXT, {
                     text: text,
-                    points: toPoints(selectedLayer.getLatLngs())
+                    points: map.toPoints(selectedLayer.getLatLngs())
                 });
             }
         }
@@ -109,7 +106,7 @@ function editFeat(cat, store, map)
     function onCommit(){
         if(checkGeom(layer))
         {
-            var feat =  { points: toPoints(layer.getLatLngs())};
+            var feat =  { points: map.toPoints(layer.getLatLngs())};
             store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: cat});
             store(a.OVERLAY_EDIT, true)
         }
@@ -130,7 +127,7 @@ function editRect(store, map){
 
     function onClick(e) {
         move(e);
-        var feat =  { points: toPoints(outline.getLatLngs())};
+        var feat =  { points: map.toPoints(outline.getLatLngs())};
         store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'rects'});
         store(a.OVERLAY_EDIT, true)
         store(a.DRAWING_MODE_SET);    
@@ -163,7 +160,7 @@ function editNote(config, store, map)
         var style = config.overlay.types.notes[type].style;
         var $text = new Text([e.latlng],  text, 0, style).addTo(map)        
         var feat = {
-            points: toPoints($text.getLatLngs()),
+            points: map.toPoints($text.getLatLngs()),
             rotate: 0,
             text: text,
             type: type         

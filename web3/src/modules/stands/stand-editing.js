@@ -2,7 +2,7 @@
 import * as m from '../../map/modes.js'
 import * as a from '../../actions.js'
 import {selectedStand, selectedStandsId} from '../../state.js'
-import {str, toPoints} from '../../utils/utils.js'
+import {str} from '../../utils/utils.js'
 import {Stand} from '../../svg/leaflet-stand.js'
 
 
@@ -22,7 +22,7 @@ export default function(config, store, map, standMapView){
 
     function onSelectedGeometryChange(e){
         var stand = selectedStand(store);
-        var points = toPoints($stand.getLatLngs())
+        var points = map.toPoints($stand.getLatLngs())
         store(a.STAND_POINTS_UPDATE, {stand: stand, points:points})
     }
 
@@ -32,7 +32,6 @@ export default function(config, store, map, standMapView){
             $stand.off('editable:vertex:dragend', onSelectedGeometryChange)
             $stand.disableEdit();
             store.off('entities.stands.'+$stand.stands_id+'.'+$stand.id, onStandSelect);            
-            console.log('disableEdit', $stand.id);
             $stand = null;
         }
         var stand = selectedStand(store);
@@ -41,7 +40,6 @@ export default function(config, store, map, standMapView){
             if($stand) {
                 L.setOptions(map.editTools, {skipMiddleMarkers: true, draggable: true});
                 $stand.enableEdit(map);   
-                console.log('enableEdit', $stand.id);
                 
                 $stand.on('editable:dragend', onSelectedGeometryChange)
                 $stand.on('editable:vertex:dragend', onSelectedGeometryChange)
@@ -61,18 +59,26 @@ function edit(store, map){
     var openWalls = 1;
 
     function move(e){
-        var ce = map.snap(e.latlng);
-        var ll = [[-10,-10],[10,-10], [10,10], [-10,10], [-10,-10] ].map(function(it){
-            return L.latLng(ce.lat+it[0], ce.lng+it[1]);
-        });
-        console.log('move', ll.map( it => it.lat).join(','))
+        var ce = e.latlng;
+        var size = store.state.ui.stands.size;
+        var dx = size.x / 2, dy = size.y / 2;
+        var ll = [[
+            L.latLng(ce.lat - dy, ce.lng - dx),
+            L.latLng(ce.lat - dy, ce.lng + dx),
+            L.latLng(ce.lat + dy, ce.lng + dx),
+            L.latLng(ce.lat + dy, ce.lng - dx),
+            L.latLng(ce.lat - dy, ce.lng - dx)
+        ].map(map.snap)];
+        // var ll = [[-10,-10],[10,-10], [10,10], [-10,10], [-10,-10] ].map(function(it){
+        //     return L.latLng(ce.lat+it[0], ce.lng+it[1]);
+        // });
         outline.setLatLngs(ll);
     }
 
     function onClick(e) {
         move(e);
         var type = store.state.ui.stands.type;
-        var feat =  { points: toPoints(outline.getLatLngs()), openWalls: openWalls, rotate: 0, type: type};
+        var feat =  { points: map.toPoints(outline.getLatLngs()), openWalls: openWalls, rotate: 0, type: type};
         store(a.STAND_ADD, feat);
         store(a.DRAWING_MODE_SET);  
         L.DomEvent.stopPropagation(e);      

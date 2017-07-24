@@ -71,8 +71,5 @@ export default function(config, store, map, overlayMapView)
     });
 
     store.on('ui.overlay.feat', closeTooltip);
-    // store.on('ui.overlay.feat', onSelectFeat);
-    // map.on('click', closeTooltip);
-
-  
+   
 }

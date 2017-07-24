@@ -39,7 +39,7 @@ def pavilion_update(id, pavi):
     with pavilions() as pavis:
         if id == 0 or id == '0':
             pavilion = {}
-            id = str(int(max(pavis.keys())) + 1) if pavis else '1'
+            id = str(max(map(int, pavis.keys())) + 1) if pavis else '1'
         else:
             pavilion = pavis.get(id, {})
         pavilion = dict(pavilion, **pavi)
@@ -122,7 +122,7 @@ def stand_update(layer_id, stand):
         stands = layers.get(layer_id, {})
         stand_id = stand.get('id')
         if stand_id is None:
-            stand_id = str(int(max(stands.keys())) + 1) if stands else '1'
+            stand_id = str(max(map(int, stands.keys())) + 1) if stands else '1'
         stand = dict(stand, id=stand_id)
         stands[stand_id] = stand
         layers[layer_id] = stands
