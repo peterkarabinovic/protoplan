@@ -86,8 +86,8 @@ export function GridPanel(map){
         $gridX.call(gridAxisX);
         $gridY.call(gridAxisY);
         
-        gradation = Math.max(d3.tickStep(b.getWest(), b.getEast(), ticks[0]) / 2, 0.5)
-        console.log('gradation', gradation)
+        // gradation = d3.tickStep(b.getWest(), b.getEast(), ticks[0]) 
+        // console.log('gradation', gradation)
     } 
 
     map.on('move', render);

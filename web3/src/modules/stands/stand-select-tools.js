@@ -58,4 +58,6 @@ export default function(config, store, map, standMapView)
 
     standMapView.standsGroup.on('click', onStandClick);
     standMapView.standsGroup.on('contextmenu', onStandContext);
+
+    store.on('ui.stands.sel', closeTooltip);
 }

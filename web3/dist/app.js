@@ -1145,8 +1145,8 @@ function GridPanel(map){
         $gridX.call(gridAxisX);
         $gridY.call(gridAxisY);
         
-        gradation = Math.max(d3.tickStep(b.getWest(), b.getEast(), ticks[0]) / 2, 0.5);
-        console.log('gradation', gradation);
+        // gradation = d3.tickStep(b.getWest(), b.getEast(), ticks[0]) 
+        // console.log('gradation', gradation)
     }; 
 
     map.on('move', render);
@@ -1168,7 +1168,6 @@ var Map = function(el, store)
         attributionControl: false,
         editable: true
     });
-    // Snapper(map);
     window.map = map$1;
 
     gridPanel = GridPanel(map$1);
@@ -2849,6 +2848,8 @@ var StandySelectTools = function(config, store, map, standMapView)
 
     standMapView.standsGroup.on('click', onStandClick);
     standMapView.standsGroup.on('contextmenu', onStandContext);
+
+    store.on('ui.stands.sel', closeTooltip);
 };
 
 function StandView(config, store){
