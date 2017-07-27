@@ -1,0 +1,1 @@
+Here I've collected simply modified tiny libraries for work with es6 modules build tool

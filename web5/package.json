@@ -1,0 +1,24 @@
+{
+  "name": "web4",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "rollup -c -w -i src/app.js -f iife -o dist/app.js",
+    "build": "rollup -c -i src/app.js -f iife -o dist/app.js && uglifyjs -c \"evaluate=false\"  -m -o dist/app.min.js dist/app.js",
+    "dev-base": "rollup -c -w -i src/app-base.js -f iife -o dist/app-base.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bind.js": "^1.1.1",
+    "d3": "^4.10.0",
+    "leaflet": "^1.1.0"
+  },
+  "devDependencies": {
+    "rollup": "^0.45.2",
+    "rollup-plugin-node-resolve": "^3.0.0",
+    "rollup-watch": "^4.3.1",
+    "uglify-js": "^3.0.26"
+  }
+}
