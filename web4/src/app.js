@@ -3,7 +3,7 @@ import {LatLng} from 'leaflet/src/geo/LatLng.js'
 import {tileLayer} from 'leaflet/src/layer/tile/TileLayer.js'
 // import json from 'd3-request/src/json.js'
 // import ticks from 'd3-array/src/ticks.js'
-import select from 'd3-selection/src/select.js'
+import select from 'd3-selection/src/select.js' 
 import _  from './underscore-es.js'
 
   
