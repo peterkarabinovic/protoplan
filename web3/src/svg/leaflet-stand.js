@@ -9,7 +9,7 @@ export var Stand = L.Polygon.extend({
     },
     
 
-    initialize: function (latlngs, options, openWalls){
+    initialize: function (latlngs, options, openWalls, label){
         options = _.extend(options, {editorClass: StandEditor});
         this.openWalls = openWalls || 1;
         L.Polygon.prototype.initialize.call(this, latlngs, options);

@@ -2,12 +2,13 @@ import * as math from './math.js'
 import * as a from '../actions.js'
 import {GridPanel} from './grid-panel.js'
 import {handle} from '../utils/redux.js'
+import {EventHandlerStack} from '../utils/leaflet-handler-stack.js'
 
 L.Browser.touch = false;
 
 export default function(el, store)
 {
-    map = L.map(el, 
+    var map = L.map(el, 
     {
         crs: L.CRS.Simple,
         zoomControl: false,
@@ -16,18 +17,20 @@ export default function(el, store)
     });
     window.map = map;
 
+    map = EventHandlerStack(map);
     gridPanel = GridPanel(map);
 
-    // we sore on server as array [lng, lat]
+    // we store on server as array [lng, lat]
     map.toPoints = function(latLngs){
         latLngs = _.flatten(latLngs);
         return latLngs.map(map.snap).map(function(ll){ return [ll.lng, ll.lat] });
     }
 
 
-    map.on('click', function(){
+    map.inqueue_on('click', function(){
         store(a.UNSELECT_ALL);
     })
+
     // State changes
     store.on('map.size_m', function(e) { updateMapSize(e.new_val); });
     return map;

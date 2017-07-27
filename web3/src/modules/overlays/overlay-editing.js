@@ -131,7 +131,7 @@ function editRect(store, map){
         store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'rects'});
         store(a.OVERLAY_EDIT, true)
         store(a.DRAWING_MODE_SET);    
-        L.DomEvent.stopPropagation(e);    
+        return true; 
     }
 
     function enter(w){
@@ -139,14 +139,14 @@ function editRect(store, map){
         outline.setLatLngs([]);
         map.addLayer(outline);
         map.on('mousemove', move);      
-        map.on('click', onClick);      
+        map.inqueue_on('click', onClick);      
     }
 
     function exit(){
         L.DomUtil.removeClass(map._container,'move-cursor');
         map.removeLayer(outline);
         map.off('mousemove', move);
-        map.off('click', onClick);      
+        map.inqueue_off('click', onClick);      
         
     }
     return {enter: enter, exit: exit}    
@@ -169,18 +169,18 @@ function editNote(config, store, map)
         store(a.OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
         store(a.OVERLAY_EDIT, true)
         store(a.DRAWING_MODE_SET);
-        L.DomEvent.stopPropagation(e);
+        return true;
     }
 
     function enter() 
     {        
         L.DomUtil.addClass(map._container,'text-cusor');
-        map.on('click',onClick);    
+        map.inqueue_on('click',onClick);    
     }
 
     function exit(){
         L.DomUtil.removeClass(map._container,'text-cusor');
-        map.off('click',onClick);            
+        map.inqueue_off('click',onClick);            
     }
 
     return {enter:enter, exit:exit};

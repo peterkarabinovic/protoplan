@@ -259,6 +259,6 @@ def delete_stand(stands_id, stand_id):
 
 
 
-server = wsgi.WSGIServer(('127.0.0.1', 5000), application=app, log=None)
+server = wsgi.WSGIServer(('127.0.0.1', 5001), application=app, log=None)
 server.serve_forever()
 

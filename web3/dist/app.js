@@ -188,6 +188,11 @@ function events_finder(new_obj, old_obj)
     }
 }
 
+/**
+ * find the properties that is not equals
+ * @param {Object} obj1  
+ * @param {Object} obj2 
+ */
 function diffs(new_obj, old_obj, keys)
 {
     return keys.reduce(function(diffs, key){
@@ -328,6 +333,12 @@ var Immutable = (function(){
     };
     return i;
 })();
+
+/**
+ * Add method `prop` for store instance to track changes of properties and store in changable object {$val: <value>} 
+ * need for work with Vue.js
+ * @param {*} store of redux.js 
+ */
 
 function bindProp(store)
 {
@@ -1050,11 +1061,9 @@ function maxZoom(img_size, min_width){
 }
 
 /**
- * Constructor of Envelope
- * @param {*} min_x 
- * @param {*} min_y 
- * @param {*} max_x 
- * @param {*} max_y 
+ * As LatLngBounds with its SouthNorthWestEast stuff mislead with planar metric space
+ * Envelope seems more convenient 
+ * @param {LatLngBounds} bounds 
  */
 
 function GridPanel(map){
@@ -1159,34 +1168,80 @@ function GridPanel(map){
     }
 }
 
+/**
+ * Add inqueue_on/inqueue_off methods on obj
+ * with these methods clients could add event handler into stack
+ * event handlers call from the tail, if handler return true? then processing stop
+ * @param {*} obj 
+ */
+function EventHandlerStack(obj)
+{
+    var stack = {};
+    obj.inqueue_on = function(event_type, handler, context){
+        var q = stack[event_type];
+        if(!q){
+            q = {};
+            q.handlers = [];
+            q.fn = function(event){
+                var q = stack[event_type] || {handlers: []};
+                for(var i=q.handlers.length-1; i>=0; i--){
+                    var h = q.handlers[i];
+                    if( h.call(h._context || this, event) === true )
+                        break;
+                }
+            };
+            stack[event_type] = q;
+            obj.on(event_type, q.fn);
+        }
+        handler._context = context;
+        q.handlers.push(handler);
+    };
+
+    obj.inqueue_off = function(event_type, handler){
+        var q = stack[event_type];
+        if(q){
+            q.handlers = _.without(q.handlers, handler);
+            if(!q.handlers.length){
+                obj.off(event_type, q.fn);
+                delete stack[event_type];
+            }
+        }
+    };
+
+    return obj;
+
+}
+
 L.Browser.touch = false;
 
 var Map = function(el, store)
 {
-    map$1 = L.map(el, 
+    var map = L.map(el, 
     {
         crs: L.CRS.Simple,
         zoomControl: false,
         attributionControl: false,
         editable: true
     });
-    window.map = map$1;
+    window.map = map;
 
-    gridPanel = GridPanel(map$1);
+    map = EventHandlerStack(map);
+    gridPanel = GridPanel(map);
 
-    // we sore on server as array [lng, lat]
-    map$1.toPoints = function(latLngs){
+    // we store on server as array [lng, lat]
+    map.toPoints = function(latLngs){
         latLngs = _.flatten(latLngs);
-        return latLngs.map(map$1.snap).map(function(ll){ return [ll.lng, ll.lat] });
+        return latLngs.map(map.snap).map(function(ll){ return [ll.lng, ll.lat] });
     };
 
 
-    map$1.on('click', function(){
+    map.inqueue_on('click', function(){
         store(UNSELECT_ALL);
     });
+
     // State changes
     store.on('map.size_m', function(e) { updateMapSize(e.new_val); });
-    return map$1;
+    return map;
 };
 
 var map$1  = null;
@@ -2048,6 +2103,28 @@ var UniformRectEditor = L.Editable.RectangleEditor.extend({
     }
 });
 
+/**
+ * 
+ *  overlay state 
+ * {
+ *      id: overlayId,
+ *      lines: {
+ *          "id1": { points: [], type: {} },
+ *          "id2": { points: [], type: {} },
+ *      },
+ *      rects: {
+ *          "id1": { points: [], type: {} },
+ *          "id2": { points: [], type: {} },
+ *      },
+ *      notes: {
+ *          "id1": { points: [], rotate: number, text: string, type: {} },
+ *          "id2": { points: [], rotate: number, text: string, type: {} }
+ *      }
+ * }
+ * 
+ *  
+ */
+
 var OverlayMapView = function(config, store, map)
 {
     var lineGroup = L.featureGroup().addTo(map);
@@ -2320,7 +2397,7 @@ function editRect(store, map){
         store(OVERLAY_FEAT_ADD, {feat: feat, cat: 'rects'});
         store(OVERLAY_EDIT, true);
         store(DRAWING_MODE_SET);    
-        L.DomEvent.stopPropagation(e);    
+        return true; 
     }
 
     function enter(w){
@@ -2328,14 +2405,14 @@ function editRect(store, map){
         outline.setLatLngs([]);
         map.addLayer(outline);
         map.on('mousemove', move);      
-        map.on('click', onClick);      
+        map.inqueue_on('click', onClick);      
     }
 
     function exit(){
         L.DomUtil.removeClass(map._container,'move-cursor');
         map.removeLayer(outline);
         map.off('mousemove', move);
-        map.off('click', onClick);      
+        map.inqueue_off('click', onClick);      
         
     }
     return {enter: enter, exit: exit}    
@@ -2358,18 +2435,18 @@ function editNote(config, store, map)
         store(OVERLAY_FEAT_ADD, {feat: feat, cat: 'notes'});
         store(OVERLAY_EDIT, true);
         store(DRAWING_MODE_SET);
-        L.DomEvent.stopPropagation(e);
+        return true;
     }
 
     function enter() 
     {        
         L.DomUtil.addClass(map._container,'text-cusor');
-        map.on('click',onClick);    
+        map.inqueue_on('click',onClick);    
     }
 
     function exit(){
         L.DomUtil.removeClass(map._container,'text-cusor');
-        map.off('click',onClick);            
+        map.inqueue_off('click',onClick);            
     }
 
     return {enter:enter, exit:exit};
@@ -2497,7 +2574,7 @@ var Stand = L.Polygon.extend({
     },
     
 
-    initialize: function (latlngs, options, openWalls){
+    initialize: function (latlngs, options, openWalls, label){
         options = _.extend(options, {editorClass: StandEditor});
         this.openWalls = openWalls || 1;
         L.Polygon.prototype.initialize.call(this, latlngs, options);
@@ -2690,7 +2767,24 @@ var DoubleLine = L.Polyline.extend({
     
 });
 
-var StandMapView = function(config, store, map){
+/**
+ * 
+ *  stands state 
+ * {
+ *      "standsId": {
+ *          "id1": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *          "id2": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *          "id3": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *          "id4": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *          "id5": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *          "id6": { points: [], rotate: number, openWalls: number, type: {}, label: string, label_point: [] },
+ *      }
+ * }
+ * 
+ *  
+ */
+
+ var StandMapView = function(config, store, map){
     var standsGroup = L.featureGroup().addTo(map);
     var stands = {};
 
@@ -2816,7 +2910,7 @@ function edit(store, map){
         var feat =  { points: map.toPoints(outline.getLatLngs()), openWalls: openWalls, rotate: 0, type: type};
         store(STAND_ADD, feat);
         store(DRAWING_MODE_SET);  
-        L.DomEvent.stopPropagation(e);      
+        return true;     
     }
 
     function enter(w){
@@ -2826,14 +2920,14 @@ function edit(store, map){
         // move({latlng: map.getCenter()});
         map.addLayer(outline);
         map.on('mousemove', move);      
-        map.on('click', onClick);      
+        map.inqueue_on('click', onClick);      
     }
 
     function exit(){
         L.DomUtil.removeClass(map._container,'move-cursor');
         map.removeLayer(outline);
         map.off('mousemove', move);
-        map.off('click', onClick);      
+        map.inqueue_off('click', onClick);      
         
     }
     return {enter: enter, exit: exit}

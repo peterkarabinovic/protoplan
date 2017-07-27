@@ -81,7 +81,7 @@ function edit(store, map){
         var feat =  { points: map.toPoints(outline.getLatLngs()), openWalls: openWalls, rotate: 0, type: type};
         store(a.STAND_ADD, feat);
         store(a.DRAWING_MODE_SET);  
-        L.DomEvent.stopPropagation(e);      
+        return true;     
     }
 
     function enter(w){
@@ -91,14 +91,14 @@ function edit(store, map){
         // move({latlng: map.getCenter()});
         map.addLayer(outline);
         map.on('mousemove', move);      
-        map.on('click', onClick);      
+        map.inqueue_on('click', onClick);      
     }
 
     function exit(){
         L.DomUtil.removeClass(map._container,'move-cursor');
         map.removeLayer(outline);
         map.off('mousemove', move);
-        map.off('click', onClick);      
+        map.inqueue_off('click', onClick);      
         
     }
     return {enter: enter, exit: exit}
