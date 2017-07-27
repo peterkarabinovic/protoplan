@@ -1,8 +1,3 @@
-(function (leaflet_src_map_index_js,leaflet_src_geo_LatLng_js,leaflet_src_layer_tile_TileLayer_js,d3Selection_src_select_js) {
-'use strict';
-
-d3Selection_src_select_js = d3Selection_src_select_js && 'default' in d3Selection_src_select_js ? d3Selection_src_select_js['default'] : d3Selection_src_select_js;
-
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -1543,29 +1538,4 @@ var root = (function() {
   return this;
 }).call({});
 
-var _ = root._;
-
-// import json from 'd3-request/src/json.js'
-// import ticks from 'd3-array/src/ticks.js'
-var map = new leaflet_src_map_index_js.Map('map', {
-    center: new leaflet_src_geo_LatLng_js.LatLng(50.455002, 30.511284),
-    zoom: 12,
-    layers : [
-            new leaflet_src_layer_tile_TileLayer_js.tileLayer('http://tms{s}.visicom.ua/2.0.0/planet3/base_ru/{z}/{x}/{y}.png',{
-                    maxZoom : 19,
-                    tms : true,
-                    attribution : 'Данные компании © 2017 <a href="http://visicom.ua/">Визиком</a>',
-                    subdomains : '123'
-            })
-    ]    
-});
-
-console.log(_.map([1,2,3,4], function(it) {return 'kino ' + it} ).join('\n')); 
-
-// json('http://api.visicom.ua/data-api/3.0/ru/feature/POIA1KIGKN.json', it=>{
-//         console.log(it); 
-// }) 
-
-// console.log(ticks(0,10,5))
-
-}(leaflet_src_map_index_js,leaflet_src_geo_LatLng_js,leaflet_src_layer_tile_TileLayer_js,d3Selection_src_select_js));
+export default root._;
