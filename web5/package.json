@@ -11,7 +11,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "bind.js": "^1.1.1",
     "d3": "^4.10.0",
     "leaflet": "^1.1.0"
   },

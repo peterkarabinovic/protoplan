@@ -552,12 +552,7 @@ export default Bind = (function Bind(global) {
     return this;
   }
 
-  // returns a vanilla object - without setters & getters
-  Bind.prototype.__export = function () {
-    return __export({}, this);
-  };
-
   return Bind;
 
-})(this);
+})({});
 

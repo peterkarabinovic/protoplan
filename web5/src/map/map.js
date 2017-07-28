@@ -1,4 +1,4 @@
-import _  from '..//es6/underscore.js'
+import _  from '../es6/underscore.js'
 import * as math from './math.js'
 import * as a from '../actions.js'
 // import {GridPanel} from './grid-panel.js'
@@ -15,9 +15,13 @@ export default function(el, store)
         crs: CRSSimple,
         zoomControl: false,
         attributionControl: false,
-        editable: true
+        editable: true,
+        // zoomAnimation: false
     });
     window.map = map;
+
+    map.ll2cp = map.latLngToContainerPoint;
+    map.ll2lp = map.latLngToLayerPoint;
 
     map = EventHandlerStack(map);
     // gridPanel = GridPanel(map);

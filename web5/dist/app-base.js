@@ -1543,569 +1543,6 @@ var root = (function() {
 
 var _ = root._;
 
-// author: Remy Sharp
-// license: http://rem.mit-license.org/
-// source: https://github.com/remy/bind/
-/* eslint-env browser */
-var Bind$1 = Bind = (function Bind(global) {
-  'use strict';
-  // support check
-  if (!Function.bind || !Object.defineProperty) {
-    throw new Error('Prerequisite APIs not available.');
-  }
-
-  var debug = false;
-
-  var array = [];
-  var isArray = Array.isArray;
-  var o = 'object';
-  var pass = function (v) {
-    return v;
-  };
-  var tryit = function (fn) {
-    return function () {
-      try {
-        return fn.apply(this, arguments);
-      } catch (e) {
-        console.error(e.stack ? e.stack : e);
-      }
-    };
-  };
-
-  function safe(str) {
-    return (str + '').replace(/[<>]/g, function (m) {
-      return {
-        '>': '&gt;',
-        '<': '&lt;',
-      }[m];
-    });
-  }
-
-  // quicker forEach, also means I can use the same forEach on nodes, etc.
-  function forEach(subject, fn) {
-    var length = subject.length;
-    for (var i = 0; i < length; i++) {
-      fn(subject[i], i, subject);
-    }
-  }
-
-  // create an array like object that mirrors all the modifying array methods
-  // so that we can hook into and call our callback action when it's changed.
-  function AugmentedArray(callback, settings) {
-    var methods = 'pop push reverse shift sort splice unshift'.split(' ');
-    forEach(methods, function eachArrayMethod(method) {
-      this[method] = function augmentedMethod() {
-        // flag that we're about to change (used later in bind)
-        this.__dirty = true;
-
-        var ret = __export({}, array[method].apply(this, arguments));
-        delete this.__dirty;
-        if (callback && settings.ready) {
-          callback(this);
-        }
-
-        return ret;
-      }.bind(this);
-    }.bind(this));
-
-    var length = this.length;
-
-    Object.defineProperty(this, 'length', {
-      configurable: false, // don't allow it to be deleted
-      enumerable: true,
-      set: function (v) {
-        if (this.__dirty) {
-          length = v;
-          // now let the native array do it's thing
-          return;
-        }
-        var newLength = v * 1; // do a simple coersion
-        // note: if `v` is a fraction, then it *should* throw an exception
-        // "Invalid array length" but we don't support right now.
-        if (length !== newLength) {
-          if (newLength > length) {
-            this.push.apply(this, new Array(newLength - length));
-          } else {
-            this.splice(newLength);
-          }
-
-          length = newLength;
-        }
-
-        return v;
-      },
-      get: function () {
-        return length;
-      },
-    });
-    return this;
-  }
-
-  // then lift the rest of the methods from a new array object
-  AugmentedArray.prototype = [];
-
-  // this is the main body of the bind library, and it is called recursively
-  // as we go deeper into the object.
-  // target is our result
-  // object is the source values
-  // settings is bind's settings (which contains mapping and callbacks)
-  // _path is a representation of the object path from the root
-  function extend(target, object, settings, _path) {
-    if (!_path) { _path = []; }
-
-    if (settings.ready && object.__callback) {
-      return target;
-    }
-
-    // don't rebind
-    if (object instanceof Bind) {
-      return object;
-    }
-
-    // this is a conditional because we're also supporting node environment
-    var $;
-    try {
-      var context = settings.context || document;
-      $ = context.querySelectorAll.bind(context);
-    } catch (e) {}
-
-    // loop through each property, and make getters & setters for
-    // each type of "regular" value. If the key/value pair is an
-    // object, then recursively call extend with the target and
-    // object as the next level down.
-    forEach(Object.getOwnPropertyNames(object), function eachProp(key) {
-      // ignore our special hooks
-      if (key === '__callback') {
-        return;
-      }
-
-      var value = object[key];
-      // create a new copy of the mapping path
-      var path = [].slice.call(_path);
-      var callback;
-      var transform = function (v) {
-        return safe(v);
-      };
-      var parse = pass;
-
-      // now create a path, so that obj { user: { name: xxx }} is
-      // user.name when joined later.
-      path.push(key);
-
-      var selector = settings.mapping[path.join('.')];
-
-      if (debug) {
-        console.log('key: %s / %s', key, path.join('.'), selector);
-      }
-
-      // then we've got an advanced config - rather than 1-1 mapping
-      if (selector && selector.toString() === '[object Object]') {
-        if (selector.callback) {
-          callback = selector.callback;
-        }
-        if (selector.transform) {
-          transform = tryit(selector.transform.bind({ safe: safe }));
-        }
-        if (selector.parse) {
-          parse = tryit(selector.parse);
-        }
-        // finally assign the DOM selector to the selector var so code
-        // can continue as it was
-        selector = selector.dom;
-      }
-
-      var elements;
-      if (typeof selector === 'string') {
-        // cache the matched elements. Note the :) is because qSA won't allow an
-        // empty (or undefined) string so I like the smilie.
-        elements = $(selector || '☺');
-      } else if (global.Element && selector instanceof global.Element) {
-        elements = [selector];
-      }
-
-      // look for the path in the mapping arg, and if the gave
-      // us a callback, use that, otherwise...
-      if (typeof selector === 'function') {
-        callback = selector;
-      } else if (elements) {
-        if (elements.length === 0) {
-          console.warn('No elements found against "' + selector + '" selector');
-        }
-
-        // create a callback that loops over *all* the elements
-        // matched from the selector (set up below), that checks
-        // the node type, and either sets the input.value or
-        // element.innerHTML to the value
-        var valueSetters = ['OPTION', 'INPUT', 'PROGRESS', 'TEXTAREA'];
-
-        if (value === null || value === undefined) {
-          if (valueSetters.indexOf(elements[0].nodeName) !== -1) {
-            if (elements[0].hasOwnProperty('checked')) {
-              value = parse(elements[0].value === 'on' ? elements[0].checked : elements[0].value);
-            } else {
-              value = parse(elements[0].value);
-            }
-          } else {
-            value = parse(elements[0].innerHTML);
-          }
-        }
-
-        var oldCallback = callback;
-        callback = function (value) {
-          // make it a live selection
-          elements = $(selector || '☺');
-          if (elements) {
-            forEach(elements, function (element) {
-              // don't try to update the dom if the change came from the DOM in
-              // the first place (see where `dirty = true`)
-              if (element.__dirty) {
-                return;
-              }
-
-              if (valueSetters.indexOf(element.nodeName) !== -1) {
-                // TODO select[multiple]
-                // special case for multi-select items
-                var result = transform(value, target);
-                if (element.type === 'checkbox') {
-                  if (value instanceof Array) {
-                    var found = value.filter(function (value) {
-                      if (value === element.value) {
-                        element.checked = element.value === value;
-                        return true;
-                      }
-                    });
-                    if (found.length === 0) {
-                      element.checked = false;
-                    }
-                  } else if (typeof value === 'boolean') {
-                    element.checked = value;
-                  }
-                } else if (element.type === 'radio') {
-                  element.checked = element.value === result;
-                } else if (typeof element.value === 'number') {
-                  try {
-                    element.value = result * 1;
-                  } catch (e) {
-                    console.error(e.message);
-                  }
-                } else {
-                  element.value = result;
-                }
-              } else {
-                // to detect both arrays & augmented arrays
-                if (!(value instanceof Array)) {
-                  value = [value];
-                }
-                var html = [];
-
-                forEach(value, function (value) {
-                  html.push(transform(value, target));
-                });
-                // peek the first item, if it's a node, append
-                // otherwise set the innerHTML
-                if (typeof html[0] === 'object') {
-                  element.innerHTML = ''; // blow away original
-                  html.forEach(function (el) {
-                    element.appendChild(el);
-                  });
-                } else {
-                  element.innerHTML = html.join('');
-                }
-              }
-            });
-          }
-          if (oldCallback) {
-            oldCallback.apply(target, arguments);
-          }
-        };
-
-        // let's make the binding two way...
-        // note that this doesn't support event delegation
-        forEach(elements, function (element) {
-          if (element.nodeName === 'INPUT' || element.nodeName === 'SELECT' || element.nodeName === 'TEXTAREA') {
-
-            // build up the event handler function
-            var oninput = function () {
-              // we set a dirty flag against this dom node to prevent a
-              // circular update / max stack explode
-              this.__dirty = true;
-              var result;
-              if (element.type === 'checkbox') {
-                var inputs = (element.form || document).querySelectorAll('input[name="' + element.name + '"][type="checkbox"]');
-                if (target[key] instanceof Array) {
-                  var results = [];
-                  forEach(inputs, function (input) {
-                    if (input.checked) {
-                      results.push(parse(input.value === 'on' ? input.checked : input.value));
-                    }
-                  });
-                  result = results;
-                } else {
-                  result = parse(this.value === 'on' ? this.checked : this.value);
-                }
-              } else {
-                if (element.type === 'radio') {
-                  result = parse(this.value === 'on' ? this.checked : this.value);
-                }
-                if (typeof target[key] === 'number') {
-                  result = parse(this.value * 1);
-                } else {
-                  result = parse(this.value);
-                }
-              }
-
-              // if parse didn't return anything, then assume this is a mistake
-              // but...you know what they say about assumption being the mother
-              // of all fucks ups?
-              if (result === undefined) {
-                result = this.value;
-              }
-
-              target[key] = result;
-
-              this.__dirty = false;
-            };
-
-            var event = {
-              // select: 'change',
-              checkbox: 'change',
-              radio: 'change',
-            }[element.type];
-
-            element.addEventListener(event || 'input', oninput);
-          }
-        });
-      }
-
-      if (callback) {
-        path.reduce(function (prev, curr, i, all) {
-          if (!prev[curr]) {
-            prev[curr] = {};
-          }
-
-          // if we're at the tip then add the callback
-          if (i === all.length - 1) {
-            prev[curr].__callback = callback;
-          }
-
-          return prev[curr];
-        }, settings.callbacks);
-
-      }
-
-      // now that the callback has been configured, wrap it to ensure that
-      // it's always callable, but also then fires a callback on it's parent
-      var findCallback = function findCallback(value) {
-        var callbacks = [];
-        var values = [];
-        var instance = settings.instance;
-        var dirty = false;
-        var always = false;
-
-        if (debug) {
-          console.log('> finding callback for %s', key, path);
-        }
-
-        path.reduce(function (prev, curr, i) {
-          if (prev && prev[curr] && curr) {
-            instance = instance[curr];
-
-            if (instance === null || instance === undefined) {
-              return prev[curr] || {};
-            }
-            if (typeof prev[curr].__callback === 'function') {
-              var v = i === path.length - 1 ? value : instance;
-              if (instance.__dirty) {
-                dirty = true;
-              }
-
-              if (i === path.length - 1 && prev[curr].__callback) {
-                always = {
-                  path: path.join('.'),
-                  callback: prev[curr].__callback,
-                  instance: v,
-                };
-              }
-
-              if (!dirty) {
-                values.push(__export(v instanceof Array ? [] : {}, v));
-                callbacks.push(prev[curr].__callback);
-              }
-            }
-            return prev[curr] || {};
-          }
-        }, settings.callbacks);
-
-        if (!dirty) {
-          values.reverse();
-          callbacks.reverse().forEach(function (fn, i) {
-            fn.call(settings.instance, values[i]);
-          });
-        }
-
-        if (dirty && always) {
-          instance = always.instance;
-          always.callback.call(settings.instance, __export(instance instanceof Array ? [] : {}, instance));
-        }
-      };
-
-      // set up a setter and getter for this property.
-      // if the set value is another object, iterate over it, re-extending
-      // so it gets these setters and getters on the set object properties.
-      // when the setter is called, check if there's a callback, if so: fire.
-      var definition = {
-        // configurable to allow object properties to be later deleted
-        configurable: true,
-        enumerable: true,
-        set: function (v) {
-          var old = value !== v ? value : undefined;
-
-
-          // if the value we're setting is an object, enumerate the properties
-          // and apply new setter & getters, returning our bound object
-          if (settings.ready && typeof v === o && v !== null && !isArray(v) && !v.__callback) {
-            value = extend(target[key] ? __export({}, target[key]) : {}, v, settings, path);
-          } else if (isArray(v)) {
-            value = extend(new AugmentedArray(findCallback, settings), v, settings, path);
-          } else {
-            value = v;
-          }
-
-          if (debug) {
-            console.log('set: key(%s): %s -> %s', key, JSON.stringify(old), JSON.stringify(v));
-          }
-
-          // expose the callback so that child properties can call the
-          // parent callback function
-          // if (target[key] instanceof Object && !target[key].__callback) {
-          //   target[key].__callback = findCallback;
-          // }
-
-          // only fire the callback immediately when the initial data binding
-          // is set up. If it's not, then defer until complete
-          if (settings.ready) {
-            // this is a run-time change
-            findCallback(value);
-          } else {
-            // defer the callback until we're fully booted
-            if (typeof settings.mapping[path.join('.')] !== 'undefined') {
-              settings.deferred.push(findCallback.bind(target, value, old));
-            }
-          }
-        },
-        get: function () {
-          return value;
-        },
-      };
-
-      // don't die trying...
-      try {
-        Object.defineProperty(target, key, definition);
-      } catch (e) {
-        if (debug) {
-          console.log('failed on Object.defineProperty', e.toString(), e.stack);
-        }
-      }
-
-      // finally, set the target aka the returned value's property to the value
-      // we're iterating over. note that this means the callbacks are fired
-      // right away - so we defer the callbacks on first run until the set up is
-      // finished.
-      if (typeof value === o && value !== null && !isArray(value)) {
-        target[key] = extend(target[key] || {}, value, settings, path);
-      } else if (isArray(value)) {
-        target[key] = extend(new AugmentedArray(findCallback, settings), value, settings, path);
-      } else if (target instanceof AugmentedArray) {
-        // do nothing
-      } else {
-        target[key] = value;
-      }
-    });
-
-    if (target instanceof AugmentedArray) {
-      target.push.apply(target, object);
-    }
-
-    return target;
-  }
-
-  function __export(target, object) {
-    if (!(object instanceof Object)) {
-      return object; // this is a primative
-    }
-
-    forEach(Object.getOwnPropertyNames(object), function (key) {
-      var value = object[key];
-
-      // ignore properties on the prototype (pretty sure there's a better way)
-      if (Bind.prototype[key] || key === '__callback') {
-        return;
-      }
-
-      if (typeof value === o && value !== null && value instanceof Array) {
-        target[key] = [].map.call(value, function (value) {
-          return value instanceof Object ?
-            __export(target[key] || {}, value) :
-            value;
-        });
-      } else if (typeof value === o && value !== null && !isArray(value) &&
-        value.toString() === '[Object object]') {
-        target[key] = __export(target[key] || {}, value);
-      } else {
-        target[key] = value;
-      }
-    });
-
-    return target;
-  }
-
-
-  function Bind(obj, mapping, context) {
-    if (!this || this === global) {
-      return new Bind(obj, mapping);
-    }
-
-    var settings = {
-      context: context || global.document,
-      mapping: mapping || {},
-      callbacks: {},
-      deferred: [],
-      ready: false,
-      instance: this,
-    };
-
-    extend(this, obj, settings);
-
-    // allow object updates to happen now, otherwise we end up iterating the
-    // setter & getter methods, which causes multiple callbacks to run
-    settings.ready = true;
-
-    // if there's deferred callbacks, let's hit them now the binding is set up
-    if (settings.deferred.length) {
-      // note: this callback will fire right away, so the callbacks
-      // may not want to directly reference the returned object,
-      // but reference the passed in "new" value or `this` keyword
-      // this can be worked around by wrapping the following code
-      // in a setTimeout(fn, 0) - but this means any changes that are
-      // synchonous in the code that creates the bind object, will
-      // run *before* this callback loop runs. Basically: race.
-      forEach(settings.deferred, function deferreds(fn) {
-        fn();
-      });
-    }
-
-    return this;
-  }
-
-  // returns a vanilla object - without setters & getters
-  Bind.prototype.__export = function () {
-    return __export({}, this);
-  };
-
-  return Bind;
-
-})(undefined);
-
 function Store(reducers, middleware)
 {
     middleware = middleware || [];
@@ -2839,7 +2276,33 @@ function stamp(obj) {
 // received by the bound function will be any arguments passed when binding the
 // function, followed by any arguments passed when invoking the bound function.
 // Has an `L.throttle` shortcut.
+function throttle(fn, time, context) {
+	var lock, args, wrapperFn, later;
 
+	later = function () {
+		// reset lock and call if queued
+		lock = false;
+		if (args) {
+			wrapperFn.apply(context, args);
+			args = false;
+		}
+	};
+
+	wrapperFn = function () {
+		if (lock) {
+			// called too soon, queue to call later
+			args = arguments;
+
+		} else {
+			// call and lock until later
+			fn.apply(context, arguments);
+			setTimeout(later, time);
+			lock = true;
+		}
+	};
+
+	return wrapperFn;
+}
 
 // @function wrapNum(num: Number, range: Number[], includeMax?: Boolean): Number
 // Returns the number `num` modulo `range` in such a way so it lies within
@@ -4315,6 +3778,25 @@ function svgCreate(name) {
 // @function pointsToPath(rings: Point[], closed: Boolean): String
 // Generates a SVG path string for multiple rings, with each ring turning
 // into "M..L..L.." instructions
+function pointsToPath(rings, closed) {
+	var str = '',
+	i, j, len, len2, points, p;
+
+	for (i = 0, len = rings.length; i < len; i++) {
+		points = rings[i];
+
+		for (j = 0, len2 = points.length; j < len2; j++) {
+			p = points[j];
+			str += (j ? 'L' : 'M') + p.x + ' ' + p.y;
+		}
+
+		// closes the ring for polygons; "x" is VML syntax
+		str += closed ? (svg ? 'z' : 'x') : '';
+	}
+
+	// SVG complains about empty path strings
+	return str || 'M0 0';
+}
 
 var style = document.documentElement.style;
 
@@ -4873,7 +4355,10 @@ function getWheelDelta(e) {
 
 var skipEvents = {};
 
-
+function fakeStop(e) {
+	// fakes stopPropagation by setting a special event flag, checked/reset with skipped(e)
+	skipEvents[e.type] = true;
+}
 
 function skipped(e) {
 	var events = skipEvents[e.type];
@@ -8090,16 +7575,20 @@ var Simple = extend({}, CRS, {
 	infinite: true
 });
 
-var Map$$1 = function(el, store)
+var Map = function(el, store)
 {
     map$1 = new Map$1(el, 
     {
         crs: Simple,
         zoomControl: false,
         attributionControl: false,
-        editable: true
+        editable: true,
+        // zoomAnimation: false
     });
     window.map = map$1;
+
+    map$1.ll2cp = map$1.latLngToContainerPoint;
+    map$1.ll2lp = map$1.latLngToLayerPoint;
 
     map$1 = EventHandlerStack(map$1);
     // gridPanel = GridPanel(map);
@@ -8616,21 +8105,4578 @@ var imageOverlay = function (url, bounds, options) {
 	return new ImageOverlay(url, bounds, options);
 };
 
+var Renderer = Layer.extend({
+
+	// @section
+	// @aka Renderer options
+	options: {
+		// @option padding: Number = 0.1
+		// How much to extend the clip area around the map view (relative to its size)
+		// e.g. 0.1 would be 10% of map view in each direction
+		padding: 0.1
+	},
+
+	initialize: function (options) {
+		setOptions(this, options);
+		stamp(this);
+		this._layers = this._layers || {};
+	},
+
+	onAdd: function () {
+		if (!this._container) {
+			this._initContainer(); // defined by renderer implementations
+
+			if (this._zoomAnimated) {
+				addClass(this._container, 'leaflet-zoom-animated');
+			}
+		}
+
+		this.getPane().appendChild(this._container);
+		this._update();
+		this.on('update', this._updatePaths, this);
+	},
+
+	onRemove: function () {
+		this.off('update', this._updatePaths, this);
+		this._destroyContainer();
+	},
+
+	getEvents: function () {
+		var events = {
+			viewreset: this._reset,
+			zoom: this._onZoom,
+			moveend: this._update,
+			zoomend: this._onZoomEnd
+		};
+		if (this._zoomAnimated) {
+			events.zoomanim = this._onAnimZoom;
+		}
+		return events;
+	},
+
+	_onAnimZoom: function (ev) {
+		this._updateTransform(ev.center, ev.zoom);
+	},
+
+	_onZoom: function () {
+		this._updateTransform(this._map.getCenter(), this._map.getZoom());
+	},
+
+	_updateTransform: function (center, zoom) {
+		var scale = this._map.getZoomScale(zoom, this._zoom),
+		    position = getPosition(this._container),
+		    viewHalf = this._map.getSize().multiplyBy(0.5 + this.options.padding),
+		    currentCenterPoint = this._map.project(this._center, zoom),
+		    destCenterPoint = this._map.project(center, zoom),
+		    centerOffset = destCenterPoint.subtract(currentCenterPoint),
+
+		    topLeftOffset = viewHalf.multiplyBy(-scale).add(position).add(viewHalf).subtract(centerOffset);
+
+		if (any3d) {
+			setTransform(this._container, topLeftOffset, scale);
+		} else {
+			setPosition(this._container, topLeftOffset);
+		}
+	},
+
+	_reset: function () {
+		this._update();
+		this._updateTransform(this._center, this._zoom);
+
+		for (var id in this._layers) {
+			this._layers[id]._reset();
+		}
+	},
+
+	_onZoomEnd: function () {
+		for (var id in this._layers) {
+			this._layers[id]._project();
+		}
+	},
+
+	_updatePaths: function () {
+		for (var id in this._layers) {
+			this._layers[id]._update();
+		}
+	},
+
+	_update: function () {
+		// Update pixel bounds of renderer container (for positioning/sizing/clipping later)
+		// Subclasses are responsible of firing the 'update' event.
+		var p = this.options.padding,
+		    size = this._map.getSize(),
+		    min = this._map.containerPointToLayerPoint(size.multiplyBy(-p)).round();
+
+		this._bounds = new Bounds(min, min.add(size.multiplyBy(1 + p * 2)).round());
+
+		this._center = this._map.getCenter();
+		this._zoom = this._map.getZoom();
+	}
+});
+
+var Canvas = Renderer.extend({
+	getEvents: function () {
+		var events = Renderer.prototype.getEvents.call(this);
+		events.viewprereset = this._onViewPreReset;
+		return events;
+	},
+
+	_onViewPreReset: function () {
+		// Set a flag so that a viewprereset+moveend+viewreset only updates&redraws once
+		this._postponeUpdatePaths = true;
+	},
+
+	onAdd: function () {
+		Renderer.prototype.onAdd.call(this);
+
+		// Redraw vectors since canvas is cleared upon removal,
+		// in case of removing the renderer itself from the map.
+		this._draw();
+	},
+
+	_initContainer: function () {
+		var container = this._container = document.createElement('canvas');
+
+		on(container, 'mousemove', throttle(this._onMouseMove, 32, this), this);
+		on(container, 'click dblclick mousedown mouseup contextmenu', this._onClick, this);
+		on(container, 'mouseout', this._handleMouseOut, this);
+
+		this._ctx = container.getContext('2d');
+	},
+
+	_destroyContainer: function () {
+		delete this._ctx;
+		remove(this._container);
+		off(this._container);
+		delete this._container;
+	},
+
+	_updatePaths: function () {
+		if (this._postponeUpdatePaths) { return; }
+
+		var layer;
+		this._redrawBounds = null;
+		for (var id in this._layers) {
+			layer = this._layers[id];
+			layer._update();
+		}
+		this._redraw();
+	},
+
+	_update: function () {
+		if (this._map._animatingZoom && this._bounds) { return; }
+
+		this._drawnLayers = {};
+
+		Renderer.prototype._update.call(this);
+
+		var b = this._bounds,
+		    container = this._container,
+		    size = b.getSize(),
+		    m = retina ? 2 : 1;
+
+		setPosition(container, b.min);
+
+		// set canvas size (also clearing it); use double size on retina
+		container.width = m * size.x;
+		container.height = m * size.y;
+		container.style.width = size.x + 'px';
+		container.style.height = size.y + 'px';
+
+		if (retina) {
+			this._ctx.scale(2, 2);
+		}
+
+		// translate so we use the same path coordinates after canvas element moves
+		this._ctx.translate(-b.min.x, -b.min.y);
+
+		// Tell paths to redraw themselves
+		this.fire('update');
+	},
+
+	_reset: function () {
+		Renderer.prototype._reset.call(this);
+
+		if (this._postponeUpdatePaths) {
+			this._postponeUpdatePaths = false;
+			this._updatePaths();
+		}
+	},
+
+	_initPath: function (layer) {
+		this._updateDashArray(layer);
+		this._layers[stamp(layer)] = layer;
+
+		var order = layer._order = {
+			layer: layer,
+			prev: this._drawLast,
+			next: null
+		};
+		if (this._drawLast) { this._drawLast.next = order; }
+		this._drawLast = order;
+		this._drawFirst = this._drawFirst || this._drawLast;
+	},
+
+	_addPath: function (layer) {
+		this._requestRedraw(layer);
+	},
+
+	_removePath: function (layer) {
+		var order = layer._order;
+		var next = order.next;
+		var prev = order.prev;
+
+		if (next) {
+			next.prev = prev;
+		} else {
+			this._drawLast = prev;
+		}
+		if (prev) {
+			prev.next = next;
+		} else {
+			this._drawFirst = next;
+		}
+
+		delete layer._order;
+
+		delete this._layers[L.stamp(layer)];
+
+		this._requestRedraw(layer);
+	},
+
+	_updatePath: function (layer) {
+		// Redraw the union of the layer's old pixel
+		// bounds and the new pixel bounds.
+		this._extendRedrawBounds(layer);
+		layer._project();
+		layer._update();
+		// The redraw will extend the redraw bounds
+		// with the new pixel bounds.
+		this._requestRedraw(layer);
+	},
+
+	_updateStyle: function (layer) {
+		this._updateDashArray(layer);
+		this._requestRedraw(layer);
+	},
+
+	_updateDashArray: function (layer) {
+		if (layer.options.dashArray) {
+			var parts = layer.options.dashArray.split(','),
+			    dashArray = [],
+			    i;
+			for (i = 0; i < parts.length; i++) {
+				dashArray.push(Number(parts[i]));
+			}
+			layer.options._dashArray = dashArray;
+		}
+	},
+
+	_requestRedraw: function (layer) {
+		if (!this._map) { return; }
+
+		this._extendRedrawBounds(layer);
+		this._redrawRequest = this._redrawRequest || requestAnimFrame(this._redraw, this);
+	},
+
+	_extendRedrawBounds: function (layer) {
+		if (layer._pxBounds) {
+			var padding = (layer.options.weight || 0) + 1;
+			this._redrawBounds = this._redrawBounds || new Bounds();
+			this._redrawBounds.extend(layer._pxBounds.min.subtract([padding, padding]));
+			this._redrawBounds.extend(layer._pxBounds.max.add([padding, padding]));
+		}
+	},
+
+	_redraw: function () {
+		this._redrawRequest = null;
+
+		if (this._redrawBounds) {
+			this._redrawBounds.min._floor();
+			this._redrawBounds.max._ceil();
+		}
+
+		this._clear(); // clear layers in redraw bounds
+		this._draw(); // draw layers
+
+		this._redrawBounds = null;
+	},
+
+	_clear: function () {
+		var bounds = this._redrawBounds;
+		if (bounds) {
+			var size = bounds.getSize();
+			this._ctx.clearRect(bounds.min.x, bounds.min.y, size.x, size.y);
+		} else {
+			this._ctx.clearRect(0, 0, this._container.width, this._container.height);
+		}
+	},
+
+	_draw: function () {
+		var layer, bounds = this._redrawBounds;
+		this._ctx.save();
+		if (bounds) {
+			var size = bounds.getSize();
+			this._ctx.beginPath();
+			this._ctx.rect(bounds.min.x, bounds.min.y, size.x, size.y);
+			this._ctx.clip();
+		}
+
+		this._drawing = true;
+
+		for (var order = this._drawFirst; order; order = order.next) {
+			layer = order.layer;
+			if (!bounds || (layer._pxBounds && layer._pxBounds.intersects(bounds))) {
+				layer._updatePath();
+			}
+		}
+
+		this._drawing = false;
+
+		this._ctx.restore();  // Restore state before clipping.
+	},
+
+	_updatePoly: function (layer, closed) {
+		if (!this._drawing) { return; }
+
+		var i, j, len2, p,
+		    parts = layer._parts,
+		    len = parts.length,
+		    ctx = this._ctx;
+
+		if (!len) { return; }
+
+		this._drawnLayers[layer._leaflet_id] = layer;
+
+		ctx.beginPath();
+
+		for (i = 0; i < len; i++) {
+			for (j = 0, len2 = parts[i].length; j < len2; j++) {
+				p = parts[i][j];
+				ctx[j ? 'lineTo' : 'moveTo'](p.x, p.y);
+			}
+			if (closed) {
+				ctx.closePath();
+			}
+		}
+
+		this._fillStroke(ctx, layer);
+
+		// TODO optimization: 1 fill/stroke for all features with equal style instead of 1 for each feature
+	},
+
+	_updateCircle: function (layer) {
+
+		if (!this._drawing || layer._empty()) { return; }
+
+		var p = layer._point,
+		    ctx = this._ctx,
+		    r = layer._radius,
+		    s = (layer._radiusY || r) / r;
+
+		this._drawnLayers[layer._leaflet_id] = layer;
+
+		if (s !== 1) {
+			ctx.save();
+			ctx.scale(1, s);
+		}
+
+		ctx.beginPath();
+		ctx.arc(p.x, p.y / s, r, 0, Math.PI * 2, false);
+
+		if (s !== 1) {
+			ctx.restore();
+		}
+
+		this._fillStroke(ctx, layer);
+	},
+
+	_fillStroke: function (ctx, layer) {
+		var options = layer.options;
+
+		if (options.fill) {
+			ctx.globalAlpha = options.fillOpacity;
+			ctx.fillStyle = options.fillColor || options.color;
+			ctx.fill(options.fillRule || 'evenodd');
+		}
+
+		if (options.stroke && options.weight !== 0) {
+			if (ctx.setLineDash) {
+				ctx.setLineDash(layer.options && layer.options._dashArray || []);
+			}
+			ctx.globalAlpha = options.opacity;
+			ctx.lineWidth = options.weight;
+			ctx.strokeStyle = options.color;
+			ctx.lineCap = options.lineCap;
+			ctx.lineJoin = options.lineJoin;
+			ctx.stroke();
+		}
+	},
+
+	// Canvas obviously doesn't have mouse events for individual drawn objects,
+	// so we emulate that by calculating what's under the mouse on mousemove/click manually
+
+	_onClick: function (e) {
+		var point = this._map.mouseEventToLayerPoint(e), layer, clickedLayer;
+
+		for (var order = this._drawFirst; order; order = order.next) {
+			layer = order.layer;
+			if (layer.options.interactive && layer._containsPoint(point) && !this._map._draggableMoved(layer)) {
+				clickedLayer = layer;
+			}
+		}
+		if (clickedLayer)  {
+			fakeStop(e);
+			this._fireEvent([clickedLayer], e);
+		}
+	},
+
+	_onMouseMove: function (e) {
+		if (!this._map || this._map.dragging.moving() || this._map._animatingZoom) { return; }
+
+		var point = this._map.mouseEventToLayerPoint(e);
+		this._handleMouseHover(e, point);
+	},
+
+
+	_handleMouseOut: function (e) {
+		var layer = this._hoveredLayer;
+		if (layer) {
+			// if we're leaving the layer, fire mouseout
+			removeClass(this._container, 'leaflet-interactive');
+			this._fireEvent([layer], e, 'mouseout');
+			this._hoveredLayer = null;
+		}
+	},
+
+	_handleMouseHover: function (e, point) {
+		var layer, candidateHoveredLayer;
+
+		for (var order = this._drawFirst; order; order = order.next) {
+			layer = order.layer;
+			if (layer.options.interactive && layer._containsPoint(point)) {
+				candidateHoveredLayer = layer;
+			}
+		}
+
+		if (candidateHoveredLayer !== this._hoveredLayer) {
+			this._handleMouseOut(e);
+
+			if (candidateHoveredLayer) {
+				addClass(this._container, 'leaflet-interactive'); // change cursor
+				this._fireEvent([candidateHoveredLayer], e, 'mouseover');
+				this._hoveredLayer = candidateHoveredLayer;
+			}
+		}
+
+		if (this._hoveredLayer) {
+			this._fireEvent([this._hoveredLayer], e);
+		}
+	},
+
+	_fireEvent: function (layers, e, type) {
+		this._map._fireDOMEvent(e, type || e.type, layers);
+	},
+
+	_bringToFront: function (layer) {
+		var order = layer._order;
+		var next = order.next;
+		var prev = order.prev;
+
+		if (next) {
+			next.prev = prev;
+		} else {
+			// Already last
+			return;
+		}
+		if (prev) {
+			prev.next = next;
+		} else if (next) {
+			// Update first entry unless this is the
+			// signle entry
+			this._drawFirst = next;
+		}
+
+		order.prev = this._drawLast;
+		this._drawLast.next = order;
+
+		order.next = null;
+		this._drawLast = order;
+
+		this._requestRedraw(layer);
+	},
+
+	_bringToBack: function (layer) {
+		var order = layer._order;
+		var next = order.next;
+		var prev = order.prev;
+
+		if (prev) {
+			prev.next = next;
+		} else {
+			// Already first
+			return;
+		}
+		if (next) {
+			next.prev = prev;
+		} else if (prev) {
+			// Update last entry unless this is the
+			// signle entry
+			this._drawLast = prev;
+		}
+
+		order.prev = null;
+
+		order.next = this._drawFirst;
+		this._drawFirst.prev = order;
+		this._drawFirst = order;
+
+		this._requestRedraw(layer);
+	}
+});
+
+// @factory L.canvas(options?: Renderer options)
+// Creates a Canvas renderer with the given options.
+function canvas$1(options) {
+	return canvas ? new Canvas(options) : null;
+}
+
+var vmlCreate = (function () {
+	try {
+		document.namespaces.add('lvml', 'urn:schemas-microsoft-com:vml');
+		return function (name) {
+			return document.createElement('<lvml:' + name + ' class="lvml">');
+		};
+	} catch (e) {
+		return function (name) {
+			return document.createElement('<' + name + ' xmlns="urn:schemas-microsoft.com:vml" class="lvml">');
+		};
+	}
+})();
+
+
+/*
+ * @class SVG
+ *
+ * Although SVG is not available on IE7 and IE8, these browsers support [VML](https://en.wikipedia.org/wiki/Vector_Markup_Language), and the SVG renderer will fall back to VML in this case.
+ *
+ * VML was deprecated in 2012, which means VML functionality exists only for backwards compatibility
+ * with old versions of Internet Explorer.
+ */
+
+// mixin to redefine some SVG methods to handle VML syntax which is similar but with some differences
+var vmlMixin = {
+
+	_initContainer: function () {
+		this._container = create$1('div', 'leaflet-vml-container');
+	},
+
+	_update: function () {
+		if (this._map._animatingZoom) { return; }
+		Renderer.prototype._update.call(this);
+		this.fire('update');
+	},
+
+	_initPath: function (layer) {
+		var container = layer._container = vmlCreate('shape');
+
+		addClass(container, 'leaflet-vml-shape ' + (this.options.className || ''));
+
+		container.coordsize = '1 1';
+
+		layer._path = vmlCreate('path');
+		container.appendChild(layer._path);
+
+		this._updateStyle(layer);
+		this._layers[stamp(layer)] = layer;
+	},
+
+	_addPath: function (layer) {
+		var container = layer._container;
+		this._container.appendChild(container);
+
+		if (layer.options.interactive) {
+			layer.addInteractiveTarget(container);
+		}
+	},
+
+	_removePath: function (layer) {
+		var container = layer._container;
+		remove(container);
+		layer.removeInteractiveTarget(container);
+		delete this._layers[stamp(layer)];
+	},
+
+	_updateStyle: function (layer) {
+		var stroke = layer._stroke,
+		    fill = layer._fill,
+		    options = layer.options,
+		    container = layer._container;
+
+		container.stroked = !!options.stroke;
+		container.filled = !!options.fill;
+
+		if (options.stroke) {
+			if (!stroke) {
+				stroke = layer._stroke = vmlCreate('stroke');
+			}
+			container.appendChild(stroke);
+			stroke.weight = options.weight + 'px';
+			stroke.color = options.color;
+			stroke.opacity = options.opacity;
+
+			if (options.dashArray) {
+				stroke.dashStyle = isArray(options.dashArray) ?
+				    options.dashArray.join(' ') :
+				    options.dashArray.replace(/( *, *)/g, ' ');
+			} else {
+				stroke.dashStyle = '';
+			}
+			stroke.endcap = options.lineCap.replace('butt', 'flat');
+			stroke.joinstyle = options.lineJoin;
+
+		} else if (stroke) {
+			container.removeChild(stroke);
+			layer._stroke = null;
+		}
+
+		if (options.fill) {
+			if (!fill) {
+				fill = layer._fill = vmlCreate('fill');
+			}
+			container.appendChild(fill);
+			fill.color = options.fillColor || options.color;
+			fill.opacity = options.fillOpacity;
+
+		} else if (fill) {
+			container.removeChild(fill);
+			layer._fill = null;
+		}
+	},
+
+	_updateCircle: function (layer) {
+		var p = layer._point.round(),
+		    r = Math.round(layer._radius),
+		    r2 = Math.round(layer._radiusY || r);
+
+		this._setPath(layer, layer._empty() ? 'M0 0' :
+				'AL ' + p.x + ',' + p.y + ' ' + r + ',' + r2 + ' 0,' + (65535 * 360));
+	},
+
+	_setPath: function (layer, path) {
+		layer._path.v = path;
+	},
+
+	_bringToFront: function (layer) {
+		toFront(layer._container);
+	},
+
+	_bringToBack: function (layer) {
+		toBack(layer._container);
+	}
+};
+
+var create$2 = vml ? vmlCreate : svgCreate;
+
+/*
+ * @class SVG
+ * @inherits Renderer
+ * @aka L.SVG
+ *
+ * Allows vector layers to be displayed with [SVG](https://developer.mozilla.org/docs/Web/SVG).
+ * Inherits `Renderer`.
+ *
+ * Due to [technical limitations](http://caniuse.com/#search=svg), SVG is not
+ * available in all web browsers, notably Android 2.x and 3.x.
+ *
+ * Although SVG is not available on IE7 and IE8, these browsers support
+ * [VML](https://en.wikipedia.org/wiki/Vector_Markup_Language)
+ * (a now deprecated technology), and the SVG renderer will fall back to VML in
+ * this case.
+ *
+ * @example
+ *
+ * Use SVG by default for all paths in the map:
+ *
+ * ```js
+ * var map = L.map('map', {
+ * 	renderer: L.svg()
+ * });
+ * ```
+ *
+ * Use a SVG renderer with extra padding for specific vector geometries:
+ *
+ * ```js
+ * var map = L.map('map');
+ * var myRenderer = L.svg({ padding: 0.5 });
+ * var line = L.polyline( coordinates, { renderer: myRenderer } );
+ * var circle = L.circle( center, { renderer: myRenderer } );
+ * ```
+ */
+
+var SVG = Renderer.extend({
+
+	getEvents: function () {
+		var events = Renderer.prototype.getEvents.call(this);
+		events.zoomstart = this._onZoomStart;
+		return events;
+	},
+
+	_initContainer: function () {
+		this._container = create$2('svg');
+
+		// makes it possible to click through svg root; we'll reset it back in individual paths
+		this._container.setAttribute('pointer-events', 'none');
+
+		this._rootGroup = create$2('g');
+		this._container.appendChild(this._rootGroup);
+	},
+
+	_destroyContainer: function () {
+		remove(this._container);
+		off(this._container);
+		delete this._container;
+		delete this._rootGroup;
+	},
+
+	_onZoomStart: function () {
+		// Drag-then-pinch interactions might mess up the center and zoom.
+		// In this case, the easiest way to prevent this is re-do the renderer
+		//   bounds and padding when the zooming starts.
+		this._update();
+	},
+
+	_update: function () {
+		if (this._map._animatingZoom && this._bounds) { return; }
+
+		Renderer.prototype._update.call(this);
+
+		var b = this._bounds,
+		    size = b.getSize(),
+		    container = this._container;
+
+		// set size of svg-container if changed
+		if (!this._svgSize || !this._svgSize.equals(size)) {
+			this._svgSize = size;
+			container.setAttribute('width', size.x);
+			container.setAttribute('height', size.y);
+		}
+
+		// movement: update container viewBox so that we don't have to change coordinates of individual layers
+		setPosition(container, b.min);
+		container.setAttribute('viewBox', [b.min.x, b.min.y, size.x, size.y].join(' '));
+
+		this.fire('update');
+	},
+
+	// methods below are called by vector layers implementations
+
+	_initPath: function (layer) {
+		var path = layer._path = create$2('path');
+
+		// @namespace Path
+		// @option className: String = null
+		// Custom class name set on an element. Only for SVG renderer.
+		if (layer.options.className) {
+			addClass(path, layer.options.className);
+		}
+
+		if (layer.options.interactive) {
+			addClass(path, 'leaflet-interactive');
+		}
+
+		this._updateStyle(layer);
+		this._layers[stamp(layer)] = layer;
+	},
+
+	_addPath: function (layer) {
+		if (!this._rootGroup) { this._initContainer(); }
+		this._rootGroup.appendChild(layer._path);
+		layer.addInteractiveTarget(layer._path);
+	},
+
+	_removePath: function (layer) {
+		remove(layer._path);
+		layer.removeInteractiveTarget(layer._path);
+		delete this._layers[stamp(layer)];
+	},
+
+	_updatePath: function (layer) {
+		layer._project();
+		layer._update();
+	},
+
+	_updateStyle: function (layer) {
+		var path = layer._path,
+		    options = layer.options;
+
+		if (!path) { return; }
+
+		if (options.stroke) {
+			path.setAttribute('stroke', options.color);
+			path.setAttribute('stroke-opacity', options.opacity);
+			path.setAttribute('stroke-width', options.weight);
+			path.setAttribute('stroke-linecap', options.lineCap);
+			path.setAttribute('stroke-linejoin', options.lineJoin);
+
+			if (options.dashArray) {
+				path.setAttribute('stroke-dasharray', options.dashArray);
+			} else {
+				path.removeAttribute('stroke-dasharray');
+			}
+
+			if (options.dashOffset) {
+				path.setAttribute('stroke-dashoffset', options.dashOffset);
+			} else {
+				path.removeAttribute('stroke-dashoffset');
+			}
+		} else {
+			path.setAttribute('stroke', 'none');
+		}
+
+		if (options.fill) {
+			path.setAttribute('fill', options.fillColor || options.color);
+			path.setAttribute('fill-opacity', options.fillOpacity);
+			path.setAttribute('fill-rule', options.fillRule || 'evenodd');
+		} else {
+			path.setAttribute('fill', 'none');
+		}
+	},
+
+	_updatePoly: function (layer, closed) {
+		this._setPath(layer, pointsToPath(layer._parts, closed));
+	},
+
+	_updateCircle: function (layer) {
+		var p = layer._point,
+		    r = layer._radius,
+		    r2 = layer._radiusY || r,
+		    arc = 'a' + r + ',' + r2 + ' 0 1,0 ';
+
+		// drawing a circle with two half-arcs
+		var d = layer._empty() ? 'M0 0' :
+				'M' + (p.x - r) + ',' + p.y +
+				arc + (r * 2) + ',0 ' +
+				arc + (-r * 2) + ',0 ';
+
+		this._setPath(layer, d);
+	},
+
+	_setPath: function (layer, path) {
+		layer._path.setAttribute('d', path);
+	},
+
+	// SVG does not have the concept of zIndex so we resort to changing the DOM order of elements
+	_bringToFront: function (layer) {
+		toFront(layer._path);
+	},
+
+	_bringToBack: function (layer) {
+		toBack(layer._path);
+	}
+});
+
+if (vml) {
+	SVG.include(vmlMixin);
+}
+
+// @factory L.svg(options?: Renderer options)
+// Creates a SVG renderer with the given options.
+function svg$1(options) {
+	return svg || vml ? new SVG(options) : null;
+}
+
+Map$1.include({
+	// @namespace Map; @method getRenderer(layer: Path): Renderer
+	// Returns the instance of `Renderer` that should be used to render the given
+	// `Path`. It will ensure that the `renderer` options of the map and paths
+	// are respected, and that the renderers do exist on the map.
+	getRenderer: function (layer) {
+		// @namespace Path; @option renderer: Renderer
+		// Use this specific instance of `Renderer` for this path. Takes
+		// precedence over the map's [default renderer](#map-renderer).
+		var renderer = layer.options.renderer || this._getPaneRenderer(layer.options.pane) || this.options.renderer || this._renderer;
+
+		if (!renderer) {
+			// @namespace Map; @option preferCanvas: Boolean = false
+			// Whether `Path`s should be rendered on a `Canvas` renderer.
+			// By default, all `Path`s are rendered in a `SVG` renderer.
+			renderer = this._renderer = (this.options.preferCanvas && canvas$1()) || svg$1();
+		}
+
+		if (!this.hasLayer(renderer)) {
+			this.addLayer(renderer);
+		}
+		return renderer;
+	},
+
+	_getPaneRenderer: function (name) {
+		if (name === 'overlayPane' || name === undefined) {
+			return false;
+		}
+
+		var renderer = this._paneRenderers[name];
+		if (renderer === undefined) {
+			renderer = (SVG && svg$1({pane: name})) || (Canvas && canvas$1({pane: name}));
+			this._paneRenderers[name] = renderer;
+		}
+		return renderer;
+	}
+});
+
+var Path = Layer.extend({
+
+	// @section
+	// @aka Path options
+	options: {
+		// @option stroke: Boolean = true
+		// Whether to draw stroke along the path. Set it to `false` to disable borders on polygons or circles.
+		stroke: true,
+
+		// @option color: String = '#3388ff'
+		// Stroke color
+		color: '#3388ff',
+
+		// @option weight: Number = 3
+		// Stroke width in pixels
+		weight: 3,
+
+		// @option opacity: Number = 1.0
+		// Stroke opacity
+		opacity: 1,
+
+		// @option lineCap: String= 'round'
+		// A string that defines [shape to be used at the end](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-linecap) of the stroke.
+		lineCap: 'round',
+
+		// @option lineJoin: String = 'round'
+		// A string that defines [shape to be used at the corners](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-linejoin) of the stroke.
+		lineJoin: 'round',
+
+		// @option dashArray: String = null
+		// A string that defines the stroke [dash pattern](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-dasharray). Doesn't work on `Canvas`-powered layers in [some old browsers](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/setLineDash#Browser_compatibility).
+		dashArray: null,
+
+		// @option dashOffset: String = null
+		// A string that defines the [distance into the dash pattern to start the dash](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-dashoffset). Doesn't work on `Canvas`-powered layers in [some old browsers](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/setLineDash#Browser_compatibility).
+		dashOffset: null,
+
+		// @option fill: Boolean = depends
+		// Whether to fill the path with color. Set it to `false` to disable filling on polygons or circles.
+		fill: false,
+
+		// @option fillColor: String = *
+		// Fill color. Defaults to the value of the [`color`](#path-color) option
+		fillColor: null,
+
+		// @option fillOpacity: Number = 0.2
+		// Fill opacity.
+		fillOpacity: 0.2,
+
+		// @option fillRule: String = 'evenodd'
+		// A string that defines [how the inside of a shape](https://developer.mozilla.org/docs/Web/SVG/Attribute/fill-rule) is determined.
+		fillRule: 'evenodd',
+
+		// className: '',
+
+		// Option inherited from "Interactive layer" abstract class
+		interactive: true,
+
+		// @option bubblingMouseEvents: Boolean = true
+		// When `true`, a mouse event on this path will trigger the same event on the map
+		// (unless [`L.DomEvent.stopPropagation`](#domevent-stoppropagation) is used).
+		bubblingMouseEvents: true
+	},
+
+	beforeAdd: function (map) {
+		// Renderer is set here because we need to call renderer.getEvents
+		// before this.getEvents.
+		this._renderer = map.getRenderer(this);
+	},
+
+	onAdd: function () {
+		this._renderer._initPath(this);
+		this._reset();
+		this._renderer._addPath(this);
+	},
+
+	onRemove: function () {
+		this._renderer._removePath(this);
+	},
+
+	// @method redraw(): this
+	// Redraws the layer. Sometimes useful after you changed the coordinates that the path uses.
+	redraw: function () {
+		if (this._map) {
+			this._renderer._updatePath(this);
+		}
+		return this;
+	},
+
+	// @method setStyle(style: Path options): this
+	// Changes the appearance of a Path based on the options in the `Path options` object.
+	setStyle: function (style) {
+		setOptions(this, style);
+		if (this._renderer) {
+			this._renderer._updateStyle(this);
+		}
+		return this;
+	},
+
+	// @method bringToFront(): this
+	// Brings the layer to the top of all path layers.
+	bringToFront: function () {
+		if (this._renderer) {
+			this._renderer._bringToFront(this);
+		}
+		return this;
+	},
+
+	// @method bringToBack(): this
+	// Brings the layer to the bottom of all path layers.
+	bringToBack: function () {
+		if (this._renderer) {
+			this._renderer._bringToBack(this);
+		}
+		return this;
+	},
+
+	getElement: function () {
+		return this._path;
+	},
+
+	_reset: function () {
+		// defined in child classes
+		this._project();
+		this._update();
+	},
+
+	_clickTolerance: function () {
+		// used when doing hit detection for Canvas layers
+		return (this.options.stroke ? this.options.weight / 2 : 0) + (touch ? 10 : 0);
+	}
+});
+
+var CircleMarker = Path.extend({
+
+	// @section
+	// @aka CircleMarker options
+	options: {
+		fill: true,
+
+		// @option radius: Number = 10
+		// Radius of the circle marker, in pixels
+		radius: 10
+	},
+
+	initialize: function (latlng, options) {
+		setOptions(this, options);
+		this._latlng = toLatLng(latlng);
+		this._radius = this.options.radius;
+	},
+
+	// @method setLatLng(latLng: LatLng): this
+	// Sets the position of a circle marker to a new location.
+	setLatLng: function (latlng) {
+		this._latlng = toLatLng(latlng);
+		this.redraw();
+		return this.fire('move', {latlng: this._latlng});
+	},
+
+	// @method getLatLng(): LatLng
+	// Returns the current geographical position of the circle marker
+	getLatLng: function () {
+		return this._latlng;
+	},
+
+	// @method setRadius(radius: Number): this
+	// Sets the radius of a circle marker. Units are in pixels.
+	setRadius: function (radius) {
+		this.options.radius = this._radius = radius;
+		return this.redraw();
+	},
+
+	// @method getRadius(): Number
+	// Returns the current radius of the circle
+	getRadius: function () {
+		return this._radius;
+	},
+
+	setStyle : function (options) {
+		var radius = options && options.radius || this._radius;
+		Path.prototype.setStyle.call(this, options);
+		this.setRadius(radius);
+		return this;
+	},
+
+	_project: function () {
+		this._point = this._map.latLngToLayerPoint(this._latlng);
+		this._updateBounds();
+	},
+
+	_updateBounds: function () {
+		var r = this._radius,
+		    r2 = this._radiusY || r,
+		    w = this._clickTolerance(),
+		    p = [r + w, r2 + w];
+		this._pxBounds = new Bounds(this._point.subtract(p), this._point.add(p));
+	},
+
+	_update: function () {
+		if (this._map) {
+			this._updatePath();
+		}
+	},
+
+	_updatePath: function () {
+		this._renderer._updateCircle(this);
+	},
+
+	_empty: function () {
+		return this._radius && !this._renderer._bounds.intersects(this._pxBounds);
+	},
+
+	// Needed by the `Canvas` renderer for interactivity
+	_containsPoint: function (p) {
+		return p.distanceTo(this._point) <= this._radius + this._clickTolerance();
+	}
+});
+
+
+// @factory L.circleMarker(latlng: LatLng, options?: CircleMarker options)
+// Instantiates a circle marker object given a geographical point, and an optional options object.
+
+var Circle = CircleMarker.extend({
+
+	initialize: function (latlng, options, legacyOptions) {
+		if (typeof options === 'number') {
+			// Backwards compatibility with 0.7.x factory (latlng, radius, options?)
+			options = extend({}, legacyOptions, {radius: options});
+		}
+		setOptions(this, options);
+		this._latlng = toLatLng(latlng);
+
+		if (isNaN(this.options.radius)) { throw new Error('Circle radius cannot be NaN'); }
+
+		// @section
+		// @aka Circle options
+		// @option radius: Number; Radius of the circle, in meters.
+		this._mRadius = this.options.radius;
+	},
+
+	// @method setRadius(radius: Number): this
+	// Sets the radius of a circle. Units are in meters.
+	setRadius: function (radius) {
+		this._mRadius = radius;
+		return this.redraw();
+	},
+
+	// @method getRadius(): Number
+	// Returns the current radius of a circle. Units are in meters.
+	getRadius: function () {
+		return this._mRadius;
+	},
+
+	// @method getBounds(): LatLngBounds
+	// Returns the `LatLngBounds` of the path.
+	getBounds: function () {
+		var half = [this._radius, this._radiusY || this._radius];
+
+		return new LatLngBounds(
+			this._map.layerPointToLatLng(this._point.subtract(half)),
+			this._map.layerPointToLatLng(this._point.add(half)));
+	},
+
+	setStyle: Path.prototype.setStyle,
+
+	_project: function () {
+
+		var lng = this._latlng.lng,
+		    lat = this._latlng.lat,
+		    map = this._map,
+		    crs = map.options.crs;
+
+		if (crs.distance === Earth.distance) {
+			var d = Math.PI / 180,
+			    latR = (this._mRadius / Earth.R) / d,
+			    top = map.project([lat + latR, lng]),
+			    bottom = map.project([lat - latR, lng]),
+			    p = top.add(bottom).divideBy(2),
+			    lat2 = map.unproject(p).lat,
+			    lngR = Math.acos((Math.cos(latR * d) - Math.sin(lat * d) * Math.sin(lat2 * d)) /
+			            (Math.cos(lat * d) * Math.cos(lat2 * d))) / d;
+
+			if (isNaN(lngR) || lngR === 0) {
+				lngR = latR / Math.cos(Math.PI / 180 * lat); // Fallback for edge case, #2425
+			}
+
+			this._point = p.subtract(map.getPixelOrigin());
+			this._radius = isNaN(lngR) ? 0 : Math.max(Math.round(p.x - map.project([lat2, lng - lngR]).x), 1);
+			this._radiusY = Math.max(Math.round(p.y - top.y), 1);
+
+		} else {
+			var latlng2 = crs.unproject(crs.project(this._latlng).subtract([this._mRadius, 0]));
+
+			this._point = map.latLngToLayerPoint(this._latlng);
+			this._radius = this._point.x - map.latLngToLayerPoint(latlng2).x;
+		}
+
+		this._updateBounds();
+	}
+});
+
+// @factory L.circle(latlng: LatLng, options?: Circle options)
+// Instantiates a circle object given a geographical point, and an options object
+// which contains the circle radius.
+// @alternative
+// @factory L.circle(latlng: LatLng, radius: Number, options?: Circle options)
+// Obsolete way of instantiating a circle, for compatibility with 0.7.x code.
+// Do not use in new applications or plugins.
+
+function simplify(points, tolerance) {
+	if (!tolerance || !points.length) {
+		return points.slice();
+	}
+
+	var sqTolerance = tolerance * tolerance;
+
+	    // stage 1: vertex reduction
+	    points = _reducePoints(points, sqTolerance);
+
+	    // stage 2: Douglas-Peucker simplification
+	    points = _simplifyDP(points, sqTolerance);
+
+	return points;
+}
+
+// @function pointToSegmentDistance(p: Point, p1: Point, p2: Point): Number
+// Returns the distance between point `p` and segment `p1` to `p2`.
+function pointToSegmentDistance(p, p1, p2) {
+	return Math.sqrt(_sqClosestPointOnSegment(p, p1, p2, true));
+}
+
+// @function closestPointOnSegment(p: Point, p1: Point, p2: Point): Number
+// Returns the closest point from a point `p` on a segment `p1` to `p2`.
+
+
+// Douglas-Peucker simplification, see http://en.wikipedia.org/wiki/Douglas-Peucker_algorithm
+function _simplifyDP(points, sqTolerance) {
+
+	var len = points.length,
+	    ArrayConstructor = typeof Uint8Array !== undefined + '' ? Uint8Array : Array,
+	    markers = new ArrayConstructor(len);
+
+	    markers[0] = markers[len - 1] = 1;
+
+	_simplifyDPStep(points, markers, sqTolerance, 0, len - 1);
+
+	var i,
+	    newPoints = [];
+
+	for (i = 0; i < len; i++) {
+		if (markers[i]) {
+			newPoints.push(points[i]);
+		}
+	}
+
+	return newPoints;
+}
+
+function _simplifyDPStep(points, markers, sqTolerance, first, last) {
+
+	var maxSqDist = 0,
+	index, i, sqDist;
+
+	for (i = first + 1; i <= last - 1; i++) {
+		sqDist = _sqClosestPointOnSegment(points[i], points[first], points[last], true);
+
+		if (sqDist > maxSqDist) {
+			index = i;
+			maxSqDist = sqDist;
+		}
+	}
+
+	if (maxSqDist > sqTolerance) {
+		markers[index] = 1;
+
+		_simplifyDPStep(points, markers, sqTolerance, first, index);
+		_simplifyDPStep(points, markers, sqTolerance, index, last);
+	}
+}
+
+// reduce points that are too close to each other to a single point
+function _reducePoints(points, sqTolerance) {
+	var reducedPoints = [points[0]];
+
+	for (var i = 1, prev = 0, len = points.length; i < len; i++) {
+		if (_sqDist(points[i], points[prev]) > sqTolerance) {
+			reducedPoints.push(points[i]);
+			prev = i;
+		}
+	}
+	if (prev < len - 1) {
+		reducedPoints.push(points[len - 1]);
+	}
+	return reducedPoints;
+}
+
+var _lastCode;
+
+// @function clipSegment(a: Point, b: Point, bounds: Bounds, useLastCode?: Boolean, round?: Boolean): Point[]|Boolean
+// Clips the segment a to b by rectangular bounds with the
+// [Cohen-Sutherland algorithm](https://en.wikipedia.org/wiki/Cohen%E2%80%93Sutherland_algorithm)
+// (modifying the segment points directly!). Used by Leaflet to only show polyline
+// points that are on the screen or near, increasing performance.
+function clipSegment(a, b, bounds, useLastCode, round) {
+	var codeA = useLastCode ? _lastCode : _getBitCode(a, bounds),
+	    codeB = _getBitCode(b, bounds),
+
+	    codeOut, p, newCode;
+
+	    // save 2nd code to avoid calculating it on the next segment
+	    _lastCode = codeB;
+
+	while (true) {
+		// if a,b is inside the clip window (trivial accept)
+		if (!(codeA | codeB)) {
+			return [a, b];
+		}
+
+		// if a,b is outside the clip window (trivial reject)
+		if (codeA & codeB) {
+			return false;
+		}
+
+		// other cases
+		codeOut = codeA || codeB;
+		p = _getEdgeIntersection(a, b, codeOut, bounds, round);
+		newCode = _getBitCode(p, bounds);
+
+		if (codeOut === codeA) {
+			a = p;
+			codeA = newCode;
+		} else {
+			b = p;
+			codeB = newCode;
+		}
+	}
+}
+
+function _getEdgeIntersection(a, b, code, bounds, round) {
+	var dx = b.x - a.x,
+	    dy = b.y - a.y,
+	    min = bounds.min,
+	    max = bounds.max,
+	    x, y;
+
+	if (code & 8) { // top
+		x = a.x + dx * (max.y - a.y) / dy;
+		y = max.y;
+
+	} else if (code & 4) { // bottom
+		x = a.x + dx * (min.y - a.y) / dy;
+		y = min.y;
+
+	} else if (code & 2) { // right
+		x = max.x;
+		y = a.y + dy * (max.x - a.x) / dx;
+
+	} else if (code & 1) { // left
+		x = min.x;
+		y = a.y + dy * (min.x - a.x) / dx;
+	}
+
+	return new Point(x, y, round);
+}
+
+function _getBitCode(p, bounds) {
+	var code = 0;
+
+	if (p.x < bounds.min.x) { // left
+		code |= 1;
+	} else if (p.x > bounds.max.x) { // right
+		code |= 2;
+	}
+
+	if (p.y < bounds.min.y) { // bottom
+		code |= 4;
+	} else if (p.y > bounds.max.y) { // top
+		code |= 8;
+	}
+
+	return code;
+}
+
+// square distance (to avoid unnecessary Math.sqrt calls)
+function _sqDist(p1, p2) {
+	var dx = p2.x - p1.x,
+	    dy = p2.y - p1.y;
+	return dx * dx + dy * dy;
+}
+
+// return closest point on segment or distance to that point
+function _sqClosestPointOnSegment(p, p1, p2, sqDist) {
+	var x = p1.x,
+	    y = p1.y,
+	    dx = p2.x - x,
+	    dy = p2.y - y,
+	    dot = dx * dx + dy * dy,
+	    t;
+
+	if (dot > 0) {
+		t = ((p.x - x) * dx + (p.y - y) * dy) / dot;
+
+		if (t > 1) {
+			x = p2.x;
+			y = p2.y;
+		} else if (t > 0) {
+			x += dx * t;
+			y += dy * t;
+		}
+	}
+
+	dx = p.x - x;
+	dy = p.y - y;
+
+	return sqDist ? dx * dx + dy * dy : new Point(x, y);
+}
+
+
+function _flat(latlngs) {
+	// true if it's a flat array of latlngs; false if nested
+	return !isArray(latlngs[0]) || (typeof latlngs[0][0] !== 'object' && typeof latlngs[0][0] !== 'undefined');
+}
+
+var Polyline = Path.extend({
+
+	// @section
+	// @aka Polyline options
+	options: {
+		// @option smoothFactor: Number = 1.0
+		// How much to simplify the polyline on each zoom level. More means
+		// better performance and smoother look, and less means more accurate representation.
+		smoothFactor: 1.0,
+
+		// @option noClip: Boolean = false
+		// Disable polyline clipping.
+		noClip: false
+	},
+
+	initialize: function (latlngs, options) {
+		setOptions(this, options);
+		this._setLatLngs(latlngs);
+	},
+
+	// @method getLatLngs(): LatLng[]
+	// Returns an array of the points in the path, or nested arrays of points in case of multi-polyline.
+	getLatLngs: function () {
+		return this._latlngs;
+	},
+
+	// @method setLatLngs(latlngs: LatLng[]): this
+	// Replaces all the points in the polyline with the given array of geographical points.
+	setLatLngs: function (latlngs) {
+		this._setLatLngs(latlngs);
+		return this.redraw();
+	},
+
+	// @method isEmpty(): Boolean
+	// Returns `true` if the Polyline has no LatLngs.
+	isEmpty: function () {
+		return !this._latlngs.length;
+	},
+
+	closestLayerPoint: function (p) {
+		var minDistance = Infinity,
+		    minPoint = null,
+		    closest = _sqClosestPointOnSegment,
+		    p1, p2;
+
+		for (var j = 0, jLen = this._parts.length; j < jLen; j++) {
+			var points = this._parts[j];
+
+			for (var i = 1, len = points.length; i < len; i++) {
+				p1 = points[i - 1];
+				p2 = points[i];
+
+				var sqDist = closest(p, p1, p2, true);
+
+				if (sqDist < minDistance) {
+					minDistance = sqDist;
+					minPoint = closest(p, p1, p2);
+				}
+			}
+		}
+		if (minPoint) {
+			minPoint.distance = Math.sqrt(minDistance);
+		}
+		return minPoint;
+	},
+
+	// @method getCenter(): LatLng
+	// Returns the center ([centroid](http://en.wikipedia.org/wiki/Centroid)) of the polyline.
+	getCenter: function () {
+		// throws error when not yet added to map as this center calculation requires projected coordinates
+		if (!this._map) {
+			throw new Error('Must add layer to map before using getCenter()');
+		}
+
+		var i, halfDist, segDist, dist, p1, p2, ratio,
+		    points = this._rings[0],
+		    len = points.length;
+
+		if (!len) { return null; }
+
+		// polyline centroid algorithm; only uses the first ring if there are multiple
+
+		for (i = 0, halfDist = 0; i < len - 1; i++) {
+			halfDist += points[i].distanceTo(points[i + 1]) / 2;
+		}
+
+		// The line is so small in the current view that all points are on the same pixel.
+		if (halfDist === 0) {
+			return this._map.layerPointToLatLng(points[0]);
+		}
+
+		for (i = 0, dist = 0; i < len - 1; i++) {
+			p1 = points[i];
+			p2 = points[i + 1];
+			segDist = p1.distanceTo(p2);
+			dist += segDist;
+
+			if (dist > halfDist) {
+				ratio = (dist - halfDist) / segDist;
+				return this._map.layerPointToLatLng([
+					p2.x - ratio * (p2.x - p1.x),
+					p2.y - ratio * (p2.y - p1.y)
+				]);
+			}
+		}
+	},
+
+	// @method getBounds(): LatLngBounds
+	// Returns the `LatLngBounds` of the path.
+	getBounds: function () {
+		return this._bounds;
+	},
+
+	// @method addLatLng(latlng: LatLng, latlngs? LatLng[]): this
+	// Adds a given point to the polyline. By default, adds to the first ring of
+	// the polyline in case of a multi-polyline, but can be overridden by passing
+	// a specific ring as a LatLng array (that you can earlier access with [`getLatLngs`](#polyline-getlatlngs)).
+	addLatLng: function (latlng, latlngs) {
+		latlngs = latlngs || this._defaultShape();
+		latlng = toLatLng(latlng);
+		latlngs.push(latlng);
+		this._bounds.extend(latlng);
+		return this.redraw();
+	},
+
+	_setLatLngs: function (latlngs) {
+		this._bounds = new LatLngBounds();
+		this._latlngs = this._convertLatLngs(latlngs);
+	},
+
+	_defaultShape: function () {
+		return _flat(this._latlngs) ? this._latlngs : this._latlngs[0];
+	},
+
+	// recursively convert latlngs input into actual LatLng instances; calculate bounds along the way
+	_convertLatLngs: function (latlngs) {
+		var result = [],
+		    flat = _flat(latlngs);
+
+		for (var i = 0, len = latlngs.length; i < len; i++) {
+			if (flat) {
+				result[i] = toLatLng(latlngs[i]);
+				this._bounds.extend(result[i]);
+			} else {
+				result[i] = this._convertLatLngs(latlngs[i]);
+			}
+		}
+
+		return result;
+	},
+
+	_project: function () {
+		var pxBounds = new Bounds();
+		this._rings = [];
+		this._projectLatlngs(this._latlngs, this._rings, pxBounds);
+
+		var w = this._clickTolerance(),
+		    p = new Point(w, w);
+
+		if (this._bounds.isValid() && pxBounds.isValid()) {
+			pxBounds.min._subtract(p);
+			pxBounds.max._add(p);
+			this._pxBounds = pxBounds;
+		}
+	},
+
+	// recursively turns latlngs into a set of rings with projected coordinates
+	_projectLatlngs: function (latlngs, result, projectedBounds) {
+		var flat = latlngs[0] instanceof LatLng,
+		    len = latlngs.length,
+		    i, ring;
+
+		if (flat) {
+			ring = [];
+			for (i = 0; i < len; i++) {
+				ring[i] = this._map.latLngToLayerPoint(latlngs[i]);
+				projectedBounds.extend(ring[i]);
+			}
+			result.push(ring);
+		} else {
+			for (i = 0; i < len; i++) {
+				this._projectLatlngs(latlngs[i], result, projectedBounds);
+			}
+		}
+	},
+
+	// clip polyline by renderer bounds so that we have less to render for performance
+	_clipPoints: function () {
+		var bounds = this._renderer._bounds;
+
+		this._parts = [];
+		if (!this._pxBounds || !this._pxBounds.intersects(bounds)) {
+			return;
+		}
+
+		if (this.options.noClip) {
+			this._parts = this._rings;
+			return;
+		}
+
+		var parts = this._parts,
+		    i, j, k, len, len2, segment, points;
+
+		for (i = 0, k = 0, len = this._rings.length; i < len; i++) {
+			points = this._rings[i];
+
+			for (j = 0, len2 = points.length; j < len2 - 1; j++) {
+				segment = clipSegment(points[j], points[j + 1], bounds, j, true);
+
+				if (!segment) { continue; }
+
+				parts[k] = parts[k] || [];
+				parts[k].push(segment[0]);
+
+				// if segment goes out of screen, or it's the last one, it's the end of the line part
+				if ((segment[1] !== points[j + 1]) || (j === len2 - 2)) {
+					parts[k].push(segment[1]);
+					k++;
+				}
+			}
+		}
+	},
+
+	// simplify each clipped part of the polyline for performance
+	_simplifyPoints: function () {
+		var parts = this._parts,
+		    tolerance = this.options.smoothFactor;
+
+		for (var i = 0, len = parts.length; i < len; i++) {
+			parts[i] = simplify(parts[i], tolerance);
+		}
+	},
+
+	_update: function () {
+		if (!this._map) { return; }
+
+		this._clipPoints();
+		this._simplifyPoints();
+		this._updatePath();
+	},
+
+	_updatePath: function () {
+		this._renderer._updatePoly(this);
+	},
+
+	// Needed by the `Canvas` renderer for interactivity
+	_containsPoint: function (p, closed) {
+		var i, j, k, len, len2, part,
+		    w = this._clickTolerance();
+
+		if (!this._pxBounds || !this._pxBounds.contains(p)) { return false; }
+
+		// hit detection for polylines
+		for (i = 0, len = this._parts.length; i < len; i++) {
+			part = this._parts[i];
+
+			for (j = 0, len2 = part.length, k = len2 - 1; j < len2; k = j++) {
+				if (!closed && (j === 0)) { continue; }
+
+				if (pointToSegmentDistance(p, part[k], part[j]) <= w) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+});
+
+// @factory L.polyline(latlngs: LatLng[], options?: Polyline options)
+// Instantiates a polyline object given an array of geographical points and
+// optionally an options object. You can create a `Polyline` object with
+// multiple separate lines (`MultiPolyline`) by passing an array of arrays
+// of geographic points.
+
+function clipPolygon(points, bounds, round) {
+	var clippedPoints,
+	    edges = [1, 4, 2, 8],
+	    i, j, k,
+	    a, b,
+	    len, edge, p;
+
+	for (i = 0, len = points.length; i < len; i++) {
+		points[i]._code = _getBitCode(points[i], bounds);
+	}
+
+	// for each edge (left, bottom, right, top)
+	for (k = 0; k < 4; k++) {
+		edge = edges[k];
+		clippedPoints = [];
+
+		for (i = 0, len = points.length, j = len - 1; i < len; j = i++) {
+			a = points[i];
+			b = points[j];
+
+			// if a is inside the clip window
+			if (!(a._code & edge)) {
+				// if b is outside the clip window (a->b goes out of screen)
+				if (b._code & edge) {
+					p = _getEdgeIntersection(b, a, edge, bounds, round);
+					p._code = _getBitCode(p, bounds);
+					clippedPoints.push(p);
+				}
+				clippedPoints.push(a);
+
+			// else if b is inside the clip window (a->b enters the screen)
+			} else if (!(b._code & edge)) {
+				p = _getEdgeIntersection(b, a, edge, bounds, round);
+				p._code = _getBitCode(p, bounds);
+				clippedPoints.push(p);
+			}
+		}
+		points = clippedPoints;
+	}
+
+	return points;
+}
+
+var Polygon = Polyline.extend({
+
+	options: {
+		fill: true
+	},
+
+	isEmpty: function () {
+		return !this._latlngs.length || !this._latlngs[0].length;
+	},
+
+	getCenter: function () {
+		// throws error when not yet added to map as this center calculation requires projected coordinates
+		if (!this._map) {
+			throw new Error('Must add layer to map before using getCenter()');
+		}
+
+		var i, j, p1, p2, f, area, x, y, center,
+		    points = this._rings[0],
+		    len = points.length;
+
+		if (!len) { return null; }
+
+		// polygon centroid algorithm; only uses the first ring if there are multiple
+
+		area = x = y = 0;
+
+		for (i = 0, j = len - 1; i < len; j = i++) {
+			p1 = points[i];
+			p2 = points[j];
+
+			f = p1.y * p2.x - p2.y * p1.x;
+			x += (p1.x + p2.x) * f;
+			y += (p1.y + p2.y) * f;
+			area += f * 3;
+		}
+
+		if (area === 0) {
+			// Polygon is so small that all points are on same pixel.
+			center = points[0];
+		} else {
+			center = [x / area, y / area];
+		}
+		return this._map.layerPointToLatLng(center);
+	},
+
+	_convertLatLngs: function (latlngs) {
+		var result = Polyline.prototype._convertLatLngs.call(this, latlngs),
+		    len = result.length;
+
+		// remove last point if it equals first one
+		if (len >= 2 && result[0] instanceof LatLng && result[0].equals(result[len - 1])) {
+			result.pop();
+		}
+		return result;
+	},
+
+	_setLatLngs: function (latlngs) {
+		Polyline.prototype._setLatLngs.call(this, latlngs);
+		if (_flat(this._latlngs)) {
+			this._latlngs = [this._latlngs];
+		}
+	},
+
+	_defaultShape: function () {
+		return _flat(this._latlngs[0]) ? this._latlngs[0] : this._latlngs[0][0];
+	},
+
+	_clipPoints: function () {
+		// polygons need a different clipping algorithm so we redefine that
+
+		var bounds = this._renderer._bounds,
+		    w = this.options.weight,
+		    p = new Point(w, w);
+
+		// increase clip padding by stroke width to avoid stroke on clip edges
+		bounds = new Bounds(bounds.min.subtract(p), bounds.max.add(p));
+
+		this._parts = [];
+		if (!this._pxBounds || !this._pxBounds.intersects(bounds)) {
+			return;
+		}
+
+		if (this.options.noClip) {
+			this._parts = this._rings;
+			return;
+		}
+
+		for (var i = 0, len = this._rings.length, clipped; i < len; i++) {
+			clipped = clipPolygon(this._rings[i], bounds, true);
+			if (clipped.length) {
+				this._parts.push(clipped);
+			}
+		}
+	},
+
+	_updatePath: function () {
+		this._renderer._updatePoly(this, true);
+	},
+
+	// Needed by the `Canvas` renderer for interactivity
+	_containsPoint: function (p) {
+		var inside = false,
+		    part, p1, p2, i, j, k, len, len2;
+
+		if (!this._pxBounds.contains(p)) { return false; }
+
+		// ray casting algorithm for detecting if point is in polygon
+		for (i = 0, len = this._parts.length; i < len; i++) {
+			part = this._parts[i];
+
+			for (j = 0, len2 = part.length, k = len2 - 1; j < len2; k = j++) {
+				p1 = part[j];
+				p2 = part[k];
+
+				if (((p1.y > p.y) !== (p2.y > p.y)) && (p.x < (p2.x - p1.x) * (p.y - p1.y) / (p2.y - p1.y) + p1.x)) {
+					inside = !inside;
+				}
+			}
+		}
+
+		// also check if it's on polygon stroke
+		return inside || Polyline.prototype._containsPoint.call(this, p, true);
+	}
+
+});
+
+
+// @factory L.polygon(latlngs: LatLng[], options?: Polyline options)
+
+var Rectangle = Polygon.extend({
+	initialize: function (latLngBounds, options) {
+		Polygon.prototype.initialize.call(this, this._boundsToLatLngs(latLngBounds), options);
+	},
+
+	// @method setBounds(latLngBounds: LatLngBounds): this
+	// Redraws the rectangle with the passed bounds.
+	setBounds: function (latLngBounds) {
+		return this.setLatLngs(this._boundsToLatLngs(latLngBounds));
+	},
+
+	_boundsToLatLngs: function (latLngBounds) {
+		latLngBounds = toLatLngBounds(latLngBounds);
+		return [
+			latLngBounds.getSouthWest(),
+			latLngBounds.getNorthWest(),
+			latLngBounds.getNorthEast(),
+			latLngBounds.getSouthEast()
+		];
+	}
+});
+
+
+// @factory L.rectangle(latLngBounds: LatLngBounds, options?: Polyline options)
+
+SVG.create = create$2;
+SVG.pointsToPath = pointsToPath;
+
+function none() {}
+
+var selector = function(selector) {
+  return selector == null ? none : function() {
+    return this.querySelector(selector);
+  };
+};
+
+var selection_select = function(select) {
+  if (typeof select !== "function") select = selector(select);
+
+  for (var groups = this._groups, m = groups.length, subgroups = new Array(m), j = 0; j < m; ++j) {
+    for (var group = groups[j], n = group.length, subgroup = subgroups[j] = new Array(n), node, subnode, i = 0; i < n; ++i) {
+      if ((node = group[i]) && (subnode = select.call(node, node.__data__, i, group))) {
+        if ("__data__" in node) subnode.__data__ = node.__data__;
+        subgroup[i] = subnode;
+      }
+    }
+  }
+
+  return new Selection(subgroups, this._parents);
+};
+
+function empty$1() {
+  return [];
+}
+
+var selectorAll = function(selector) {
+  return selector == null ? empty$1 : function() {
+    return this.querySelectorAll(selector);
+  };
+};
+
+var selection_selectAll = function(select) {
+  if (typeof select !== "function") select = selectorAll(select);
+
+  for (var groups = this._groups, m = groups.length, subgroups = [], parents = [], j = 0; j < m; ++j) {
+    for (var group = groups[j], n = group.length, node, i = 0; i < n; ++i) {
+      if (node = group[i]) {
+        subgroups.push(select.call(node, node.__data__, i, group));
+        parents.push(node);
+      }
+    }
+  }
+
+  return new Selection(subgroups, parents);
+};
+
+var matcher = function(selector) {
+  return function() {
+    return this.matches(selector);
+  };
+};
+
+if (typeof document !== "undefined") {
+  var element = document.documentElement;
+  if (!element.matches) {
+    var vendorMatches = element.webkitMatchesSelector
+        || element.msMatchesSelector
+        || element.mozMatchesSelector
+        || element.oMatchesSelector;
+    matcher = function(selector) {
+      return function() {
+        return vendorMatches.call(this, selector);
+      };
+    };
+  }
+}
+
+var matcher$1 = matcher;
+
+var selection_filter = function(match) {
+  if (typeof match !== "function") match = matcher$1(match);
+
+  for (var groups = this._groups, m = groups.length, subgroups = new Array(m), j = 0; j < m; ++j) {
+    for (var group = groups[j], n = group.length, subgroup = subgroups[j] = [], node, i = 0; i < n; ++i) {
+      if ((node = group[i]) && match.call(node, node.__data__, i, group)) {
+        subgroup.push(node);
+      }
+    }
+  }
+
+  return new Selection(subgroups, this._parents);
+};
+
+var sparse = function(update) {
+  return new Array(update.length);
+};
+
+var selection_enter = function() {
+  return new Selection(this._enter || this._groups.map(sparse), this._parents);
+};
+
+function EnterNode(parent, datum) {
+  this.ownerDocument = parent.ownerDocument;
+  this.namespaceURI = parent.namespaceURI;
+  this._next = null;
+  this._parent = parent;
+  this.__data__ = datum;
+}
+
+EnterNode.prototype = {
+  constructor: EnterNode,
+  appendChild: function(child) { return this._parent.insertBefore(child, this._next); },
+  insertBefore: function(child, next) { return this._parent.insertBefore(child, next); },
+  querySelector: function(selector) { return this._parent.querySelector(selector); },
+  querySelectorAll: function(selector) { return this._parent.querySelectorAll(selector); }
+};
+
+var constant = function(x) {
+  return function() {
+    return x;
+  };
+};
+
+var keyPrefix = "$"; // Protect against keys like “__proto__”.
+
+function bindIndex(parent, group, enter, update, exit, data) {
+  var i = 0,
+      node,
+      groupLength = group.length,
+      dataLength = data.length;
+
+  // Put any non-null nodes that fit into update.
+  // Put any null nodes into enter.
+  // Put any remaining data into enter.
+  for (; i < dataLength; ++i) {
+    if (node = group[i]) {
+      node.__data__ = data[i];
+      update[i] = node;
+    } else {
+      enter[i] = new EnterNode(parent, data[i]);
+    }
+  }
+
+  // Put any non-null nodes that don’t fit into exit.
+  for (; i < groupLength; ++i) {
+    if (node = group[i]) {
+      exit[i] = node;
+    }
+  }
+}
+
+function bindKey(parent, group, enter, update, exit, data, key) {
+  var i,
+      node,
+      nodeByKeyValue = {},
+      groupLength = group.length,
+      dataLength = data.length,
+      keyValues = new Array(groupLength),
+      keyValue;
+
+  // Compute the key for each node.
+  // If multiple nodes have the same key, the duplicates are added to exit.
+  for (i = 0; i < groupLength; ++i) {
+    if (node = group[i]) {
+      keyValues[i] = keyValue = keyPrefix + key.call(node, node.__data__, i, group);
+      if (keyValue in nodeByKeyValue) {
+        exit[i] = node;
+      } else {
+        nodeByKeyValue[keyValue] = node;
+      }
+    }
+  }
+
+  // Compute the key for each datum.
+  // If there a node associated with this key, join and add it to update.
+  // If there is not (or the key is a duplicate), add it to enter.
+  for (i = 0; i < dataLength; ++i) {
+    keyValue = keyPrefix + key.call(parent, data[i], i, data);
+    if (node = nodeByKeyValue[keyValue]) {
+      update[i] = node;
+      node.__data__ = data[i];
+      nodeByKeyValue[keyValue] = null;
+    } else {
+      enter[i] = new EnterNode(parent, data[i]);
+    }
+  }
+
+  // Add any remaining nodes that were not bound to data to exit.
+  for (i = 0; i < groupLength; ++i) {
+    if ((node = group[i]) && (nodeByKeyValue[keyValues[i]] === node)) {
+      exit[i] = node;
+    }
+  }
+}
+
+var selection_data = function(value, key) {
+  if (!value) {
+    data = new Array(this.size()), j = -1;
+    this.each(function(d) { data[++j] = d; });
+    return data;
+  }
+
+  var bind = key ? bindKey : bindIndex,
+      parents = this._parents,
+      groups = this._groups;
+
+  if (typeof value !== "function") value = constant(value);
+
+  for (var m = groups.length, update = new Array(m), enter = new Array(m), exit = new Array(m), j = 0; j < m; ++j) {
+    var parent = parents[j],
+        group = groups[j],
+        groupLength = group.length,
+        data = value.call(parent, parent && parent.__data__, j, parents),
+        dataLength = data.length,
+        enterGroup = enter[j] = new Array(dataLength),
+        updateGroup = update[j] = new Array(dataLength),
+        exitGroup = exit[j] = new Array(groupLength);
+
+    bind(parent, group, enterGroup, updateGroup, exitGroup, data, key);
+
+    // Now connect the enter nodes to their following update node, such that
+    // appendChild can insert the materialized enter node before this node,
+    // rather than at the end of the parent node.
+    for (var i0 = 0, i1 = 0, previous, next; i0 < dataLength; ++i0) {
+      if (previous = enterGroup[i0]) {
+        if (i0 >= i1) i1 = i0 + 1;
+        while (!(next = updateGroup[i1]) && ++i1 < dataLength);
+        previous._next = next || null;
+      }
+    }
+  }
+
+  update = new Selection(update, parents);
+  update._enter = enter;
+  update._exit = exit;
+  return update;
+};
+
+var selection_exit = function() {
+  return new Selection(this._exit || this._groups.map(sparse), this._parents);
+};
+
+var selection_merge = function(selection$$1) {
+
+  for (var groups0 = this._groups, groups1 = selection$$1._groups, m0 = groups0.length, m1 = groups1.length, m = Math.min(m0, m1), merges = new Array(m0), j = 0; j < m; ++j) {
+    for (var group0 = groups0[j], group1 = groups1[j], n = group0.length, merge = merges[j] = new Array(n), node, i = 0; i < n; ++i) {
+      if (node = group0[i] || group1[i]) {
+        merge[i] = node;
+      }
+    }
+  }
+
+  for (; j < m0; ++j) {
+    merges[j] = groups0[j];
+  }
+
+  return new Selection(merges, this._parents);
+};
+
+var selection_order = function() {
+
+  for (var groups = this._groups, j = -1, m = groups.length; ++j < m;) {
+    for (var group = groups[j], i = group.length - 1, next = group[i], node; --i >= 0;) {
+      if (node = group[i]) {
+        if (next && next !== node.nextSibling) next.parentNode.insertBefore(node, next);
+        next = node;
+      }
+    }
+  }
+
+  return this;
+};
+
+var selection_sort = function(compare) {
+  if (!compare) compare = ascending;
+
+  function compareNode(a, b) {
+    return a && b ? compare(a.__data__, b.__data__) : !a - !b;
+  }
+
+  for (var groups = this._groups, m = groups.length, sortgroups = new Array(m), j = 0; j < m; ++j) {
+    for (var group = groups[j], n = group.length, sortgroup = sortgroups[j] = new Array(n), node, i = 0; i < n; ++i) {
+      if (node = group[i]) {
+        sortgroup[i] = node;
+      }
+    }
+    sortgroup.sort(compareNode);
+  }
+
+  return new Selection(sortgroups, this._parents).order();
+};
+
+function ascending(a, b) {
+  return a < b ? -1 : a > b ? 1 : a >= b ? 0 : NaN;
+}
+
+var selection_call = function() {
+  var callback = arguments[0];
+  arguments[0] = this;
+  callback.apply(null, arguments);
+  return this;
+};
+
+var selection_nodes = function() {
+  var nodes = new Array(this.size()), i = -1;
+  this.each(function() { nodes[++i] = this; });
+  return nodes;
+};
+
+var selection_node = function() {
+
+  for (var groups = this._groups, j = 0, m = groups.length; j < m; ++j) {
+    for (var group = groups[j], i = 0, n = group.length; i < n; ++i) {
+      var node = group[i];
+      if (node) return node;
+    }
+  }
+
+  return null;
+};
+
+var selection_size = function() {
+  var size = 0;
+  this.each(function() { ++size; });
+  return size;
+};
+
+var selection_empty = function() {
+  return !this.node();
+};
+
+var selection_each = function(callback) {
+
+  for (var groups = this._groups, j = 0, m = groups.length; j < m; ++j) {
+    for (var group = groups[j], i = 0, n = group.length, node; i < n; ++i) {
+      if (node = group[i]) callback.call(node, node.__data__, i, group);
+    }
+  }
+
+  return this;
+};
+
+var xhtml = "http://www.w3.org/1999/xhtml";
+
+var namespaces = {
+  svg: "http://www.w3.org/2000/svg",
+  xhtml: xhtml,
+  xlink: "http://www.w3.org/1999/xlink",
+  xml: "http://www.w3.org/XML/1998/namespace",
+  xmlns: "http://www.w3.org/2000/xmlns/"
+};
+
+var namespace = function(name) {
+  var prefix = name += "", i = prefix.indexOf(":");
+  if (i >= 0 && (prefix = name.slice(0, i)) !== "xmlns") name = name.slice(i + 1);
+  return namespaces.hasOwnProperty(prefix) ? {space: namespaces[prefix], local: name} : name;
+};
+
+function attrRemove(name) {
+  return function() {
+    this.removeAttribute(name);
+  };
+}
+
+function attrRemoveNS(fullname) {
+  return function() {
+    this.removeAttributeNS(fullname.space, fullname.local);
+  };
+}
+
+function attrConstant(name, value) {
+  return function() {
+    this.setAttribute(name, value);
+  };
+}
+
+function attrConstantNS(fullname, value) {
+  return function() {
+    this.setAttributeNS(fullname.space, fullname.local, value);
+  };
+}
+
+function attrFunction(name, value) {
+  return function() {
+    var v = value.apply(this, arguments);
+    if (v == null) this.removeAttribute(name);
+    else this.setAttribute(name, v);
+  };
+}
+
+function attrFunctionNS(fullname, value) {
+  return function() {
+    var v = value.apply(this, arguments);
+    if (v == null) this.removeAttributeNS(fullname.space, fullname.local);
+    else this.setAttributeNS(fullname.space, fullname.local, v);
+  };
+}
+
+var selection_attr = function(name, value) {
+  var fullname = namespace(name);
+
+  if (arguments.length < 2) {
+    var node = this.node();
+    return fullname.local
+        ? node.getAttributeNS(fullname.space, fullname.local)
+        : node.getAttribute(fullname);
+  }
+
+  return this.each((value == null
+      ? (fullname.local ? attrRemoveNS : attrRemove) : (typeof value === "function"
+      ? (fullname.local ? attrFunctionNS : attrFunction)
+      : (fullname.local ? attrConstantNS : attrConstant)))(fullname, value));
+};
+
+var defaultView = function(node) {
+  return (node.ownerDocument && node.ownerDocument.defaultView) // node is a Node
+      || (node.document && node) // node is a Window
+      || node.defaultView; // node is a Document
+};
+
+function styleRemove(name) {
+  return function() {
+    this.style.removeProperty(name);
+  };
+}
+
+function styleConstant(name, value, priority) {
+  return function() {
+    this.style.setProperty(name, value, priority);
+  };
+}
+
+function styleFunction(name, value, priority) {
+  return function() {
+    var v = value.apply(this, arguments);
+    if (v == null) this.style.removeProperty(name);
+    else this.style.setProperty(name, v, priority);
+  };
+}
+
+var selection_style = function(name, value, priority) {
+  return arguments.length > 1
+      ? this.each((value == null
+            ? styleRemove : typeof value === "function"
+            ? styleFunction
+            : styleConstant)(name, value, priority == null ? "" : priority))
+      : styleValue(this.node(), name);
+};
+
+function styleValue(node, name) {
+  return node.style.getPropertyValue(name)
+      || defaultView(node).getComputedStyle(node, null).getPropertyValue(name);
+}
+
+function propertyRemove(name) {
+  return function() {
+    delete this[name];
+  };
+}
+
+function propertyConstant(name, value) {
+  return function() {
+    this[name] = value;
+  };
+}
+
+function propertyFunction(name, value) {
+  return function() {
+    var v = value.apply(this, arguments);
+    if (v == null) delete this[name];
+    else this[name] = v;
+  };
+}
+
+var selection_property = function(name, value) {
+  return arguments.length > 1
+      ? this.each((value == null
+          ? propertyRemove : typeof value === "function"
+          ? propertyFunction
+          : propertyConstant)(name, value))
+      : this.node()[name];
+};
+
+function classArray(string) {
+  return string.trim().split(/^|\s+/);
+}
+
+function classList(node) {
+  return node.classList || new ClassList(node);
+}
+
+function ClassList(node) {
+  this._node = node;
+  this._names = classArray(node.getAttribute("class") || "");
+}
+
+ClassList.prototype = {
+  add: function(name) {
+    var i = this._names.indexOf(name);
+    if (i < 0) {
+      this._names.push(name);
+      this._node.setAttribute("class", this._names.join(" "));
+    }
+  },
+  remove: function(name) {
+    var i = this._names.indexOf(name);
+    if (i >= 0) {
+      this._names.splice(i, 1);
+      this._node.setAttribute("class", this._names.join(" "));
+    }
+  },
+  contains: function(name) {
+    return this._names.indexOf(name) >= 0;
+  }
+};
+
+function classedAdd(node, names) {
+  var list = classList(node), i = -1, n = names.length;
+  while (++i < n) list.add(names[i]);
+}
+
+function classedRemove(node, names) {
+  var list = classList(node), i = -1, n = names.length;
+  while (++i < n) list.remove(names[i]);
+}
+
+function classedTrue(names) {
+  return function() {
+    classedAdd(this, names);
+  };
+}
+
+function classedFalse(names) {
+  return function() {
+    classedRemove(this, names);
+  };
+}
+
+function classedFunction(names, value) {
+  return function() {
+    (value.apply(this, arguments) ? classedAdd : classedRemove)(this, names);
+  };
+}
+
+var selection_classed = function(name, value) {
+  var names = classArray(name + "");
+
+  if (arguments.length < 2) {
+    var list = classList(this.node()), i = -1, n = names.length;
+    while (++i < n) if (!list.contains(names[i])) return false;
+    return true;
+  }
+
+  return this.each((typeof value === "function"
+      ? classedFunction : value
+      ? classedTrue
+      : classedFalse)(names, value));
+};
+
+function textRemove() {
+  this.textContent = "";
+}
+
+function textConstant(value) {
+  return function() {
+    this.textContent = value;
+  };
+}
+
+function textFunction(value) {
+  return function() {
+    var v = value.apply(this, arguments);
+    this.textContent = v == null ? "" : v;
+  };
+}
+
+var selection_text = function(value) {
+  return arguments.length
+      ? this.each(value == null
+          ? textRemove : (typeof value === "function"
+          ? textFunction
+          : textConstant)(value))
+      : this.node().textContent;
+};
+
+function htmlRemove() {
+  this.innerHTML = "";
+}
+
+function htmlConstant(value) {
+  return function() {
+    this.innerHTML = value;
+  };
+}
+
+function htmlFunction(value) {
+  return function() {
+    var v = value.apply(this, arguments);
+    this.innerHTML = v == null ? "" : v;
+  };
+}
+
+var selection_html = function(value) {
+  return arguments.length
+      ? this.each(value == null
+          ? htmlRemove : (typeof value === "function"
+          ? htmlFunction
+          : htmlConstant)(value))
+      : this.node().innerHTML;
+};
+
+function raise() {
+  if (this.nextSibling) this.parentNode.appendChild(this);
+}
+
+var selection_raise = function() {
+  return this.each(raise);
+};
+
+function lower() {
+  if (this.previousSibling) this.parentNode.insertBefore(this, this.parentNode.firstChild);
+}
+
+var selection_lower = function() {
+  return this.each(lower);
+};
+
+function creatorInherit(name) {
+  return function() {
+    var document = this.ownerDocument,
+        uri = this.namespaceURI;
+    return uri === xhtml && document.documentElement.namespaceURI === xhtml
+        ? document.createElement(name)
+        : document.createElementNS(uri, name);
+  };
+}
+
+function creatorFixed(fullname) {
+  return function() {
+    return this.ownerDocument.createElementNS(fullname.space, fullname.local);
+  };
+}
+
+var creator = function(name) {
+  var fullname = namespace(name);
+  return (fullname.local
+      ? creatorFixed
+      : creatorInherit)(fullname);
+};
+
+var selection_append = function(name) {
+  var create = typeof name === "function" ? name : creator(name);
+  return this.select(function() {
+    return this.appendChild(create.apply(this, arguments));
+  });
+};
+
+function constantNull() {
+  return null;
+}
+
+var selection_insert = function(name, before) {
+  var create = typeof name === "function" ? name : creator(name),
+      select = before == null ? constantNull : typeof before === "function" ? before : selector(before);
+  return this.select(function() {
+    return this.insertBefore(create.apply(this, arguments), select.apply(this, arguments) || null);
+  });
+};
+
+function remove$1() {
+  var parent = this.parentNode;
+  if (parent) parent.removeChild(this);
+}
+
+var selection_remove = function() {
+  return this.each(remove$1);
+};
+
+var selection_datum = function(value) {
+  return arguments.length
+      ? this.property("__data__", value)
+      : this.node().__data__;
+};
+
+var filterEvents = {};
+
+var event = null;
+
+if (typeof document !== "undefined") {
+  var element$1 = document.documentElement;
+  if (!("onmouseenter" in element$1)) {
+    filterEvents = {mouseenter: "mouseover", mouseleave: "mouseout"};
+  }
+}
+
+function filterContextListener(listener, index, group) {
+  listener = contextListener(listener, index, group);
+  return function(event) {
+    var related = event.relatedTarget;
+    if (!related || (related !== this && !(related.compareDocumentPosition(this) & 8))) {
+      listener.call(this, event);
+    }
+  };
+}
+
+function contextListener(listener, index, group) {
+  return function(event1) {
+    var event0 = event; // Events can be reentrant (e.g., focus).
+    event = event1;
+    try {
+      listener.call(this, this.__data__, index, group);
+    } finally {
+      event = event0;
+    }
+  };
+}
+
+function parseTypenames(typenames) {
+  return typenames.trim().split(/^|\s+/).map(function(t) {
+    var name = "", i = t.indexOf(".");
+    if (i >= 0) name = t.slice(i + 1), t = t.slice(0, i);
+    return {type: t, name: name};
+  });
+}
+
+function onRemove(typename) {
+  return function() {
+    var on = this.__on;
+    if (!on) return;
+    for (var j = 0, i = -1, m = on.length, o; j < m; ++j) {
+      if (o = on[j], (!typename.type || o.type === typename.type) && o.name === typename.name) {
+        this.removeEventListener(o.type, o.listener, o.capture);
+      } else {
+        on[++i] = o;
+      }
+    }
+    if (++i) on.length = i;
+    else delete this.__on;
+  };
+}
+
+function onAdd(typename, value, capture) {
+  var wrap = filterEvents.hasOwnProperty(typename.type) ? filterContextListener : contextListener;
+  return function(d, i, group) {
+    var on = this.__on, o, listener = wrap(value, i, group);
+    if (on) for (var j = 0, m = on.length; j < m; ++j) {
+      if ((o = on[j]).type === typename.type && o.name === typename.name) {
+        this.removeEventListener(o.type, o.listener, o.capture);
+        this.addEventListener(o.type, o.listener = listener, o.capture = capture);
+        o.value = value;
+        return;
+      }
+    }
+    this.addEventListener(typename.type, listener, capture);
+    o = {type: typename.type, name: typename.name, value: value, listener: listener, capture: capture};
+    if (!on) this.__on = [o];
+    else on.push(o);
+  };
+}
+
+var selection_on = function(typename, value, capture) {
+  var typenames = parseTypenames(typename + ""), i, n = typenames.length, t;
+
+  if (arguments.length < 2) {
+    var on = this.node().__on;
+    if (on) for (var j = 0, m = on.length, o; j < m; ++j) {
+      for (i = 0, o = on[j]; i < n; ++i) {
+        if ((t = typenames[i]).type === o.type && t.name === o.name) {
+          return o.value;
+        }
+      }
+    }
+    return;
+  }
+
+  on = value ? onAdd : onRemove;
+  if (capture == null) capture = false;
+  for (i = 0; i < n; ++i) this.each(on(typenames[i], value, capture));
+  return this;
+};
+
+function dispatchEvent(node, type, params) {
+  var window = defaultView(node),
+      event = window.CustomEvent;
+
+  if (typeof event === "function") {
+    event = new event(type, params);
+  } else {
+    event = window.document.createEvent("Event");
+    if (params) event.initEvent(type, params.bubbles, params.cancelable), event.detail = params.detail;
+    else event.initEvent(type, false, false);
+  }
+
+  node.dispatchEvent(event);
+}
+
+function dispatchConstant(type, params) {
+  return function() {
+    return dispatchEvent(this, type, params);
+  };
+}
+
+function dispatchFunction(type, params) {
+  return function() {
+    return dispatchEvent(this, type, params.apply(this, arguments));
+  };
+}
+
+var selection_dispatch = function(type, params) {
+  return this.each((typeof params === "function"
+      ? dispatchFunction
+      : dispatchConstant)(type, params));
+};
+
+var root$1 = [null];
+
+function Selection(groups, parents) {
+  this._groups = groups;
+  this._parents = parents;
+}
+
+function selection() {
+  return new Selection([[document.documentElement]], root$1);
+}
+
+Selection.prototype = selection.prototype = {
+  constructor: Selection,
+  select: selection_select,
+  selectAll: selection_selectAll,
+  filter: selection_filter,
+  data: selection_data,
+  enter: selection_enter,
+  exit: selection_exit,
+  merge: selection_merge,
+  order: selection_order,
+  sort: selection_sort,
+  call: selection_call,
+  nodes: selection_nodes,
+  node: selection_node,
+  size: selection_size,
+  empty: selection_empty,
+  each: selection_each,
+  attr: selection_attr,
+  style: selection_style,
+  property: selection_property,
+  classed: selection_classed,
+  text: selection_text,
+  html: selection_html,
+  raise: selection_raise,
+  lower: selection_lower,
+  append: selection_append,
+  insert: selection_insert,
+  remove: selection_remove,
+  datum: selection_datum,
+  on: selection_on,
+  dispatch: selection_dispatch
+};
+
+var select = function(selector) {
+  return typeof selector === "string"
+      ? new Selection([[document.querySelector(selector)]], [document.documentElement])
+      : new Selection([[selector]], root$1);
+};
+
+var ascending$1 = function(a, b) {
+  return a < b ? -1 : a > b ? 1 : a >= b ? 0 : NaN;
+};
+
+var bisector = function(compare) {
+  if (compare.length === 1) compare = ascendingComparator(compare);
+  return {
+    left: function(a, x, lo, hi) {
+      if (lo == null) lo = 0;
+      if (hi == null) hi = a.length;
+      while (lo < hi) {
+        var mid = lo + hi >>> 1;
+        if (compare(a[mid], x) < 0) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    },
+    right: function(a, x, lo, hi) {
+      if (lo == null) lo = 0;
+      if (hi == null) hi = a.length;
+      while (lo < hi) {
+        var mid = lo + hi >>> 1;
+        if (compare(a[mid], x) > 0) hi = mid;
+        else lo = mid + 1;
+      }
+      return lo;
+    }
+  };
+};
+
+function ascendingComparator(f) {
+  return function(d, x) {
+    return ascending$1(f(d), x);
+  };
+}
+
+var ascendingBisect = bisector(ascending$1);
+var bisectRight = ascendingBisect.right;
+
+function pair(a, b) {
+  return [a, b];
+}
+
+var number = function(x) {
+  return x === null ? NaN : +x;
+};
+
+var extent = function(values, valueof) {
+  var n = values.length,
+      i = -1,
+      value,
+      min,
+      max;
+
+  if (valueof == null) {
+    while (++i < n) { // Find the first comparable value.
+      if ((value = values[i]) != null && value >= value) {
+        min = max = value;
+        while (++i < n) { // Compare the remaining values.
+          if ((value = values[i]) != null) {
+            if (min > value) min = value;
+            if (max < value) max = value;
+          }
+        }
+      }
+    }
+  }
+
+  else {
+    while (++i < n) { // Find the first comparable value.
+      if ((value = valueof(values[i], i, values)) != null && value >= value) {
+        min = max = value;
+        while (++i < n) { // Compare the remaining values.
+          if ((value = valueof(values[i], i, values)) != null) {
+            if (min > value) min = value;
+            if (max < value) max = value;
+          }
+        }
+      }
+    }
+  }
+
+  return [min, max];
+};
+
+var identity = function(x) {
+  return x;
+};
+
+var range = function(start, stop, step) {
+  start = +start, stop = +stop, step = (n = arguments.length) < 2 ? (stop = start, start = 0, 1) : n < 3 ? 1 : +step;
+
+  var i = -1,
+      n = Math.max(0, Math.ceil((stop - start) / step)) | 0,
+      range = new Array(n);
+
+  while (++i < n) {
+    range[i] = start + i * step;
+  }
+
+  return range;
+};
+
+var e10 = Math.sqrt(50);
+var e5 = Math.sqrt(10);
+var e2 = Math.sqrt(2);
+
+var ticks = function(start, stop, count) {
+  var reverse = stop < start,
+      i = -1,
+      n,
+      ticks,
+      step;
+
+  if (reverse) n = start, start = stop, stop = n;
+
+  if ((step = tickIncrement(start, stop, count)) === 0 || !isFinite(step)) return [];
+
+  if (step > 0) {
+    start = Math.ceil(start / step);
+    stop = Math.floor(stop / step);
+    ticks = new Array(n = Math.ceil(stop - start + 1));
+    while (++i < n) ticks[i] = (start + i) * step;
+  } else {
+    start = Math.floor(start * step);
+    stop = Math.ceil(stop * step);
+    ticks = new Array(n = Math.ceil(start - stop + 1));
+    while (++i < n) ticks[i] = (start - i) / step;
+  }
+
+  if (reverse) ticks.reverse();
+
+  return ticks;
+};
+
+function tickIncrement(start, stop, count) {
+  var step = (stop - start) / Math.max(0, count),
+      power = Math.floor(Math.log(step) / Math.LN10),
+      error = step / Math.pow(10, power);
+  return power >= 0
+      ? (error >= e10 ? 10 : error >= e5 ? 5 : error >= e2 ? 2 : 1) * Math.pow(10, power)
+      : -Math.pow(10, -power) / (error >= e10 ? 10 : error >= e5 ? 5 : error >= e2 ? 2 : 1);
+}
+
+function tickStep(start, stop, count) {
+  var step0 = Math.abs(stop - start) / Math.max(0, count),
+      step1 = Math.pow(10, Math.floor(Math.log(step0) / Math.LN10)),
+      error = step0 / step1;
+  if (error >= e10) step1 *= 10;
+  else if (error >= e5) step1 *= 5;
+  else if (error >= e2) step1 *= 2;
+  return stop < start ? -step1 : step1;
+}
+
+var sturges = function(values) {
+  return Math.ceil(Math.log(values.length) / Math.LN2) + 1;
+};
+
+var quantile = function(values, p, valueof) {
+  if (valueof == null) valueof = number;
+  if (!(n = values.length)) return;
+  if ((p = +p) <= 0 || n < 2) return +valueof(values[0], 0, values);
+  if (p >= 1) return +valueof(values[n - 1], n - 1, values);
+  var n,
+      i = (n - 1) * p,
+      i0 = Math.floor(i),
+      value0 = +valueof(values[i0], i0, values),
+      value1 = +valueof(values[i0 + 1], i0 + 1, values);
+  return value0 + (value1 - value0) * (i - i0);
+};
+
+var min$1 = function(values, valueof) {
+  var n = values.length,
+      i = -1,
+      value,
+      min;
+
+  if (valueof == null) {
+    while (++i < n) { // Find the first comparable value.
+      if ((value = values[i]) != null && value >= value) {
+        min = value;
+        while (++i < n) { // Compare the remaining values.
+          if ((value = values[i]) != null && min > value) {
+            min = value;
+          }
+        }
+      }
+    }
+  }
+
+  else {
+    while (++i < n) { // Find the first comparable value.
+      if ((value = valueof(values[i], i, values)) != null && value >= value) {
+        min = value;
+        while (++i < n) { // Compare the remaining values.
+          if ((value = valueof(values[i], i, values)) != null && min > value) {
+            min = value;
+          }
+        }
+      }
+    }
+  }
+
+  return min;
+};
+
+function length(d) {
+  return d.length;
+}
+
+var define$1 = function(constructor, factory, prototype) {
+  constructor.prototype = factory.prototype = prototype;
+  prototype.constructor = constructor;
+};
+
+function extend$1(parent, definition) {
+  var prototype = Object.create(parent.prototype);
+  for (var key in definition) prototype[key] = definition[key];
+  return prototype;
+}
+
+function Color() {}
+
+var darker = 0.7;
+var brighter = 1 / darker;
+
+var reI = "\\s*([+-]?\\d+)\\s*";
+var reN = "\\s*([+-]?\\d*\\.?\\d+(?:[eE][+-]?\\d+)?)\\s*";
+var reP = "\\s*([+-]?\\d*\\.?\\d+(?:[eE][+-]?\\d+)?)%\\s*";
+var reHex3 = /^#([0-9a-f]{3})$/;
+var reHex6 = /^#([0-9a-f]{6})$/;
+var reRgbInteger = new RegExp("^rgb\\(" + [reI, reI, reI] + "\\)$");
+var reRgbPercent = new RegExp("^rgb\\(" + [reP, reP, reP] + "\\)$");
+var reRgbaInteger = new RegExp("^rgba\\(" + [reI, reI, reI, reN] + "\\)$");
+var reRgbaPercent = new RegExp("^rgba\\(" + [reP, reP, reP, reN] + "\\)$");
+var reHslPercent = new RegExp("^hsl\\(" + [reN, reP, reP] + "\\)$");
+var reHslaPercent = new RegExp("^hsla\\(" + [reN, reP, reP, reN] + "\\)$");
+
+var named = {
+  aliceblue: 0xf0f8ff,
+  antiquewhite: 0xfaebd7,
+  aqua: 0x00ffff,
+  aquamarine: 0x7fffd4,
+  azure: 0xf0ffff,
+  beige: 0xf5f5dc,
+  bisque: 0xffe4c4,
+  black: 0x000000,
+  blanchedalmond: 0xffebcd,
+  blue: 0x0000ff,
+  blueviolet: 0x8a2be2,
+  brown: 0xa52a2a,
+  burlywood: 0xdeb887,
+  cadetblue: 0x5f9ea0,
+  chartreuse: 0x7fff00,
+  chocolate: 0xd2691e,
+  coral: 0xff7f50,
+  cornflowerblue: 0x6495ed,
+  cornsilk: 0xfff8dc,
+  crimson: 0xdc143c,
+  cyan: 0x00ffff,
+  darkblue: 0x00008b,
+  darkcyan: 0x008b8b,
+  darkgoldenrod: 0xb8860b,
+  darkgray: 0xa9a9a9,
+  darkgreen: 0x006400,
+  darkgrey: 0xa9a9a9,
+  darkkhaki: 0xbdb76b,
+  darkmagenta: 0x8b008b,
+  darkolivegreen: 0x556b2f,
+  darkorange: 0xff8c00,
+  darkorchid: 0x9932cc,
+  darkred: 0x8b0000,
+  darksalmon: 0xe9967a,
+  darkseagreen: 0x8fbc8f,
+  darkslateblue: 0x483d8b,
+  darkslategray: 0x2f4f4f,
+  darkslategrey: 0x2f4f4f,
+  darkturquoise: 0x00ced1,
+  darkviolet: 0x9400d3,
+  deeppink: 0xff1493,
+  deepskyblue: 0x00bfff,
+  dimgray: 0x696969,
+  dimgrey: 0x696969,
+  dodgerblue: 0x1e90ff,
+  firebrick: 0xb22222,
+  floralwhite: 0xfffaf0,
+  forestgreen: 0x228b22,
+  fuchsia: 0xff00ff,
+  gainsboro: 0xdcdcdc,
+  ghostwhite: 0xf8f8ff,
+  gold: 0xffd700,
+  goldenrod: 0xdaa520,
+  gray: 0x808080,
+  green: 0x008000,
+  greenyellow: 0xadff2f,
+  grey: 0x808080,
+  honeydew: 0xf0fff0,
+  hotpink: 0xff69b4,
+  indianred: 0xcd5c5c,
+  indigo: 0x4b0082,
+  ivory: 0xfffff0,
+  khaki: 0xf0e68c,
+  lavender: 0xe6e6fa,
+  lavenderblush: 0xfff0f5,
+  lawngreen: 0x7cfc00,
+  lemonchiffon: 0xfffacd,
+  lightblue: 0xadd8e6,
+  lightcoral: 0xf08080,
+  lightcyan: 0xe0ffff,
+  lightgoldenrodyellow: 0xfafad2,
+  lightgray: 0xd3d3d3,
+  lightgreen: 0x90ee90,
+  lightgrey: 0xd3d3d3,
+  lightpink: 0xffb6c1,
+  lightsalmon: 0xffa07a,
+  lightseagreen: 0x20b2aa,
+  lightskyblue: 0x87cefa,
+  lightslategray: 0x778899,
+  lightslategrey: 0x778899,
+  lightsteelblue: 0xb0c4de,
+  lightyellow: 0xffffe0,
+  lime: 0x00ff00,
+  limegreen: 0x32cd32,
+  linen: 0xfaf0e6,
+  magenta: 0xff00ff,
+  maroon: 0x800000,
+  mediumaquamarine: 0x66cdaa,
+  mediumblue: 0x0000cd,
+  mediumorchid: 0xba55d3,
+  mediumpurple: 0x9370db,
+  mediumseagreen: 0x3cb371,
+  mediumslateblue: 0x7b68ee,
+  mediumspringgreen: 0x00fa9a,
+  mediumturquoise: 0x48d1cc,
+  mediumvioletred: 0xc71585,
+  midnightblue: 0x191970,
+  mintcream: 0xf5fffa,
+  mistyrose: 0xffe4e1,
+  moccasin: 0xffe4b5,
+  navajowhite: 0xffdead,
+  navy: 0x000080,
+  oldlace: 0xfdf5e6,
+  olive: 0x808000,
+  olivedrab: 0x6b8e23,
+  orange: 0xffa500,
+  orangered: 0xff4500,
+  orchid: 0xda70d6,
+  palegoldenrod: 0xeee8aa,
+  palegreen: 0x98fb98,
+  paleturquoise: 0xafeeee,
+  palevioletred: 0xdb7093,
+  papayawhip: 0xffefd5,
+  peachpuff: 0xffdab9,
+  peru: 0xcd853f,
+  pink: 0xffc0cb,
+  plum: 0xdda0dd,
+  powderblue: 0xb0e0e6,
+  purple: 0x800080,
+  rebeccapurple: 0x663399,
+  red: 0xff0000,
+  rosybrown: 0xbc8f8f,
+  royalblue: 0x4169e1,
+  saddlebrown: 0x8b4513,
+  salmon: 0xfa8072,
+  sandybrown: 0xf4a460,
+  seagreen: 0x2e8b57,
+  seashell: 0xfff5ee,
+  sienna: 0xa0522d,
+  silver: 0xc0c0c0,
+  skyblue: 0x87ceeb,
+  slateblue: 0x6a5acd,
+  slategray: 0x708090,
+  slategrey: 0x708090,
+  snow: 0xfffafa,
+  springgreen: 0x00ff7f,
+  steelblue: 0x4682b4,
+  tan: 0xd2b48c,
+  teal: 0x008080,
+  thistle: 0xd8bfd8,
+  tomato: 0xff6347,
+  turquoise: 0x40e0d0,
+  violet: 0xee82ee,
+  wheat: 0xf5deb3,
+  white: 0xffffff,
+  whitesmoke: 0xf5f5f5,
+  yellow: 0xffff00,
+  yellowgreen: 0x9acd32
+};
+
+define$1(Color, color, {
+  displayable: function() {
+    return this.rgb().displayable();
+  },
+  toString: function() {
+    return this.rgb() + "";
+  }
+});
+
+function color(format) {
+  var m;
+  format = (format + "").trim().toLowerCase();
+  return (m = reHex3.exec(format)) ? (m = parseInt(m[1], 16), new Rgb((m >> 8 & 0xf) | (m >> 4 & 0x0f0), (m >> 4 & 0xf) | (m & 0xf0), ((m & 0xf) << 4) | (m & 0xf), 1)) // #f00
+      : (m = reHex6.exec(format)) ? rgbn(parseInt(m[1], 16)) // #ff0000
+      : (m = reRgbInteger.exec(format)) ? new Rgb(m[1], m[2], m[3], 1) // rgb(255, 0, 0)
+      : (m = reRgbPercent.exec(format)) ? new Rgb(m[1] * 255 / 100, m[2] * 255 / 100, m[3] * 255 / 100, 1) // rgb(100%, 0%, 0%)
+      : (m = reRgbaInteger.exec(format)) ? rgba(m[1], m[2], m[3], m[4]) // rgba(255, 0, 0, 1)
+      : (m = reRgbaPercent.exec(format)) ? rgba(m[1] * 255 / 100, m[2] * 255 / 100, m[3] * 255 / 100, m[4]) // rgb(100%, 0%, 0%, 1)
+      : (m = reHslPercent.exec(format)) ? hsla(m[1], m[2] / 100, m[3] / 100, 1) // hsl(120, 50%, 50%)
+      : (m = reHslaPercent.exec(format)) ? hsla(m[1], m[2] / 100, m[3] / 100, m[4]) // hsla(120, 50%, 50%, 1)
+      : named.hasOwnProperty(format) ? rgbn(named[format])
+      : format === "transparent" ? new Rgb(NaN, NaN, NaN, 0)
+      : null;
+}
+
+function rgbn(n) {
+  return new Rgb(n >> 16 & 0xff, n >> 8 & 0xff, n & 0xff, 1);
+}
+
+function rgba(r, g, b, a) {
+  if (a <= 0) r = g = b = NaN;
+  return new Rgb(r, g, b, a);
+}
+
+function rgbConvert(o) {
+  if (!(o instanceof Color)) o = color(o);
+  if (!o) return new Rgb;
+  o = o.rgb();
+  return new Rgb(o.r, o.g, o.b, o.opacity);
+}
+
+function rgb(r, g, b, opacity) {
+  return arguments.length === 1 ? rgbConvert(r) : new Rgb(r, g, b, opacity == null ? 1 : opacity);
+}
+
+function Rgb(r, g, b, opacity) {
+  this.r = +r;
+  this.g = +g;
+  this.b = +b;
+  this.opacity = +opacity;
+}
+
+define$1(Rgb, rgb, extend$1(Color, {
+  brighter: function(k) {
+    k = k == null ? brighter : Math.pow(brighter, k);
+    return new Rgb(this.r * k, this.g * k, this.b * k, this.opacity);
+  },
+  darker: function(k) {
+    k = k == null ? darker : Math.pow(darker, k);
+    return new Rgb(this.r * k, this.g * k, this.b * k, this.opacity);
+  },
+  rgb: function() {
+    return this;
+  },
+  displayable: function() {
+    return (0 <= this.r && this.r <= 255)
+        && (0 <= this.g && this.g <= 255)
+        && (0 <= this.b && this.b <= 255)
+        && (0 <= this.opacity && this.opacity <= 1);
+  },
+  toString: function() {
+    var a = this.opacity; a = isNaN(a) ? 1 : Math.max(0, Math.min(1, a));
+    return (a === 1 ? "rgb(" : "rgba(")
+        + Math.max(0, Math.min(255, Math.round(this.r) || 0)) + ", "
+        + Math.max(0, Math.min(255, Math.round(this.g) || 0)) + ", "
+        + Math.max(0, Math.min(255, Math.round(this.b) || 0))
+        + (a === 1 ? ")" : ", " + a + ")");
+  }
+}));
+
+function hsla(h, s, l, a) {
+  if (a <= 0) h = s = l = NaN;
+  else if (l <= 0 || l >= 1) h = s = NaN;
+  else if (s <= 0) h = NaN;
+  return new Hsl(h, s, l, a);
+}
+
+function hslConvert(o) {
+  if (o instanceof Hsl) return new Hsl(o.h, o.s, o.l, o.opacity);
+  if (!(o instanceof Color)) o = color(o);
+  if (!o) return new Hsl;
+  if (o instanceof Hsl) return o;
+  o = o.rgb();
+  var r = o.r / 255,
+      g = o.g / 255,
+      b = o.b / 255,
+      min = Math.min(r, g, b),
+      max = Math.max(r, g, b),
+      h = NaN,
+      s = max - min,
+      l = (max + min) / 2;
+  if (s) {
+    if (r === max) h = (g - b) / s + (g < b) * 6;
+    else if (g === max) h = (b - r) / s + 2;
+    else h = (r - g) / s + 4;
+    s /= l < 0.5 ? max + min : 2 - max - min;
+    h *= 60;
+  } else {
+    s = l > 0 && l < 1 ? 0 : h;
+  }
+  return new Hsl(h, s, l, o.opacity);
+}
+
+function hsl(h, s, l, opacity) {
+  return arguments.length === 1 ? hslConvert(h) : new Hsl(h, s, l, opacity == null ? 1 : opacity);
+}
+
+function Hsl(h, s, l, opacity) {
+  this.h = +h;
+  this.s = +s;
+  this.l = +l;
+  this.opacity = +opacity;
+}
+
+define$1(Hsl, hsl, extend$1(Color, {
+  brighter: function(k) {
+    k = k == null ? brighter : Math.pow(brighter, k);
+    return new Hsl(this.h, this.s, this.l * k, this.opacity);
+  },
+  darker: function(k) {
+    k = k == null ? darker : Math.pow(darker, k);
+    return new Hsl(this.h, this.s, this.l * k, this.opacity);
+  },
+  rgb: function() {
+    var h = this.h % 360 + (this.h < 0) * 360,
+        s = isNaN(h) || isNaN(this.s) ? 0 : this.s,
+        l = this.l,
+        m2 = l + (l < 0.5 ? l : 1 - l) * s,
+        m1 = 2 * l - m2;
+    return new Rgb(
+      hsl2rgb(h >= 240 ? h - 240 : h + 120, m1, m2),
+      hsl2rgb(h, m1, m2),
+      hsl2rgb(h < 120 ? h + 240 : h - 120, m1, m2),
+      this.opacity
+    );
+  },
+  displayable: function() {
+    return (0 <= this.s && this.s <= 1 || isNaN(this.s))
+        && (0 <= this.l && this.l <= 1)
+        && (0 <= this.opacity && this.opacity <= 1);
+  }
+}));
+
+/* From FvD 13.37, CSS Color Module Level 3 */
+function hsl2rgb(h, m1, m2) {
+  return (h < 60 ? m1 + (m2 - m1) * h / 60
+      : h < 180 ? m2
+      : h < 240 ? m1 + (m2 - m1) * (240 - h) / 60
+      : m1) * 255;
+}
+
+var deg2rad = Math.PI / 180;
+var rad2deg = 180 / Math.PI;
+
+var Kn = 18;
+var Xn = 0.950470;
+var Yn = 1;
+var Zn = 1.088830;
+var t0 = 4 / 29;
+var t1 = 6 / 29;
+var t2 = 3 * t1 * t1;
+var t3 = t1 * t1 * t1;
+
+function labConvert(o) {
+  if (o instanceof Lab) return new Lab(o.l, o.a, o.b, o.opacity);
+  if (o instanceof Hcl) {
+    var h = o.h * deg2rad;
+    return new Lab(o.l, Math.cos(h) * o.c, Math.sin(h) * o.c, o.opacity);
+  }
+  if (!(o instanceof Rgb)) o = rgbConvert(o);
+  var b = rgb2xyz(o.r),
+      a = rgb2xyz(o.g),
+      l = rgb2xyz(o.b),
+      x = xyz2lab((0.4124564 * b + 0.3575761 * a + 0.1804375 * l) / Xn),
+      y = xyz2lab((0.2126729 * b + 0.7151522 * a + 0.0721750 * l) / Yn),
+      z = xyz2lab((0.0193339 * b + 0.1191920 * a + 0.9503041 * l) / Zn);
+  return new Lab(116 * y - 16, 500 * (x - y), 200 * (y - z), o.opacity);
+}
+
+function lab(l, a, b, opacity) {
+  return arguments.length === 1 ? labConvert(l) : new Lab(l, a, b, opacity == null ? 1 : opacity);
+}
+
+function Lab(l, a, b, opacity) {
+  this.l = +l;
+  this.a = +a;
+  this.b = +b;
+  this.opacity = +opacity;
+}
+
+define$1(Lab, lab, extend$1(Color, {
+  brighter: function(k) {
+    return new Lab(this.l + Kn * (k == null ? 1 : k), this.a, this.b, this.opacity);
+  },
+  darker: function(k) {
+    return new Lab(this.l - Kn * (k == null ? 1 : k), this.a, this.b, this.opacity);
+  },
+  rgb: function() {
+    var y = (this.l + 16) / 116,
+        x = isNaN(this.a) ? y : y + this.a / 500,
+        z = isNaN(this.b) ? y : y - this.b / 200;
+    y = Yn * lab2xyz(y);
+    x = Xn * lab2xyz(x);
+    z = Zn * lab2xyz(z);
+    return new Rgb(
+      xyz2rgb( 3.2404542 * x - 1.5371385 * y - 0.4985314 * z), // D65 -> sRGB
+      xyz2rgb(-0.9692660 * x + 1.8760108 * y + 0.0415560 * z),
+      xyz2rgb( 0.0556434 * x - 0.2040259 * y + 1.0572252 * z),
+      this.opacity
+    );
+  }
+}));
+
+function xyz2lab(t) {
+  return t > t3 ? Math.pow(t, 1 / 3) : t / t2 + t0;
+}
+
+function lab2xyz(t) {
+  return t > t1 ? t * t * t : t2 * (t - t0);
+}
+
+function xyz2rgb(x) {
+  return 255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055);
+}
+
+function rgb2xyz(x) {
+  return (x /= 255) <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+}
+
+function hclConvert(o) {
+  if (o instanceof Hcl) return new Hcl(o.h, o.c, o.l, o.opacity);
+  if (!(o instanceof Lab)) o = labConvert(o);
+  var h = Math.atan2(o.b, o.a) * rad2deg;
+  return new Hcl(h < 0 ? h + 360 : h, Math.sqrt(o.a * o.a + o.b * o.b), o.l, o.opacity);
+}
+
+function hcl(h, c, l, opacity) {
+  return arguments.length === 1 ? hclConvert(h) : new Hcl(h, c, l, opacity == null ? 1 : opacity);
+}
+
+function Hcl(h, c, l, opacity) {
+  this.h = +h;
+  this.c = +c;
+  this.l = +l;
+  this.opacity = +opacity;
+}
+
+define$1(Hcl, hcl, extend$1(Color, {
+  brighter: function(k) {
+    return new Hcl(this.h, this.c, this.l + Kn * (k == null ? 1 : k), this.opacity);
+  },
+  darker: function(k) {
+    return new Hcl(this.h, this.c, this.l - Kn * (k == null ? 1 : k), this.opacity);
+  },
+  rgb: function() {
+    return labConvert(this).rgb();
+  }
+}));
+
+var A = -0.14861;
+var B = +1.78277;
+var C = -0.29227;
+var D = -0.90649;
+var E = +1.97294;
+var ED = E * D;
+var EB = E * B;
+var BC_DA = B * C - D * A;
+
+function cubehelixConvert(o) {
+  if (o instanceof Cubehelix) return new Cubehelix(o.h, o.s, o.l, o.opacity);
+  if (!(o instanceof Rgb)) o = rgbConvert(o);
+  var r = o.r / 255,
+      g = o.g / 255,
+      b = o.b / 255,
+      l = (BC_DA * b + ED * r - EB * g) / (BC_DA + ED - EB),
+      bl = b - l,
+      k = (E * (g - l) - C * bl) / D,
+      s = Math.sqrt(k * k + bl * bl) / (E * l * (1 - l)), // NaN if l=0 or l=1
+      h = s ? Math.atan2(k, bl) * rad2deg - 120 : NaN;
+  return new Cubehelix(h < 0 ? h + 360 : h, s, l, o.opacity);
+}
+
+function cubehelix(h, s, l, opacity) {
+  return arguments.length === 1 ? cubehelixConvert(h) : new Cubehelix(h, s, l, opacity == null ? 1 : opacity);
+}
+
+function Cubehelix(h, s, l, opacity) {
+  this.h = +h;
+  this.s = +s;
+  this.l = +l;
+  this.opacity = +opacity;
+}
+
+define$1(Cubehelix, cubehelix, extend$1(Color, {
+  brighter: function(k) {
+    k = k == null ? brighter : Math.pow(brighter, k);
+    return new Cubehelix(this.h, this.s, this.l * k, this.opacity);
+  },
+  darker: function(k) {
+    k = k == null ? darker : Math.pow(darker, k);
+    return new Cubehelix(this.h, this.s, this.l * k, this.opacity);
+  },
+  rgb: function() {
+    var h = isNaN(this.h) ? 0 : (this.h + 120) * deg2rad,
+        l = +this.l,
+        a = isNaN(this.s) ? 0 : this.s * l * (1 - l),
+        cosh = Math.cos(h),
+        sinh = Math.sin(h);
+    return new Rgb(
+      255 * (l + a * (A * cosh + B * sinh)),
+      255 * (l + a * (C * cosh + D * sinh)),
+      255 * (l + a * (E * cosh)),
+      this.opacity
+    );
+  }
+}));
+
+function basis(t1, v0, v1, v2, v3) {
+  var t2 = t1 * t1, t3 = t2 * t1;
+  return ((1 - 3 * t1 + 3 * t2 - t3) * v0
+      + (4 - 6 * t2 + 3 * t3) * v1
+      + (1 + 3 * t1 + 3 * t2 - 3 * t3) * v2
+      + t3 * v3) / 6;
+}
+
+var constant$2 = function(x) {
+  return function() {
+    return x;
+  };
+};
+
+function linear$1(a, d) {
+  return function(t) {
+    return a + t * d;
+  };
+}
+
+function exponential(a, b, y) {
+  return a = Math.pow(a, y), b = Math.pow(b, y) - a, y = 1 / y, function(t) {
+    return Math.pow(a + t * b, y);
+  };
+}
+
+function hue(a, b) {
+  var d = b - a;
+  return d ? linear$1(a, d > 180 || d < -180 ? d - 360 * Math.round(d / 360) : d) : constant$2(isNaN(a) ? b : a);
+}
+
+function gamma(y) {
+  return (y = +y) === 1 ? nogamma : function(a, b) {
+    return b - a ? exponential(a, b, y) : constant$2(isNaN(a) ? b : a);
+  };
+}
+
+function nogamma(a, b) {
+  var d = b - a;
+  return d ? linear$1(a, d) : constant$2(isNaN(a) ? b : a);
+}
+
+var rgb$1 = (function rgbGamma(y) {
+  var color$$1 = gamma(y);
+
+  function rgb$$1(start, end) {
+    var r = color$$1((start = rgb(start)).r, (end = rgb(end)).r),
+        g = color$$1(start.g, end.g),
+        b = color$$1(start.b, end.b),
+        opacity = nogamma(start.opacity, end.opacity);
+    return function(t) {
+      start.r = r(t);
+      start.g = g(t);
+      start.b = b(t);
+      start.opacity = opacity(t);
+      return start + "";
+    };
+  }
+
+  rgb$$1.gamma = rgbGamma;
+
+  return rgb$$1;
+})(1);
+
+var array$1 = function(a, b) {
+  var nb = b ? b.length : 0,
+      na = a ? Math.min(nb, a.length) : 0,
+      x = new Array(nb),
+      c = new Array(nb),
+      i;
+
+  for (i = 0; i < na; ++i) x[i] = interpolateValue(a[i], b[i]);
+  for (; i < nb; ++i) c[i] = b[i];
+
+  return function(t) {
+    for (i = 0; i < na; ++i) c[i] = x[i](t);
+    return c;
+  };
+};
+
+var date = function(a, b) {
+  var d = new Date;
+  return a = +a, b -= a, function(t) {
+    return d.setTime(a + b * t), d;
+  };
+};
+
+var number$1 = function(a, b) {
+  return a = +a, b -= a, function(t) {
+    return a + b * t;
+  };
+};
+
+var object = function(a, b) {
+  var i = {},
+      c = {},
+      k;
+
+  if (a === null || typeof a !== "object") a = {};
+  if (b === null || typeof b !== "object") b = {};
+
+  for (k in b) {
+    if (k in a) {
+      i[k] = interpolateValue(a[k], b[k]);
+    } else {
+      c[k] = b[k];
+    }
+  }
+
+  return function(t) {
+    for (k in i) c[k] = i[k](t);
+    return c;
+  };
+};
+
+var reA = /[-+]?(?:\d+\.?\d*|\.?\d+)(?:[eE][-+]?\d+)?/g;
+var reB = new RegExp(reA.source, "g");
+
+function zero(b) {
+  return function() {
+    return b;
+  };
+}
+
+function one(b) {
+  return function(t) {
+    return b(t) + "";
+  };
+}
+
+var string = function(a, b) {
+  var bi = reA.lastIndex = reB.lastIndex = 0, // scan index for next number in b
+      am, // current match in a
+      bm, // current match in b
+      bs, // string preceding current number in b, if any
+      i = -1, // index in s
+      s = [], // string constants and placeholders
+      q = []; // number interpolators
+
+  // Coerce inputs to strings.
+  a = a + "", b = b + "";
+
+  // Interpolate pairs of numbers in a & b.
+  while ((am = reA.exec(a))
+      && (bm = reB.exec(b))) {
+    if ((bs = bm.index) > bi) { // a string precedes the next number in b
+      bs = b.slice(bi, bs);
+      if (s[i]) s[i] += bs; // coalesce with previous string
+      else s[++i] = bs;
+    }
+    if ((am = am[0]) === (bm = bm[0])) { // numbers in a & b match
+      if (s[i]) s[i] += bm; // coalesce with previous string
+      else s[++i] = bm;
+    } else { // interpolate non-matching numbers
+      s[++i] = null;
+      q.push({i: i, x: number$1(am, bm)});
+    }
+    bi = reB.lastIndex;
+  }
+
+  // Add remains of b.
+  if (bi < b.length) {
+    bs = b.slice(bi);
+    if (s[i]) s[i] += bs; // coalesce with previous string
+    else s[++i] = bs;
+  }
+
+  // Special optimization for only a single match.
+  // Otherwise, interpolate each of the numbers and rejoin the string.
+  return s.length < 2 ? (q[0]
+      ? one(q[0].x)
+      : zero(b))
+      : (b = q.length, function(t) {
+          for (var i = 0, o; i < b; ++i) s[(o = q[i]).i] = o.x(t);
+          return s.join("");
+        });
+};
+
+var interpolateValue = function(a, b) {
+  var t = typeof b, c;
+  return b == null || t === "boolean" ? constant$2(b)
+      : (t === "number" ? number$1
+      : t === "string" ? ((c = color(b)) ? (b = c, rgb$1) : string)
+      : b instanceof color ? rgb$1
+      : b instanceof Date ? date
+      : Array.isArray(b) ? array$1
+      : typeof b.valueOf !== "function" && typeof b.toString !== "function" || isNaN(b) ? object
+      : number$1)(a, b);
+};
+
+var interpolateRound = function(a, b) {
+  return a = +a, b -= a, function(t) {
+    return Math.round(a + b * t);
+  };
+};
+
+function cubehelix$1(hue$$1) {
+  return (function cubehelixGamma(y) {
+    y = +y;
+
+    function cubehelix$$1(start, end) {
+      var h = hue$$1((start = cubehelix(start)).h, (end = cubehelix(end)).h),
+          s = nogamma(start.s, end.s),
+          l = nogamma(start.l, end.l),
+          opacity = nogamma(start.opacity, end.opacity);
+      return function(t) {
+        start.h = h(t);
+        start.s = s(t);
+        start.l = l(Math.pow(t, y));
+        start.opacity = opacity(t);
+        return start + "";
+      };
+    }
+
+    cubehelix$$1.gamma = cubehelixGamma;
+
+    return cubehelix$$1;
+  })(1);
+}
+
+cubehelix$1(hue);
+var cubehelixLong = cubehelix$1(nogamma);
+
+var array$2 = Array.prototype;
+
+var map$3 = array$2.map;
+var slice$1 = array$2.slice;
+
+var constant$3 = function(x) {
+  return function() {
+    return x;
+  };
+};
+
+var number$2 = function(x) {
+  return +x;
+};
+
+var unit = [0, 1];
+
+function deinterpolateLinear(a, b) {
+  return (b -= (a = +a))
+      ? function(x) { return (x - a) / b; }
+      : constant$3(b);
+}
+
+function deinterpolateClamp(deinterpolate) {
+  return function(a, b) {
+    var d = deinterpolate(a = +a, b = +b);
+    return function(x) { return x <= a ? 0 : x >= b ? 1 : d(x); };
+  };
+}
+
+function reinterpolateClamp(reinterpolate) {
+  return function(a, b) {
+    var r = reinterpolate(a = +a, b = +b);
+    return function(t) { return t <= 0 ? a : t >= 1 ? b : r(t); };
+  };
+}
+
+function bimap(domain, range$$1, deinterpolate, reinterpolate) {
+  var d0 = domain[0], d1 = domain[1], r0 = range$$1[0], r1 = range$$1[1];
+  if (d1 < d0) d0 = deinterpolate(d1, d0), r0 = reinterpolate(r1, r0);
+  else d0 = deinterpolate(d0, d1), r0 = reinterpolate(r0, r1);
+  return function(x) { return r0(d0(x)); };
+}
+
+function polymap(domain, range$$1, deinterpolate, reinterpolate) {
+  var j = Math.min(domain.length, range$$1.length) - 1,
+      d = new Array(j),
+      r = new Array(j),
+      i = -1;
+
+  // Reverse descending domains.
+  if (domain[j] < domain[0]) {
+    domain = domain.slice().reverse();
+    range$$1 = range$$1.slice().reverse();
+  }
+
+  while (++i < j) {
+    d[i] = deinterpolate(domain[i], domain[i + 1]);
+    r[i] = reinterpolate(range$$1[i], range$$1[i + 1]);
+  }
+
+  return function(x) {
+    var i = bisectRight(domain, x, 1, j) - 1;
+    return r[i](d[i](x));
+  };
+}
+
+function copy(source, target) {
+  return target
+      .domain(source.domain())
+      .range(source.range())
+      .interpolate(source.interpolate())
+      .clamp(source.clamp());
+}
+
+// deinterpolate(a, b)(x) takes a domain value x in [a,b] and returns the corresponding parameter t in [0,1].
+// reinterpolate(a, b)(t) takes a parameter t in [0,1] and returns the corresponding domain value x in [a,b].
+function continuous(deinterpolate, reinterpolate) {
+  var domain = unit,
+      range$$1 = unit,
+      interpolate = interpolateValue,
+      clamp = false,
+      piecewise,
+      output,
+      input;
+
+  function rescale() {
+    piecewise = Math.min(domain.length, range$$1.length) > 2 ? polymap : bimap;
+    output = input = null;
+    return scale;
+  }
+
+  function scale(x) {
+    return (output || (output = piecewise(domain, range$$1, clamp ? deinterpolateClamp(deinterpolate) : deinterpolate, interpolate)))(+x);
+  }
+
+  scale.invert = function(y) {
+    return (input || (input = piecewise(range$$1, domain, deinterpolateLinear, clamp ? reinterpolateClamp(reinterpolate) : reinterpolate)))(+y);
+  };
+
+  scale.domain = function(_) {
+    return arguments.length ? (domain = map$3.call(_, number$2), rescale()) : domain.slice();
+  };
+
+  scale.range = function(_) {
+    return arguments.length ? (range$$1 = slice$1.call(_), rescale()) : range$$1.slice();
+  };
+
+  scale.rangeRound = function(_) {
+    return range$$1 = slice$1.call(_), interpolate = interpolateRound, rescale();
+  };
+
+  scale.clamp = function(_) {
+    return arguments.length ? (clamp = !!_, rescale()) : clamp;
+  };
+
+  scale.interpolate = function(_) {
+    return arguments.length ? (interpolate = _, rescale()) : interpolate;
+  };
+
+  return rescale();
+}
+
+// Computes the decimal coefficient and exponent of the specified number x with
+// significant digits p, where x is positive and p is in [1, 21] or undefined.
+// For example, formatDecimal(1.23) returns ["123", 0].
+var formatDecimal = function(x, p) {
+  if ((i = (x = p ? x.toExponential(p - 1) : x.toExponential()).indexOf("e")) < 0) return null; // NaN, ±Infinity
+  var i, coefficient = x.slice(0, i);
+
+  // The string returned by toExponential either has the form \d\.\d+e[-+]\d+
+  // (e.g., 1.2e+3) or the form \de[-+]\d+ (e.g., 1e+3).
+  return [
+    coefficient.length > 1 ? coefficient[0] + coefficient.slice(2) : coefficient,
+    +x.slice(i + 1)
+  ];
+};
+
+var exponent = function(x) {
+  return x = formatDecimal(Math.abs(x)), x ? x[1] : NaN;
+};
+
+var formatGroup = function(grouping, thousands) {
+  return function(value, width) {
+    var i = value.length,
+        t = [],
+        j = 0,
+        g = grouping[0],
+        length = 0;
+
+    while (i > 0 && g > 0) {
+      if (length + g + 1 > width) g = Math.max(1, width - length);
+      t.push(value.substring(i -= g, i + g));
+      if ((length += g + 1) > width) break;
+      g = grouping[j = (j + 1) % grouping.length];
+    }
+
+    return t.reverse().join(thousands);
+  };
+};
+
+var formatNumerals = function(numerals) {
+  return function(value) {
+    return value.replace(/[0-9]/g, function(i) {
+      return numerals[+i];
+    });
+  };
+};
+
+var formatDefault = function(x, p) {
+  x = x.toPrecision(p);
+
+  out: for (var n = x.length, i = 1, i0 = -1, i1; i < n; ++i) {
+    switch (x[i]) {
+      case ".": i0 = i1 = i; break;
+      case "0": if (i0 === 0) i0 = i; i1 = i; break;
+      case "e": break out;
+      default: if (i0 > 0) i0 = 0; break;
+    }
+  }
+
+  return i0 > 0 ? x.slice(0, i0) + x.slice(i1 + 1) : x;
+};
+
+var prefixExponent;
+
+var formatPrefixAuto = function(x, p) {
+  var d = formatDecimal(x, p);
+  if (!d) return x + "";
+  var coefficient = d[0],
+      exponent = d[1],
+      i = exponent - (prefixExponent = Math.max(-8, Math.min(8, Math.floor(exponent / 3))) * 3) + 1,
+      n = coefficient.length;
+  return i === n ? coefficient
+      : i > n ? coefficient + new Array(i - n + 1).join("0")
+      : i > 0 ? coefficient.slice(0, i) + "." + coefficient.slice(i)
+      : "0." + new Array(1 - i).join("0") + formatDecimal(x, Math.max(0, p + i - 1))[0]; // less than 1y!
+};
+
+var formatRounded = function(x, p) {
+  var d = formatDecimal(x, p);
+  if (!d) return x + "";
+  var coefficient = d[0],
+      exponent = d[1];
+  return exponent < 0 ? "0." + new Array(-exponent).join("0") + coefficient
+      : coefficient.length > exponent + 1 ? coefficient.slice(0, exponent + 1) + "." + coefficient.slice(exponent + 1)
+      : coefficient + new Array(exponent - coefficient.length + 2).join("0");
+};
+
+var formatTypes = {
+  "": formatDefault,
+  "%": function(x, p) { return (x * 100).toFixed(p); },
+  "b": function(x) { return Math.round(x).toString(2); },
+  "c": function(x) { return x + ""; },
+  "d": function(x) { return Math.round(x).toString(10); },
+  "e": function(x, p) { return x.toExponential(p); },
+  "f": function(x, p) { return x.toFixed(p); },
+  "g": function(x, p) { return x.toPrecision(p); },
+  "o": function(x) { return Math.round(x).toString(8); },
+  "p": function(x, p) { return formatRounded(x * 100, p); },
+  "r": formatRounded,
+  "s": formatPrefixAuto,
+  "X": function(x) { return Math.round(x).toString(16).toUpperCase(); },
+  "x": function(x) { return Math.round(x).toString(16); }
+};
+
+var re = /^(?:(.)?([<>=^]))?([+\-\( ])?([$#])?(0)?(\d+)?(,)?(\.\d+)?([a-z%])?$/i;
+
+function formatSpecifier(specifier) {
+  return new FormatSpecifier(specifier);
+}
+
+formatSpecifier.prototype = FormatSpecifier.prototype; // instanceof
+
+function FormatSpecifier(specifier) {
+  if (!(match = re.exec(specifier))) throw new Error("invalid format: " + specifier);
+
+  var match,
+      fill = match[1] || " ",
+      align = match[2] || ">",
+      sign = match[3] || "-",
+      symbol = match[4] || "",
+      zero = !!match[5],
+      width = match[6] && +match[6],
+      comma = !!match[7],
+      precision = match[8] && +match[8].slice(1),
+      type = match[9] || "";
+
+  // The "n" type is an alias for ",g".
+  if (type === "n") comma = true, type = "g";
+
+  // Map invalid types to the default format.
+  else if (!formatTypes[type]) type = "";
+
+  // If zero fill is specified, padding goes after sign and before digits.
+  if (zero || (fill === "0" && align === "=")) zero = true, fill = "0", align = "=";
+
+  this.fill = fill;
+  this.align = align;
+  this.sign = sign;
+  this.symbol = symbol;
+  this.zero = zero;
+  this.width = width;
+  this.comma = comma;
+  this.precision = precision;
+  this.type = type;
+}
+
+FormatSpecifier.prototype.toString = function() {
+  return this.fill
+      + this.align
+      + this.sign
+      + this.symbol
+      + (this.zero ? "0" : "")
+      + (this.width == null ? "" : Math.max(1, this.width | 0))
+      + (this.comma ? "," : "")
+      + (this.precision == null ? "" : "." + Math.max(0, this.precision | 0))
+      + this.type;
+};
+
+var identity$2 = function(x) {
+  return x;
+};
+
+var prefixes = ["y","z","a","f","p","n","µ","m","","k","M","G","T","P","E","Z","Y"];
+
+var formatLocale = function(locale) {
+  var group = locale.grouping && locale.thousands ? formatGroup(locale.grouping, locale.thousands) : identity$2,
+      currency = locale.currency,
+      decimal = locale.decimal,
+      numerals = locale.numerals ? formatNumerals(locale.numerals) : identity$2,
+      percent = locale.percent || "%";
+
+  function newFormat(specifier) {
+    specifier = formatSpecifier(specifier);
+
+    var fill = specifier.fill,
+        align = specifier.align,
+        sign = specifier.sign,
+        symbol = specifier.symbol,
+        zero = specifier.zero,
+        width = specifier.width,
+        comma = specifier.comma,
+        precision = specifier.precision,
+        type = specifier.type;
+
+    // Compute the prefix and suffix.
+    // For SI-prefix, the suffix is lazily computed.
+    var prefix = symbol === "$" ? currency[0] : symbol === "#" && /[boxX]/.test(type) ? "0" + type.toLowerCase() : "",
+        suffix = symbol === "$" ? currency[1] : /[%p]/.test(type) ? percent : "";
+
+    // What format function should we use?
+    // Is this an integer type?
+    // Can this type generate exponential notation?
+    var formatType = formatTypes[type],
+        maybeSuffix = !type || /[defgprs%]/.test(type);
+
+    // Set the default precision if not specified,
+    // or clamp the specified precision to the supported range.
+    // For significant precision, it must be in [1, 21].
+    // For fixed precision, it must be in [0, 20].
+    precision = precision == null ? (type ? 6 : 12)
+        : /[gprs]/.test(type) ? Math.max(1, Math.min(21, precision))
+        : Math.max(0, Math.min(20, precision));
+
+    function format(value) {
+      var valuePrefix = prefix,
+          valueSuffix = suffix,
+          i, n, c;
+
+      if (type === "c") {
+        valueSuffix = formatType(value) + valueSuffix;
+        value = "";
+      } else {
+        value = +value;
+
+        // Perform the initial formatting.
+        var valueNegative = value < 0;
+        value = formatType(Math.abs(value), precision);
+
+        // If a negative value rounds to zero during formatting, treat as positive.
+        if (valueNegative && +value === 0) valueNegative = false;
+
+        // Compute the prefix and suffix.
+        valuePrefix = (valueNegative ? (sign === "(" ? sign : "-") : sign === "-" || sign === "(" ? "" : sign) + valuePrefix;
+        valueSuffix = valueSuffix + (type === "s" ? prefixes[8 + prefixExponent / 3] : "") + (valueNegative && sign === "(" ? ")" : "");
+
+        // Break the formatted value into the integer “value” part that can be
+        // grouped, and fractional or exponential “suffix” part that is not.
+        if (maybeSuffix) {
+          i = -1, n = value.length;
+          while (++i < n) {
+            if (c = value.charCodeAt(i), 48 > c || c > 57) {
+              valueSuffix = (c === 46 ? decimal + value.slice(i + 1) : value.slice(i)) + valueSuffix;
+              value = value.slice(0, i);
+              break;
+            }
+          }
+        }
+      }
+
+      // If the fill character is not "0", grouping is applied before padding.
+      if (comma && !zero) value = group(value, Infinity);
+
+      // Compute the padding.
+      var length = valuePrefix.length + value.length + valueSuffix.length,
+          padding = length < width ? new Array(width - length + 1).join(fill) : "";
+
+      // If the fill character is "0", grouping is applied after padding.
+      if (comma && zero) value = group(padding + value, padding.length ? width - valueSuffix.length : Infinity), padding = "";
+
+      // Reconstruct the final output based on the desired alignment.
+      switch (align) {
+        case "<": value = valuePrefix + value + valueSuffix + padding; break;
+        case "=": value = valuePrefix + padding + value + valueSuffix; break;
+        case "^": value = padding.slice(0, length = padding.length >> 1) + valuePrefix + value + valueSuffix + padding.slice(length); break;
+        default: value = padding + valuePrefix + value + valueSuffix; break;
+      }
+
+      return numerals(value);
+    }
+
+    format.toString = function() {
+      return specifier + "";
+    };
+
+    return format;
+  }
+
+  function formatPrefix(specifier, value) {
+    var f = newFormat((specifier = formatSpecifier(specifier), specifier.type = "f", specifier)),
+        e = Math.max(-8, Math.min(8, Math.floor(exponent(value) / 3))) * 3,
+        k = Math.pow(10, -e),
+        prefix = prefixes[8 + e / 3];
+    return function(value) {
+      return f(k * value) + prefix;
+    };
+  }
+
+  return {
+    format: newFormat,
+    formatPrefix: formatPrefix
+  };
+};
+
+var locale;
+var format;
+var formatPrefix;
+
+defaultLocale({
+  decimal: ".",
+  thousands: ",",
+  grouping: [3],
+  currency: ["$", ""]
+});
+
+function defaultLocale(definition) {
+  locale = formatLocale(definition);
+  format = locale.format;
+  formatPrefix = locale.formatPrefix;
+  return locale;
+}
+
+var precisionFixed = function(step) {
+  return Math.max(0, -exponent(Math.abs(step)));
+};
+
+var precisionPrefix = function(step, value) {
+  return Math.max(0, Math.max(-8, Math.min(8, Math.floor(exponent(value) / 3))) * 3 - exponent(Math.abs(step)));
+};
+
+var precisionRound = function(step, max) {
+  step = Math.abs(step), max = Math.abs(max) - step;
+  return Math.max(0, exponent(max) - exponent(step)) + 1;
+};
+
+var tickFormat = function(domain, count, specifier) {
+  var start = domain[0],
+      stop = domain[domain.length - 1],
+      step = tickStep(start, stop, count == null ? 10 : count),
+      precision;
+  specifier = formatSpecifier(specifier == null ? ",f" : specifier);
+  switch (specifier.type) {
+    case "s": {
+      var value = Math.max(Math.abs(start), Math.abs(stop));
+      if (specifier.precision == null && !isNaN(precision = precisionPrefix(step, value))) specifier.precision = precision;
+      return formatPrefix(specifier, value);
+    }
+    case "":
+    case "e":
+    case "g":
+    case "p":
+    case "r": {
+      if (specifier.precision == null && !isNaN(precision = precisionRound(step, Math.max(Math.abs(start), Math.abs(stop))))) specifier.precision = precision - (specifier.type === "e");
+      break;
+    }
+    case "f":
+    case "%": {
+      if (specifier.precision == null && !isNaN(precision = precisionFixed(step))) specifier.precision = precision - (specifier.type === "%") * 2;
+      break;
+    }
+  }
+  return format(specifier);
+};
+
+function linearish(scale) {
+  var domain = scale.domain;
+
+  scale.ticks = function(count) {
+    var d = domain();
+    return ticks(d[0], d[d.length - 1], count == null ? 10 : count);
+  };
+
+  scale.tickFormat = function(count, specifier) {
+    return tickFormat(domain(), count, specifier);
+  };
+
+  scale.nice = function(count) {
+    if (count == null) count = 10;
+
+    var d = domain(),
+        i0 = 0,
+        i1 = d.length - 1,
+        start = d[i0],
+        stop = d[i1],
+        step;
+
+    if (stop < start) {
+      step = start, start = stop, stop = step;
+      step = i0, i0 = i1, i1 = step;
+    }
+
+    step = tickIncrement(start, stop, count);
+
+    if (step > 0) {
+      start = Math.floor(start / step) * step;
+      stop = Math.ceil(stop / step) * step;
+      step = tickIncrement(start, stop, count);
+    } else if (step < 0) {
+      start = Math.ceil(start * step) / step;
+      stop = Math.floor(stop * step) / step;
+      step = tickIncrement(start, stop, count);
+    }
+
+    if (step > 0) {
+      d[i0] = Math.floor(start / step) * step;
+      d[i1] = Math.ceil(stop / step) * step;
+      domain(d);
+    } else if (step < 0) {
+      d[i0] = Math.ceil(start * step) / step;
+      d[i1] = Math.floor(stop * step) / step;
+      domain(d);
+    }
+
+    return scale;
+  };
+
+  return scale;
+}
+
+function linear() {
+  var scale = continuous(deinterpolateLinear, number$1);
+
+  scale.copy = function() {
+    return copy(scale, linear());
+  };
+
+  return linearish(scale);
+}
+
+var slice$2 = Array.prototype.slice;
+
+var identity$3 = function(x) {
+  return x;
+};
+
+var top = 1;
+var right = 2;
+var bottom = 3;
+var left = 4;
+var epsilon = 1e-6;
+
+function translateX(x) {
+  return "translate(" + (x + 0.5) + ",0)";
+}
+
+function translateY(y) {
+  return "translate(0," + (y + 0.5) + ")";
+}
+
+function number$3(scale) {
+  return function(d) {
+    return +scale(d);
+  };
+}
+
+function center(scale) {
+  var offset = Math.max(0, scale.bandwidth() - 1) / 2; // Adjust for 0.5px offset.
+  if (scale.round()) offset = Math.round(offset);
+  return function(d) {
+    return +scale(d) + offset;
+  };
+}
+
+function entering() {
+  return !this.__axis;
+}
+
+function axis(orient, scale) {
+  var tickArguments = [],
+      tickValues = null,
+      tickFormat = null,
+      tickSizeInner = 6,
+      tickSizeOuter = 6,
+      tickPadding = 3,
+      k = orient === top || orient === left ? -1 : 1,
+      x = orient === left || orient === right ? "x" : "y",
+      transform = orient === top || orient === bottom ? translateX : translateY;
+
+  function axis(context) {
+    var values = tickValues == null ? (scale.ticks ? scale.ticks.apply(scale, tickArguments) : scale.domain()) : tickValues,
+        format = tickFormat == null ? (scale.tickFormat ? scale.tickFormat.apply(scale, tickArguments) : identity$3) : tickFormat,
+        spacing = Math.max(tickSizeInner, 0) + tickPadding,
+        range = scale.range(),
+        range0 = +range[0] + 0.5,
+        range1 = +range[range.length - 1] + 0.5,
+        position = (scale.bandwidth ? center : number$3)(scale.copy()),
+        selection = context.selection ? context.selection() : context,
+        path = selection.selectAll(".domain").data([null]),
+        tick = selection.selectAll(".tick").data(values, scale).order(),
+        tickExit = tick.exit(),
+        tickEnter = tick.enter().append("g").attr("class", "tick"),
+        line = tick.select("line"),
+        text = tick.select("text");
+
+    path = path.merge(path.enter().insert("path", ".tick")
+        .attr("class", "domain")
+        .attr("stroke", "#000"));
+
+    tick = tick.merge(tickEnter);
+
+    line = line.merge(tickEnter.append("line")
+        .attr("stroke", "#000")
+        .attr(x + "2", k * tickSizeInner));
+
+    text = text.merge(tickEnter.append("text")
+        .attr("fill", "#000")
+        .attr(x, k * spacing)
+        .attr("dy", orient === top ? "0em" : orient === bottom ? "0.71em" : "0.32em"));
+
+    if (context !== selection) {
+      path = path.transition(context);
+      tick = tick.transition(context);
+      line = line.transition(context);
+      text = text.transition(context);
+
+      tickExit = tickExit.transition(context)
+          .attr("opacity", epsilon)
+          .attr("transform", function(d) { return isFinite(d = position(d)) ? transform(d) : this.getAttribute("transform"); });
+
+      tickEnter
+          .attr("opacity", epsilon)
+          .attr("transform", function(d) { var p = this.parentNode.__axis; return transform(p && isFinite(p = p(d)) ? p : position(d)); });
+    }
+
+    tickExit.remove();
+
+    path
+        .attr("d", orient === left || orient == right
+            ? "M" + k * tickSizeOuter + "," + range0 + "H0.5V" + range1 + "H" + k * tickSizeOuter
+            : "M" + range0 + "," + k * tickSizeOuter + "V0.5H" + range1 + "V" + k * tickSizeOuter);
+
+    tick
+        .attr("opacity", 1)
+        .attr("transform", function(d) { return transform(position(d)); });
+
+    line
+        .attr(x + "2", k * tickSizeInner);
+
+    text
+        .attr(x, k * spacing)
+        .text(format);
+
+    selection.filter(entering)
+        .attr("fill", "none")
+        .attr("font-size", 10)
+        .attr("font-family", "sans-serif")
+        .attr("text-anchor", orient === right ? "start" : orient === left ? "end" : "middle");
+
+    selection
+        .each(function() { this.__axis = position; });
+  }
+
+  axis.scale = function(_) {
+    return arguments.length ? (scale = _, axis) : scale;
+  };
+
+  axis.ticks = function() {
+    return tickArguments = slice$2.call(arguments), axis;
+  };
+
+  axis.tickArguments = function(_) {
+    return arguments.length ? (tickArguments = _ == null ? [] : slice$2.call(_), axis) : tickArguments.slice();
+  };
+
+  axis.tickValues = function(_) {
+    return arguments.length ? (tickValues = _ == null ? null : slice$2.call(_), axis) : tickValues && tickValues.slice();
+  };
+
+  axis.tickFormat = function(_) {
+    return arguments.length ? (tickFormat = _, axis) : tickFormat;
+  };
+
+  axis.tickSize = function(_) {
+    return arguments.length ? (tickSizeInner = tickSizeOuter = +_, axis) : tickSizeInner;
+  };
+
+  axis.tickSizeInner = function(_) {
+    return arguments.length ? (tickSizeInner = +_, axis) : tickSizeInner;
+  };
+
+  axis.tickSizeOuter = function(_) {
+    return arguments.length ? (tickSizeOuter = +_, axis) : tickSizeOuter;
+  };
+
+  axis.tickPadding = function(_) {
+    return arguments.length ? (tickPadding = +_, axis) : tickPadding;
+  };
+
+  return axis;
+}
+
+
+
+
+
+function axisBottom(scale) {
+  return axis(bottom, scale);
+}
+
+function axisLeft(scale) {
+  return axis(left, scale);
+}
+
+var Grid = Rectangle.extend({
+    options: {
+        color: 'grey',
+        weight: 1,
+        fill: false,
+        className: 'grid-axis'
+    },
+
+    onAdd: function (map) {
+        var g = map.getRenderer(this)._rootGroup;
+        this.$axis = select(g).append('g')
+                .attr('class', 'grid')
+                .style('pointer-events', 'none');
+        this._addAxis(map);
+        Rectangle.prototype.onAdd.call(this, map);
+        map.on('move', this._updateAxis, this);
+    },
+
+    onRemove: function (map) {
+        this.$axis.remove();
+        this.$graphPanel.remove();
+        map.off('move', this._updateAxis, this);
+        Rectangle.prototype.onRemove.call(this, map);
+    },
+
+    _addAxis: function(map){
+        var format_meters = function(d) { return d + ' м'};
+        var map_size = map._container.getBoundingClientRect();
+        var margin = {left: 50, right: 0, top: 5, bottom: 30};
+        this.$graphPanel = select('body')
+            .append('svg')
+                .style('position', 'absolute')
+                .style('top', (map_size.top - margin.top) + 'px')
+                .style('left', (map_size.left - margin.left - 1) + 'px')
+                .style('height', (map_size.height + margin.top + margin.bottom) + 'px')
+                .style('width', (map_size.width + margin.left + margin.right) + 'px')
+                .style('pointer-events', 'none')
+                .style('z-index', "399");
+        // Axis X
+        this.$axisX = this.$graphPanel.append('g')
+                        .attr('class', 'x axis')
+                        .attr("transform", "translate("+ margin.left+"," + (margin.top + map_size.height) + ")");
+        this.scaleX = linear().range([0, map_size.width]);
+        this.axisX = axisBottom(this.scaleX).ticks(10).tickFormat(format_meters);
+
+        // Axis Y
+        this.$axisY = this.$graphPanel.append('g')
+                        .attr('class', 'y axis')
+                        .attr("transform", "translate("+ (margin.left) +"," + margin.top + ")");
+        this.scaleY = linear().range([0, map_size.height ]);
+        this.axisY = axisLeft(this.scaleY).ticks(10).tickFormat(format_meters);
+    },
+
+    _updateAxis: function(){
+        var b = this._map.getBounds();
+        var myb = this.getBounds();
+        this.scaleX.domain([b.getWest() - myb.getWest(), b.getEast() - myb.getWest()]);
+        this.$axisX.call(this.axisX);
+
+        this.scaleY.domain([b.getSouth()-myb.getSouth(), b.getNorth()-myb.getSouth() ]);
+        this.$axisY.call(this.axisY);
+    },
+
+    _updatePath: function(){
+        var map = this._map;
+        Rectangle.prototype._updatePath.call(this);
+        var step = this.step;
+        var bb = toBounds(this._parts[0]);
+        var topLeft = bb.getTopLeft();
+        var bottomRight = bb.getBottomRight();
+        var xNum = 0, yNum = 0;
+        if(step > 2) {
+            xNum = Math.ceil((bottomRight.x - topLeft.x) / step);
+            yNum = Math.ceil((bottomRight.y - topLeft.y) / step);
+        }
+        
+        var $x = this.$axis.selectAll('line.x').data(_.range(1, xNum));
+        $x.exit().remove();
+        $x.enter()
+            .append('line')
+                .style('stroke', this.options.color)
+                .style('stroke-width', this.options.weight)
+                .attr('class', 'grid-axis x')
+            .merge($x)
+                .attr('y1', topLeft.y)
+                .attr('y2', bottomRight.y)
+                .attr('x1', function(d) { 
+                    return topLeft.x + d * step
+                } )
+                .attr('x2', function(d) { return topLeft.x + d * step} );
+        var $y = this.$axis.selectAll('line.y').data(_.range(1, yNum));
+        $y.exit().remove();
+        $y.enter()
+            .append('line')
+                .style('stroke', this.options.color)
+                .style('stroke-width', this.options.weight)
+                .attr('class', 'grid-axis y')
+            .merge($y)
+                .attr('y1', function(d) { return  topLeft.y + d * step; } )
+                .attr('y2', function(d) { return  topLeft.y + d * step; } )
+                .attr('x1', topLeft.x)
+                .attr('x2', bottomRight.x);
+        
+        this._updateAxis();
+    },
+ 
+    _project: function(){
+        if(this._map){
+            // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
+            var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+            var p2 = this._map.latLngToContainerPoint(toLatLng(0,0.5));
+            var d = p1.distanceTo(p2);
+            if(d < 5){
+                var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+                var p2 = this._map.latLngToContainerPoint(toLatLng(0,1));
+                var d = p1.distanceTo(p2);
+                if(d < 5){
+                    var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+                    var p2 = this._map.latLngToContainerPoint(toLatLng(0,5));
+                    var d = p1.distanceTo(p2);
+                }
+                if(d < 5){
+                    var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+                    var p2 = this._map.latLngToContainerPoint(toLatLng(0,10));
+                    var d = p1.distanceTo(p2);
+                }
+            // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
+            }
+            this.step = d;
+        }
+        Rectangle.prototype._project.call(this);
+    }
+});
+
 var BaseMapView = function (store, map)
 {
     var baseLayer$$1 = null;
+    var grid = null;
 
     store.on('selectedBase.url', function(e){
         var url = e.new_val;        
         if(baseLayer$$1) {
             map.removeLayer(baseLayer$$1);
             baseLayer$$1 = null;
+            map.removeLayer(grid);
+            grid = null;
         }
         if(url) {
             var size_m = selectedBase(store).size_m;
             var bounds =  toLatLngBounds([[0,0], [size_m.y, size_m.x]]);
             baseLayer$$1 = imageOverlay(url, bounds, {crossOrigin: true}).addTo(map);
             map.fitBounds(bounds);
+            var latlngs = [bounds.getSouthWest(),
+			bounds.getNorthWest(),
+			bounds.getNorthEast(),
+            bounds.getSouthEast()];
+            grid = new Grid(latlngs).addTo(map);
         }
     });
 
@@ -8641,6 +12687,76 @@ var BaseMapView = function (store, map)
             baseLayer$$1.setBounds(bounds);    
         }
     });
+};
+
+var DRAW_DISTANCE = 'draw-distance';
+
+var BaseMapDistance = function(store, map){
+
+    var line = null;
+    var tooltip = null; 
+    store.on('map.drawMode', function(e)
+    {
+        if(e.new_val == DRAW_DISTANCE)
+        {
+            L.setOptions(map.editTools, {skipMiddleMarkers: true});
+            line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'});   
+            line.on('editable:editing', on_edit);
+        }
+        else if(e.old_val == DRAW_DISTANCE) {
+            L.setOptions(map.editTools, {skipMiddleMarkers: false});            
+        }
+    });
+
+    store.on('selectedBase.distance', function(e){
+        if(!e.new_val || !e.new_val.points) {
+            if(line) {
+                line.disableEdit();
+                map.removeLayer(line);
+                line = null;
+            }
+        }
+    });
+
+    store.on('selectedBase.size_m', function(e){
+        if(!line || !e.new_val || !selectedBase(store).distance) return
+        var points = selectedBase(store).distance.points;
+        var latLngs = points.map(function(it){
+            return map.unproject(it,1);
+        });
+        line.disableEdit();
+        line.setLatLngs(latLngs);
+        line.enableEdit(map);
+        updateTooltip(selectedBase(store).distance.length_m);
+    });
+
+    function on_edit(event)
+    {
+        var line = event.layer;
+        if(line.getLatLngs().length == 2) 
+        {
+            var latLngs = line.getLatLngs();
+            map.editTools.commitDrawing();
+            var points = latLngs.map(function(it){
+                return map.project(it,1);
+            });
+            var length_px = points[0].distanceTo(points[1]);
+            var length_m = Math.round(L.CRS.Simple.distance(latLngs[0], latLngs[1]));
+            updateTooltip(length_m);
+            store(BASE_DISTANCE_SET, {length_px: length_px, length_m:length_m, points: points});
+            store(DRAWING_MODE_SET, null);
+        }
+    }
+
+    function updateTooltip(length_m){
+        var content = length_m + ' m';
+        if(line.getTooltip())
+            line.getTooltip().setLatLng(line.getCenter()).setContent(content);
+        else
+            line.bindTooltip(content, {permanent:true, interactive:true}); 
+                
+    }
+
 };
 
 var cur_locale = 'ru';
@@ -8764,18 +12880,33 @@ var store = Store(reducers);
 store.state = initState;
 window.store = store;
 
-var map = Map$$1('map', store);
+var map = Map('map', store);
 BaseMapView(store,map);
+BaseMapDistance(store,map);
 store("INIT");
 
 
-var form = Bind$1({
-    error: '',
-}, {
-    error: '#error',
-    
+var $ = function(id) { return document.getElementById(id) };
+var show = function(id) { $(id).style['display'] = ''; };
+var html = function(id, t) {  $(id).innerHTML = t; };
+var text = function(id, t) {  $(id).innerText = t; };
+
+
+$('file').onchange = FileHandler(store, function(error){ 
+    html('error', error);
 });
 
-document.getElementById('file').onchange = FileHandler(store, function(error){ error.length && alert(error); } );
+$('draw_line').onclick = function(){
+    store(DRAWING_MODE_SET, DRAW_DISTANCE);
+};
+
+store.on('selectedBase.size_m', function(e){
+    if(e.new_val) {
+        var size = e.new_val;
+        show('toolbar');
+        show('size');
+        text('size', size.x + ' - ' + size.y);
+    }
+});
 
 }());

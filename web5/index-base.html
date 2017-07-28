@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title></title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="dist/css/leaflet.css" rel="stylesheet">
+        <link href="dist/css/w3.css" rel="stylesheet">
+        <style>
+            .grid-axis{
+                shape-rendering: crispEdges;
+                stroke-opacity: 0.3;
+            }
+            .axis text{
+                pointer-events: none;
+            }
+            .axis path,
+            .axis line { 
+                fill: none;
+                stroke: grey;
+                stroke-width: 1;
+                shape-rendering: crispEdges;
+            }   
+            
+        </style>
+    </head>
+    <body style="margin: 30px;">
+        <div id="map" class="w3-margin" style="width: 800px; height: 600px;">
+            
+        </div>
+        <div class="w3-container w3-padding-32">
+            <div class="w3-section w3-text-red w3-small">
+                <span id='error'></span>
+            </div>
+            <div class="w3-section">
+                <input type="file" id='file'>
+            </div>
+            <div class="w3-section">
+                <p id='size' style="display: none">
+
+                </p>
+            </div>
+            <div id="toolbar" class="w3-section w3-small" style="display: none">
+                <button id='draw_line' class="w3-btn">Изменить масштаб</button>
+                <button class="w3-btn">Изменить сетку</button>
+            </div>
+        </div>
+	
+        <script src="dist/app-base.js"></script>
+    </body>
+</html>
