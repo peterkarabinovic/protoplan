@@ -20,7 +20,6 @@ var form = Bind({
     error: '',
 }, {
     error: '#error',
-    
 })
 
 document.getElementById('file').onchange = FileHandler(store, function(error){ error.length && alert(error); } );
