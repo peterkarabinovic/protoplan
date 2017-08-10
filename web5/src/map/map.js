@@ -1,4 +1,5 @@
 import _  from '../es6/underscore.js'
+import {Editable} from '../es6/Leaflet.Editable.js'
 import * as math from './math.js'
 import * as a from '../actions.js'
 // import {GridPanel} from './grid-panel.js'

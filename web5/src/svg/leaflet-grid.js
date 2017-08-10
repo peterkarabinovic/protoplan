@@ -36,6 +36,14 @@ export var Grid = Rectangle.extend({
         Rectangle.prototype.onRemove.call(this, map);
     },
 
+    getPoints: function(){
+        var ll = this._boundsToLatLngs(this.getLatLngs());
+        return {
+            topLeft: { x: ll[0].lng, y: ll[0].lat },
+            bottomRight: { x: ll[2].lng, y: ll[2].lat },
+        }
+    },
+
     _addAxis: function(map){
         var format_meters = function(d) { return d + ' м'}
         var map_size = map._container.getBoundingClientRect();
@@ -60,7 +68,7 @@ export var Grid = Rectangle.extend({
         this.$axisY = this.$graphPanel.append('g')
                         .attr('class', 'y axis')
                         .attr("transform", "translate("+ (margin.left) +"," + margin.top + ")");
-        this.scaleY = scaleLinear().range([0, map_size.height ]);
+        this.scaleY = scaleLinear().range([map_size.height, 0 ]);
         this.axisY = axisLeft(this.scaleY).ticks(10).tickFormat(format_meters);
     },
 
@@ -70,7 +78,8 @@ export var Grid = Rectangle.extend({
         this.scaleX.domain([b.getWest() - myb.getWest(), b.getEast() - myb.getWest()]);
         this.$axisX.call(this.axisX);
 
-        this.scaleY.domain([b.getSouth()-myb.getSouth(), b.getNorth()-myb.getSouth() ]);
+        // this.scaleY.domain([b.getSouth()-myb.getSouth(), b.getNorth()-myb.getSouth() ]);
+        this.scaleY.domain([myb.getNorth()-b.getNorth(), myb.getNorth()-b.getSouth() ]);
         this.$axisY.call(this.axisY);
     },
 
@@ -139,7 +148,7 @@ export var Grid = Rectangle.extend({
                 }
             // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
             }
-            this.step = d;
+            this.step = d > 5 ? d : 5;
         }
         Rectangle.prototype._project.call(this);
     }

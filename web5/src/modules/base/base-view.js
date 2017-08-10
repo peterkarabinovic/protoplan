@@ -1,90 +1,58 @@
+import _  from '../../es6/underscore.js'
 import {t} from '../../locale.js'
-import {DRAW_DISTANCE} from '../../map/modes.js'
+import {DRAW_DISTANCE, EDIT_GRID} from '../../map/modes.js'
 
 import {FileHandler} from './base-file-change.js'
 import {baseLayer} from '../../state.js'
-import {BASE_LAYER_SAVE,
-        DRAWING_MODE_SET, 
+import {DRAWING_MODE_SET, 
         BASE_DISTANCE_LENGTH_SET} from '../../actions.js'
 
 
+export default function BaseView(store) {
 
-function BaseView(store) {
-    var onFile = FileHandler(store, function(error){
-        vm.error = error;
-    });
-    var vm = new Vue({
-        el: '#base-layer',
-        template: '#base-layer-template',
-        data: {
-            width: null, height: null,
-            lineLength: null,
-            error: '',
-            selectedBase: store.prop('selectedBase')
-        },
-        methods: 
-        {
-            on_file: onFile,
+    var el = function(id) { return document.getElementById(id) }
+    var show = function(id) { el(id).style['display'] = '' }
+    var hide = function(id) { el(id).style['display'] = 'none' }
+    var html = function(id, t) {  el(id).innerHTML = t }
+    var text = function(id, t) {  el(id).innerText = t }
+    var value = function(id, t) {  el(id).value = t }
 
-            draw_line: function(){
-                store(DRAWING_MODE_SET, DRAW_DISTANCE)
-            },
-            recalculateScale: function(){
-                if(this.lineLength <= 0) return;
-                store(BASE_DISTANCE_LENGTH_SET, this.lineLength);
-            },
-            needDrawLine: function(){
-                return this.selectedBase.$val && !this.selectedBase.$val.distance;
-            },
-            needRecalculate: function(){
-                var sb = this.selectedBase.$val;
-                return sb && this.lineLength > 0 && this.lineLength != Math.round(sb.distance.length_m);
-            },
-            needSave: function(){
-                var bl = baseLayer(store),
-                    sb = this.selectedBase.$val;
-                return sb &&  (!_.isEqual(bl.size_m, sb.size_m) || !_.isEqual(bl.url, sb.url));
 
-            },
-            save: function(){
-                store(BASE_LAYER_SAVE, {base: this.selectedBase.$val})
-            }
-        }, 
-        computed: {
-            widthHeight: function(){
-                var sb = this.selectedBase.$val;
-                return sb && sb.size_m ? Math.round(sb.size_m.x) + ' m / ' + Math.round(sb.size_m.y) + ' m' : ''
-            }
-        }
+    el('file').onchange = FileHandler(store, function(error){ 
+        html('error', error);
     });
 
-    // function updateWidthHeight(e){
-    //     var base = e.new_val;
-    //     if(base && base.size_m) { 
-    //         vm.width = Math.round(base.size_m.x);
-    //         vm.height = Math.round(base.size_m.y);
-    //     }
-    //     else {
-    //         vm.width = vm.height = null;
-    //     }
-    // }
-
-    function updateLength_m(e){
-        vm.lineLength = e.new_val;
+    el('draw_line').onclick = function(){
+        store(DRAWING_MODE_SET, DRAW_DISTANCE);
     }
 
-    // store.on('selectedBase', updateWidthHeight);
-    store.on('selectedBase.distance.length_m', updateLength_m);    
+    el('grid_edit').onclick = function(){
+        store(DRAWING_MODE_SET, EDIT_GRID);
+    }
 
-    return vm;
+    el('distance_input').oninput = _.debounce( function(e){
+        var v = parseInt(el('distance_input').value)
+        if(!Number.isNaN(v) && v > 0)
+            store(BASE_DISTANCE_LENGTH_SET, v);
+    }, 500);
+
+    store.on('selectedBase.size_m', function(e){
+        if(e.new_val) {
+            var size = e.new_val
+            show('toolbar')
+            show('size')
+            text('size_input', Math.round(size.x) + 'x' + Math.round(size.y))
+        }
+    }); 
+
+    store.on('selectedBase.distance', function(e){
+        if(e.new_val){
+            show('distance');
+            value('distance_input', e.new_val.length_m)
+        }
+        else {
+            hide('distance');
+        }
+    });
 } 
 
-import BaseMapView from './base-map-view.js' 
-import BaseMapDistance from './base-map-distance.js'   
-
-export default function(store, map)
-{
-    BaseView(store);
-    BaseMapView(store, map);
-    BaseMapDistance(store, map);
-};

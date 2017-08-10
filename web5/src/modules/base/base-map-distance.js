@@ -1,9 +1,16 @@
 
+import * as Util from 'leaflet/src/core/Util.js';
+import {toLatLng} from 'leaflet/src/geo/LatLng.js'
+import {Simple as CRSSimple} from "leaflet/src/geo/crs/CRS.Simple.js";
+import {tooltip} from  "leaflet/src/layer/Tooltip.js";
+import {popup} from  "leaflet/src/layer/Popup.js";
+import {polyline} from  'leaflet/src/layer/vector/Polyline.js';
 import {DRAW_DISTANCE} from '../../map/modes.js'
 import {selectedBase} from '../../state.js'
 import {BASE_DISTANCE_SET, DRAWING_MODE_SET} from '../../actions.js'
 
-
+// hack to rollup.js load all layer functions
+console.log(typeof(tooltip), typeof(popup))
 
 export default function(store, map){
 
@@ -13,12 +20,20 @@ export default function(store, map){
     {
         if(e.new_val == DRAW_DISTANCE)
         {
-            L.setOptions(map.editTools, {skipMiddleMarkers: true});
-            line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'})   
-            line.on('editable:editing', on_edit)
+            var ce = map.getCenter();
+            var b = map.getBounds();
+            var w = (b.getEast() - b.getWest()) / 4;
+            var ll = [toLatLng(ce.lat, ce.lng + w),  toLatLng(ce.lat, ce.lng - w)];
+            line = polyline(ll, {weight:2, color: 'red', dashArray:'5,10'})   
+            line.addTo(map);
+            Util.setOptions(map.editTools, {skipMiddleMarkers: true});
+            line.enableEdit(map); 
+            line.on('editable:editing', on_edit);
+            on_edit({layer: line})
         }
         else if(e.old_val == DRAW_DISTANCE) {
-            L.setOptions(map.editTools, {skipMiddleMarkers: false});            
+            Util.setOptions(map.editTools, {skipMiddleMarkers: false}); 
+            store(BASE_DISTANCE_SET);
         }
     });
 
@@ -55,10 +70,10 @@ export default function(store, map){
                 return map.project(it,1);
             });
             var length_px = points[0].distanceTo(points[1]);
-            var length_m = Math.round(L.CRS.Simple.distance(latLngs[0], latLngs[1]));
+            var length_m = Math.round(CRSSimple.distance(latLngs[0], latLngs[1]));
             updateTooltip(length_m)
             store(BASE_DISTANCE_SET, {length_px: length_px, length_m:length_m, points: points});
-            store(DRAWING_MODE_SET, null);
+            // store(DRAWING_MODE_SET, null);
         }
     }
 

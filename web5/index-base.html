@@ -33,16 +33,28 @@
                 <span id='error'></span>
             </div>
             <div class="w3-section">
-                <input type="file" id='file'>
+                <input type="file" id='file' class="w3-padding-small">
+                
             </div>
             <div class="w3-section">
-                <p id='size' style="display: none">
-
-                </p>
+                <label id='size' style="display: none" class="w3-small">
+                    Ширина x Высота:
+                    <span id='size_input' class="w3-padding-small"></span>
+                </label>
+                <label id='distance' style="display: none" class="w3-small">
+                    Длина отрезка:
+                    <input type="number" id='distance_input' >
+                </label>
+            </div>
+            <div class="w3-section">
             </div>
             <div id="toolbar" class="w3-section w3-small" style="display: none">
-                <button id='draw_line' class="w3-btn">Изменить масштаб</button>
-                <button class="w3-btn">Изменить сетку</button>
+                <p>
+                    <input id='draw_line' type="radio"  name='g'>Задать масштаб
+                </p>
+                <p>
+                    <input id='grid_edit' type="radio" name='g' >Изменить сетку
+                </p>
             </div>
         </div>
 	

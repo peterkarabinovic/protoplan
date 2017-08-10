@@ -1,11 +1,11 @@
 import _  from './es6/underscore.js'
 import {Immutable} from './utils/fp.js'
-import {reduceReducers} from './utils/redux.js'
 import {str} from './utils/utils.js'
 import * as a from './actions.js'
+import {toPoint} from 'leaflet/src/geometry/Point.js'
 
 
-var errorReducer = function(state, action){
+export var errorReducer = function(state, action){
     switch(action.type){
         case a.ERROR_SET:
             return Immutable.set(state, 'ui.error', action.payload);
@@ -14,7 +14,7 @@ var errorReducer = function(state, action){
     return state;
 }
 
-var mapReducer = function(state, action)
+export var mapReducer = function(state, action)
 {
     switch(action.type){
         case a.DRAWING_MODE_SET:
@@ -30,7 +30,7 @@ var mapReducer = function(state, action)
     return state;
 }
 
-var pavilionReducer = function(state, action)
+export var pavilionReducer = function(state, action)
 {
     switch(action.type)
     {
@@ -86,7 +86,7 @@ var pavilionReducer = function(state, action)
 }
 
 
-var baseReducer = function(state, action)
+export var baseReducer = function(state, action)
 {
     switch(action.type)
     {
@@ -95,6 +95,12 @@ var baseReducer = function(state, action)
 
         case a.BASE_LAYER_SET: 
             var base = action.payload;
+            
+            base = Immutable.extend(base, "grid", {
+                topLeft: toPoint(0,0),
+                bottomRight: toPoint(base.size_m.x, base.size_m.y)
+            });
+
             state = Immutable.extend(state, 'selectedBase', base);
             return Immutable.set(state, 'map.size_m', base.size_m);
         
@@ -102,13 +108,20 @@ var baseReducer = function(state, action)
             var length_m = action.payload;
             var ratio =  length_m / state.selectedBase.distance.length_m;
             var size_m = state.selectedBase.size_m;
-            size_m = {
-                x: size_m.x * ratio,
-                y: size_m.y * ratio
+            size_m = toPoint(size_m).multiplyBy(ratio);
+            var grid = state.selectedBase.grid;
+            grid = {
+                topLeft: toPoint(grid.topLeft).multiplyBy(ratio),
+                bottomRight: toPoint(grid.bottomRight).multiplyBy(ratio)
             };
             state = Immutable.set(state, 'map.size_m', size_m);
             state = Immutable.set(state, 'selectedBase.size_m', size_m );
-            return Immutable.set(state, 'selectedBase.distance.length_m', length_m);             
+            state = Immutable.set(state, 'selectedBase.grid', grid );
+            return Immutable.set(state, 'selectedBase.distance.length_m', length_m);  
+        
+        case a.BASE_GRID_GEOMETRY:
+            var grid = action.payload;
+            return Immutable.set(state, 'selectedBase.grid', grid );
         
         case a.BASE_DISTANCE_SET: 
             var distance = action.payload;
@@ -129,7 +142,7 @@ var baseReducer = function(state, action)
     return state;
 }
 
-var overlayReducer = function(state, action){
+export var overlayReducer = function(state, action){
     switch(action.type){
         case a.OVERLAYS_LOADED:
             return Immutable.set(state, 'entities.overlays', action.payload);
@@ -221,7 +234,7 @@ var overlayReducer = function(state, action){
     return state;
 }
 
-var standsReducer = function(state, action){
+export var standsReducer = function(state, action){
     switch(action.type){
         case a.STANDS_LOADED:
             var stands = action.payload;
@@ -278,7 +291,7 @@ var standsReducer = function(state, action){
     return state;
 }
 
-export default reduceReducers([errorReducer, mapReducer, pavilionReducer, baseReducer, overlayReducer, standsReducer])
+// export default reduceReducers([errorReducer, mapReducer, pavilionReducer, baseReducer, overlayReducer, standsReducer])
 
 
 function generateId(state, path){

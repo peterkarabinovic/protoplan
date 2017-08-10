@@ -1,3 +1,6 @@
+import {toLatLng} from 'leaflet/src/geo/LatLng.js'
+import * as Util from 'leaflet/src/core/Util.js';
+
 
 export function str() {
     return "".concat.apply("",arguments);
@@ -8,7 +11,11 @@ export function startswith(str, substr) {
 };
 
 export function toLatLngs(points) {
-    return points.map(function(p){ return  L.latLng(p[1], p[0])});
+    return points.map(function(p){ 
+        if(Util.isArray(p))
+            return toLatLng(p[1], p[0])
+        return toLatLng(p.y, p.x);
+    });
 }
 
 

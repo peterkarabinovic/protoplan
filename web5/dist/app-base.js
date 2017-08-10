@@ -1864,356 +1864,14 @@ var Immutable = (function(){
     return i;
 })();
 
-function str() {
-    return "".concat.apply("",arguments);
-}
-
-function startswith(str, substr) { 
-    return str && str.indexOf(str) === 0;
-}
-
-
-
-
-
-/*
- * Selfcheck - wrap callback function for check if it already called in stack above
- */
-
-var UNSELECT_ALL = 'UNSELECT_ALL';
-
-
-
-var PAVILION_DELETED = 'PAVILION_DELETED';
-var PAVILION_ADDED = 'PAVILION_ADDED';
-var PAVILION_SELECT = 'PAVILION_SELECT';
-var PAVILIONS_LOADED = 'PAVILIONS_LOADED';
-
-
-var BASE_LAYER_SET = 'BASE_LAYER_SET';
-
-var BASE_LAYER_SAVED = 'BASE_LAYER_SAVED';
-var BASES_LOADED = 'BASES_LOADED';
-var BASE_DISTANCE_SET = 'BASE_DISTANCE_SET';
-var BASE_DISTANCE_LENGTH_SET = 'BASE_DISTANCE_LENGTH_SET';
-
-
-var DRAWING_MODE_SET = 'DRAWING_MODE_SET';
-
-var OVERLAY_FEAT_ADD = 'OVERLAY_FEAT_ADD';
-var OVERLAYS_LOADED = 'OVERLAYS_LOADED';
-var OVERLAY_FEAT_UPDATE = 'OVERLAY_FEAT_UPDATE';
-var OVERLAY_FEAT_DELETE = 'OVERLAY_FEAT_DELETE';
-var OVERLAY_FEAT_ROTATE = 'OVERLAY_FEAT_ROTATE';
-var OVERLAY_FEAT_TEXT = 'OVERLAY_FEAT_TEXT';
-var OVERLAY_ROLLBACK = 'OVERLAY_ROLLBACK';
-
-var OVERLAY_SAVED = 'OVERLAY_SAVED';
-var OVERLAY_FEAT_SELECT = 'OVERLAY_FEAT_SELECT';
-var OVERLAY_EDIT = 'OVERLAY_EDIT';
-var OVERLAY_TYPE_SELECT = 'OVERLAY_TYPE_SELECT';
-
-var STANDS_LOADED = 'STANDS_LOADED';
-
-var STAND_ADDED = 'STAND_ADDED';
-
-var STAND_UPDATED = 'STAND_UPDATED';
-
-var STAND_DELETED = 'STAND_DELETED';
-var STAND_SELECT = 'STAND_SELECT';
-var STAND_EDIT = 'STAND_EDIT';
-var STAND_TYPE_UPDATE = 'STAND_TYPE_UPDATE';
-
-
-
-var ERROR_SET = 'ERROR_SET';
-
-var errorReducer = function(state, action){
-    switch(action.type){
-        case ERROR_SET:
-            return Immutable.set(state, 'ui.error', action.payload);
-    }
-    state = Immutable.set(state, 'ui.error');
-    return state;
-};
-
-var mapReducer = function(state, action)
-{
-    switch(action.type){
-        case DRAWING_MODE_SET:
-            var mode = action.payload;
-            return Immutable.set(state, 'map.drawMode', mode);
-        
-        case UNSELECT_ALL:
-            state = Immutable.remove(state, 'ui.overlay.feat');
-            state = Immutable.remove(state, 'ui.stands.sel');
-            return state;
-
-    }
-    return state;
-};
-
-var pavilionReducer = function(state, action)
-{
-    switch(action.type)
-    {
-        case PAVILIONS_LOADED:
-            return Immutable.set(state, 'pavilions', action.payload);
-
-        case PAVILION_DELETED:
-            var pavi_id = action.payload;
-            var pavi = state.pavilions[pavi_id];
-            if(pavi) {
-                state = Immutable.remove(state, 'pavilions.'+pavi.id);
-                state = Immutable.remove(state, 'entities.bases.'+pavi.id);
-                state = Immutable.remove(state, 'entities.overlays.'+pavi.id);
-                state = Immutable.remove(state, 'entities.stands.'+pavi.id);
-            }
-            if(state.selectedPavilion && state.selectedPavilion.id == pavi_id) {
-                state = Immutable.set(state, 'selectedPavilion');
-                state = Immutable.set(state, 'selectedBase');
-                state = Immutable.set(state, 'selectedOverlay');
-                state = Immutable.set(state, 'selectedStandsId');
-                state = Immutable.set(state, 'ui.overlay.feat');
-                state = Immutable.set(state, 'ui.stands.feat');
-            }
-            return state;
-
-        case PAVILION_ADDED:
-            var pavi = action.payload;
-            state = Immutable.set(state, 'pavilions.'+pavi.id, pavi);
-            state = Immutable.set(state, 'selectedPavilion', pavi);
-            state = Immutable.set(state, 'selectedBase', {id:pavi.id});
-            state = Immutable.set(state, 'selectedStandsId', pavi.id);
-            // state = Immutable.extend(state, 'entities.stands.'+pavi.id, {id: pavi.id});
-            return state;
-
-        case PAVILION_SELECT:
-            var pavi = action.payload;
-            state = Immutable.set(state, 'selectedPavilion', pavi);
-            if(pavi) {
-                var base = state.entities.bases[pavi.id] || {id: pavi.id};
-                state = Immutable.set(state, 'selectedBase', base);
-                state = Immutable.set(state, str('entities.bases.',pavi.id), base);                
-                state = Immutable.set(state, 'map.size_m', base.size_m);
-                var overlay = state.entities.overlays[pavi.id] || {id:pavi.id};
-                state = Immutable.set(state, 'selectedOverlay', overlay);
-                state = Immutable.set(state, str('entities.overlays.',pavi.id), overlay);
-                state = Immutable.set(state, 'selectedStandsId', pavi.id);
-            }
-            return state;
-            
-
-    }
-    return state;
-};
-
-
-var baseReducer = function(state, action)
-{
-    switch(action.type)
-    {
-        case BASES_LOADED:
-            return Immutable.set(state, 'entities.bases', action.payload);
-
-        case BASE_LAYER_SET: 
-            var base = action.payload;
-            state = Immutable.extend(state, 'selectedBase', base);
-            return Immutable.set(state, 'map.size_m', base.size_m);
-        
-        case BASE_DISTANCE_LENGTH_SET:
-            var length_m = action.payload;
-            var ratio =  length_m / state.selectedBase.distance.length_m;
-            var size_m = state.selectedBase.size_m;
-            size_m = {
-                x: size_m.x * ratio,
-                y: size_m.y * ratio
-            };
-            state = Immutable.set(state, 'map.size_m', size_m);
-            state = Immutable.set(state, 'selectedBase.size_m', size_m );
-            return Immutable.set(state, 'selectedBase.distance.length_m', length_m);             
-        
-        case BASE_DISTANCE_SET: 
-            var distance = action.payload;
-            return Immutable.set(state, 'selectedBase.distance', distance);
-
-        case BASE_LAYER_SAVED:
-            var base = action.payload;
-            if(state.pavilions[base.id]) {
-                state = Immutable.set(state, 'entities.bases.'+base.id, base);
-                if(state.selectedPavilion && base.id == state.selectedPavilion.id)
-                    state = Immutable.set(state, 'selectedBase', base);
-            }
-            else {
-                state = Immutable.remove(state, 'entities.bases.'+base.id);
-            }
-            return state;
-    }
-    return state;
-};
-
-var overlayReducer = function(state, action){
-    switch(action.type){
-        case OVERLAYS_LOADED:
-            return Immutable.set(state, 'entities.overlays', action.payload);
-
-        case OVERLAY_FEAT_ADD: 
-            var cat = action.payload.cat;
-            var feat = action.payload.feat;
-            feat = _.extend({}, feat, {
-                id: generateId(state, 'selectedOverlay.'+cat),
-                type: state.ui.overlay.types[cat]
-            });
-            state = Immutable.remove(state, 'ui.stands.sel');
-            state = Immutable.set(state, 'ui.overlay.feat', str(cat,'.',feat.id));
-            return Immutable.set(state, str('selectedOverlay.',cat,'.',feat.id), feat);
-
-        case OVERLAY_FEAT_UPDATE: 
-            var cat = action.payload.cat;
-            var feat = action.payload.feat;
-            return Immutable.extend(state, 'selectedOverlay.'+cat+'.'+feat.id, feat);
-
-        case OVERLAY_FEAT_DELETE: 
-            var feat_id = state.ui.overlay.feat,
-                p = feat_id.split('.'),
-                cat = p[0],
-                id = +p[1];
-            state = Immutable.remove(state, 'selectedOverlay.'+cat+'.'+id);
-            return Immutable.remove(state, 'ui.overlay.feat');
-
-        case OVERLAY_FEAT_ROTATE:
-            var feat_id = state.ui.overlay.feat,
-                p = feat_id.split('.'),
-                cat = p[0],
-                id = +p[1];
-            var angle = state.selectedOverlay[cat][id].rotate;
-            var da = Math.PI / 4;
-            return Immutable.set(state, str('selectedOverlay.',cat,'.',id,'.rotate'), (angle-da) % (2*Math.PI));
-
-        case OVERLAY_FEAT_TEXT:
-            var feat = action.payload;
-            var feat_id = state.ui.overlay.feat,
-                p = feat_id.split('.'),
-                cat = p[0],
-                id = +p[1];
-            return Immutable.extend(state, str('selectedOverlay.',cat,'.',id), feat);
-
-        case OVERLAY_FEAT_SELECT:
-            var feat_id = action.payload;
-            if(feat_id) {
-               var p = feat_id.split('.'),
-                   cat = p[0],
-                   id = +p[1];
-                var feat = state.selectedOverlay[cat][id];
-                state = Immutable.remove(state, 'ui.stands.sel');
-                state = Immutable.set(state, str('ui.overlay.types.',cat), feat.type);
-            }
-            else
-                return Immutable.set(state, 'ui.overlay.edit')    
-            return Immutable.set(state, 'ui.overlay.feat', feat_id);
-
-        case OVERLAY_EDIT:
-            var edit = action.payload;
-            return Immutable.set(state, 'ui.overlay.edit', edit)
-        
-        case OVERLAY_TYPE_SELECT:
-            var p = action.payload;
-            state = Immutable.set(state, str('ui.overlay.types.',p.feat.cat), p.type_id);
-            return Immutable.set(state, str('selectedOverlay.',p.feat.cat,'.',p.feat.id, '.type'),  p.type_id)
-
-        case OVERLAY_SAVED:
-            var overlay = action.payload;
-            if(state.pavilions[overlay.id]) {
-                state = Immutable.set(state, 'entities.overlays.'+overlay.id, overlay);
-                if(state.selectedPavilion && overlay.id == state.selectedPavilion.id)
-                    state = Immutable.extend(state, 'selectedOverlay', overlay);
-                state = Immutable.remove(state, 'ui.overlay.feat');
-            }
-            else {
-                state = Immutable.remove(state, 'entities.overlays.'+overlay.id);
-            }
-            return state;
-
-        case OVERLAY_ROLLBACK:
-            var overlay = state.selectedOverlay;
-            overlay = state.entities.overlays[overlay.id];
-            state = Immutable.set(state, 'selectedOverlay', overlay);
-            return Immutable.remove(state, 'ui.overlay.feat');
-
-    }
-    return state;
-};
-
-var standsReducer = function(state, action){
-    switch(action.type){
-        case STANDS_LOADED:
-            var stands = action.payload;
-            return Immutable.set(state,'entities.stands', stands);
-
-        case STAND_ADDED:
-            var stand = action.payload.stand;
-            var stands_id = action.payload.stands_id;
-            state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
-            state = Immutable.set(state, 'ui.stands.edit', true);
-            return Immutable.set(state, 'ui.stands.sel', stand.id)
-
-        case STAND_UPDATED:
-            var stand = action.payload.stand;
-            var stands_id = action.payload.stands_id;
-            if(state.entities.stands[stands_id]) {
-                state = Immutable.set(state,str('entities.stands.',stands_id,'.',stand.id), stand);
-                state = Immutable.set(state, 'ui.stands.sel', stand.id);
-                var size = L.bounds(stand.points).getSize();
-                state = Immutable.set(state, 'ui.stands.size', size);
-            }
-            return state;
-        
-        case STAND_DELETED:
-            var stand_id = action.payload.stand_id;
-            var stands_id = action.payload.stands_id;
-            if(stand_id == state.ui.stands.sel)
-                state = Immutable.remove(state, 'ui.stands.sel');
-            return Immutable.remove(state,str('entities.stands.',stands_id,'.',stand_id));
-
-        case STAND_SELECT:
-            var stand_id = action.payload;
-            if(stand_id) {
-                var stands_id = state.selectedStandsId;
-                var stand = state.entities.stands[stands_id][stand_id];
-                state = Immutable.set(state, 'ui.stands.type', stand.type);
-            }
-            state = Immutable.remove(state, 'ui.overlay.feat');
-            return Immutable.set(state, 'ui.stands.sel', stand_id);
-        
-        case STAND_EDIT:
-            var edit = action.payload;
-            return Immutable.set(state, 'ui.stands.edit', edit);
-
-        case STAND_TYPE_UPDATE:
-            var type = action.payload.type;
-            return Immutable.set(state, 'state.ui.stands.type', type);
-        
-            
-
-        
-            
-    }
-    return state;
-};
-
-var reducers = reduceReducers([errorReducer, mapReducer, pavilionReducer, baseReducer, overlayReducer, standsReducer]);
-
-
-function generateId(state, path){
-    var ids = _.keys( Immutable.get(state, path) || {} );
-    return ids.length ? +_.max(ids) + 1 : 1;
-}
-
 /*
  * @namespace Util
  *
  * Various utility functions, used by Leaflet internally.
  */
+
+
+Object.freeze = function (obj) { return obj; };
 
 // @function extend(dest: Object, src?: Object): Object
 // Merges the properties of the `src` object (or multiple objects) into `dest` object and returns the latter. Has an `L.extend` shortcut.
@@ -2602,62 +2260,6 @@ function toPoint(x, y, round) {
 		return new Point(x.x, x.y);
 	}
 	return new Point(x, y, round);
-}
-
-function Transformation(a, b, c, d) {
-	if (isArray(a)) {
-		// use array properties
-		this._a = a[0];
-		this._b = a[1];
-		this._c = a[2];
-		this._d = a[3];
-		return;
-	}
-	this._a = a;
-	this._b = b;
-	this._c = c;
-	this._d = d;
-}
-
-Transformation.prototype = {
-	// @method transform(point: Point, scale?: Number): Point
-	// Returns a transformed point, optionally multiplied by the given scale.
-	// Only accepts actual `L.Point` instances, not arrays.
-	transform: function (point, scale) { // (Point, Number) -> Point
-		return this._transform(point.clone(), scale);
-	},
-
-	// destructive transform (faster)
-	_transform: function (point, scale) {
-		scale = scale || 1;
-		point.x = scale * (this._a * point.x + this._b);
-		point.y = scale * (this._c * point.y + this._d);
-		return point;
-	},
-
-	// @method untransform(point: Point, scale?: Number): Point
-	// Returns the reverse transformation of the given point, optionally divided
-	// by the given scale. Only accepts actual `L.Point` instances, not arrays.
-	untransform: function (point, scale) {
-		scale = scale || 1;
-		return new Point(
-		        (point.x / scale - this._b) / this._a,
-		        (point.y / scale - this._d) / this._c);
-	}
-};
-
-// factory L.transformation(a: Number, b: Number, c: Number, d: Number)
-
-// @factory L.transformation(a: Number, b: Number, c: Number, d: Number)
-// Instantiates a Transformation object with the given coefficients.
-
-// @alternative
-// @factory L.transformation(coefficients: Array): Transformation
-// Expects an coeficients array of the form
-// `[a: Number, b: Number, c: Number, d: Number]`.
-
-function toTransformation(a, b, c, d) {
-	return new Transformation(a, b, c, d);
 }
 
 function Bounds(a, b) {
@@ -3271,82 +2873,278 @@ function toLatLng(a, b, c) {
 	return new LatLng(a, b, c);
 }
 
-function transformation(map_size, img_size){
-   
-    var x_ratio = map_size.x / img_size.x;
-    var y_ratio = map_size.y / img_size.y;
-    if(x_ratio <= y_ratio){
-        var a = x_ratio;
-        var b = 0;
-        var c = x_ratio;
-        var d = (map_size.y - (x_ratio * img_size.y)) / 2;
-    }
-    else { 
-        var a = y_ratio;
-        var b = (map_size.x - (y_ratio * img_size.x)) / 2;
-        var c = y_ratio;
-        var d = 0;
-    }
-    return new Transformation(a,b,c,d);        
+function startswith(str, substr) { 
+    return str && str.indexOf(str) === 0;
 }
 
-/**
- * Calculate max zoom
- * @param {Size} img_size - size of images in custom unit (meters)
- * @param {int} min_width - length of min visible width (default 10)
- */
-function maxZoom(img_size, min_width){
-    min_width = min_width || 10;
-    var max_width = Math.max(img_size.y, img_size.x);
-    // var maxZoom = Math.log2( max_width / (1 * min_width) )   -- IE 11 not supported log2
-    var maxZoom = Math.log( max_width / (1 * min_width) )  / Math.log(2);
-    return Math.round(maxZoom);
+function toLatLngs(points) {
+    return points.map(function(p){ 
+        if(isArray(p))
+            return toLatLng(p[1], p[0])
+        return toLatLng(p.y, p.x);
+    });
 }
 
-/**
- * Constructor of Envelope
- * @param {*} min_x 
- * @param {*} min_y 
- * @param {*} max_x 
- * @param {*} max_y 
+
+
+/*
+ * Selfcheck - wrap callback function for check if it already called in stack above
  */
 
-function EventHandlerStack(obj)
+var UNSELECT_ALL = 'UNSELECT_ALL';
+
+
+
+
+
+
+
+
+
+var BASE_LAYER_SET = 'BASE_LAYER_SET';
+
+var BASE_LAYER_SAVED = 'BASE_LAYER_SAVED';
+var BASES_LOADED = 'BASES_LOADED';
+var BASE_DISTANCE_SET = 'BASE_DISTANCE_SET';
+var BASE_DISTANCE_LENGTH_SET = 'BASE_DISTANCE_LENGTH_SET';
+var BASE_GRID_GEOMETRY = 'BASE_GRID_GEOMETRY';
+
+
+var DRAWING_MODE_SET = 'DRAWING_MODE_SET';
+
+var mapReducer = function(state, action)
 {
-    var stack = {};
-    obj.inqueue_on = function(event_type, handler, context){
-        var q = stack[event_type];
-        if(!q){
-            q = {};
-            q.handlers = [];
-            q.fn = function(event){
-                var q = stack[event_type] || {handlers: []};
-                for(var i=q.handlers.length-1; i>=0; i--){
-                    var h = q.handlers[i];
-                    if( h.call(h._context || this, event) === true )
-                        break;
-                }
+    switch(action.type){
+        case DRAWING_MODE_SET:
+            var mode = action.payload;
+            return Immutable.set(state, 'map.drawMode', mode);
+        
+        case UNSELECT_ALL:
+            state = Immutable.remove(state, 'ui.overlay.feat');
+            state = Immutable.remove(state, 'ui.stands.sel');
+            return state;
+
+    }
+    return state;
+};
+
+
+
+
+var baseReducer = function(state, action)
+{
+    switch(action.type)
+    {
+        case BASES_LOADED:
+            return Immutable.set(state, 'entities.bases', action.payload);
+
+        case BASE_LAYER_SET: 
+            var base = action.payload;
+            
+            base = Immutable.extend(base, "grid", {
+                topLeft: toPoint(0,0),
+                bottomRight: toPoint(base.size_m.x, base.size_m.y)
+            });
+
+            state = Immutable.extend(state, 'selectedBase', base);
+            return Immutable.set(state, 'map.size_m', base.size_m);
+        
+        case BASE_DISTANCE_LENGTH_SET:
+            var length_m = action.payload;
+            var ratio =  length_m / state.selectedBase.distance.length_m;
+            var size_m = state.selectedBase.size_m;
+            size_m = toPoint(size_m).multiplyBy(ratio);
+            var grid = state.selectedBase.grid;
+            grid = {
+                topLeft: toPoint(grid.topLeft).multiplyBy(ratio),
+                bottomRight: toPoint(grid.bottomRight).multiplyBy(ratio)
             };
-            stack[event_type] = q;
-            obj.on(event_type, q.fn);
-        }
-        handler._context = context;
-        q.handlers.push(handler);
-    };
+            state = Immutable.set(state, 'map.size_m', size_m);
+            state = Immutable.set(state, 'selectedBase.size_m', size_m );
+            state = Immutable.set(state, 'selectedBase.grid', grid );
+            return Immutable.set(state, 'selectedBase.distance.length_m', length_m);  
+        
+        case BASE_GRID_GEOMETRY:
+            var grid = action.payload;
+            return Immutable.set(state, 'selectedBase.grid', grid );
+        
+        case BASE_DISTANCE_SET: 
+            var distance = action.payload;
+            return Immutable.set(state, 'selectedBase.distance', distance);
 
-    obj.inqueue_off = function(event_type, handler){
-        var q = stack[event_type];
-        if(q){
-            q.handlers = _.without(q.handlers, handler);
-            if(!q.handlers.length){
-                obj.off(event_type, q.fn);
-                delete stack[event_type];
+        case BASE_LAYER_SAVED:
+            var base = action.payload;
+            if(state.pavilions[base.id]) {
+                state = Immutable.set(state, 'entities.bases.'+base.id, base);
+                if(state.selectedPavilion && base.id == state.selectedPavilion.id)
+                    state = Immutable.set(state, 'selectedBase', base);
             }
-        }
-    };
+            else {
+                state = Immutable.remove(state, 'entities.bases.'+base.id);
+            }
+            return state;
+    }
+    return state;
+};
 
-    return obj;
 
+
+
+
+// export default reduceReducers([errorReducer, mapReducer, pavilionReducer, baseReducer, overlayReducer, standsReducer])
+
+function svgCreate(name) {
+	return document.createElementNS('http://www.w3.org/2000/svg', name);
+}
+
+// @function pointsToPath(rings: Point[], closed: Boolean): String
+// Generates a SVG path string for multiple rings, with each ring turning
+// into "M..L..L.." instructions
+function pointsToPath(rings, closed) {
+	var str = '',
+	i, j, len, len2, points, p;
+
+	for (i = 0, len = rings.length; i < len; i++) {
+		points = rings[i];
+
+		for (j = 0, len2 = points.length; j < len2; j++) {
+			p = points[j];
+			str += (j ? 'L' : 'M') + p.x + ' ' + p.y;
+		}
+
+		// closes the ring for polygons; "x" is VML syntax
+		str += closed ? (svg ? 'z' : 'x') : '';
+	}
+
+	// SVG complains about empty path strings
+	return str || 'M0 0';
+}
+
+var style = document.documentElement.style;
+
+// @property ie: Boolean; `true` for all Internet Explorer versions (not Edge).
+var ie = 'ActiveXObject' in window;
+
+// @property ielt9: Boolean; `true` for Internet Explorer versions less than 9.
+var ielt9 = ie && !document.addEventListener;
+
+// @property edge: Boolean; `true` for the Edge web browser.
+var edge = 'msLaunchUri' in navigator && !('documentMode' in document);
+
+// @property webkit: Boolean;
+// `true` for webkit-based browsers like Chrome and Safari (including mobile versions).
+var webkit = userAgentContains('webkit');
+
+// @property android: Boolean
+// `true` for any browser running on an Android platform.
+var android = userAgentContains('android');
+
+// @property android23: Boolean; `true` for browsers running on Android 2 or Android 3.
+var android23 = userAgentContains('android 2') || userAgentContains('android 3');
+
+// @property opera: Boolean; `true` for the Opera browser
+var opera = !!window.opera;
+
+// @property chrome: Boolean; `true` for the Chrome browser.
+var chrome = userAgentContains('chrome');
+
+// @property gecko: Boolean; `true` for gecko-based browsers like Firefox.
+var gecko = userAgentContains('gecko') && !webkit && !opera && !ie;
+
+// @property safari: Boolean; `true` for the Safari browser.
+var safari = !chrome && userAgentContains('safari');
+
+var phantom = userAgentContains('phantom');
+
+// @property opera12: Boolean
+// `true` for the Opera browser supporting CSS transforms (version 12 or later).
+var opera12 = 'OTransition' in style;
+
+// @property win: Boolean; `true` when the browser is running in a Windows platform
+var win = navigator.platform.indexOf('Win') === 0;
+
+// @property ie3d: Boolean; `true` for all Internet Explorer versions supporting CSS transforms.
+var ie3d = ie && ('transition' in style);
+
+// @property webkit3d: Boolean; `true` for webkit-based browsers supporting CSS transforms.
+var webkit3d = ('WebKitCSSMatrix' in window) && ('m11' in new window.WebKitCSSMatrix()) && !android23;
+
+// @property gecko3d: Boolean; `true` for gecko-based browsers supporting CSS transforms.
+var gecko3d = 'MozPerspective' in style;
+
+// @property any3d: Boolean
+// `true` for all browsers supporting CSS transforms.
+var any3d = !window.L_DISABLE_3D && (ie3d || webkit3d || gecko3d) && !opera12 && !phantom;
+
+// @property mobile: Boolean; `true` for all browsers running in a mobile device.
+var mobile = typeof orientation !== 'undefined' || userAgentContains('mobile');
+
+// @property mobileWebkit: Boolean; `true` for all webkit-based browsers in a mobile device.
+
+
+// @property mobileWebkit3d: Boolean
+// `true` for all webkit-based browsers in a mobile device supporting CSS transforms.
+
+
+// @property msPointer: Boolean
+// `true` for browsers implementing the Microsoft touch events model (notably IE10).
+var msPointer = !window.PointerEvent && window.MSPointerEvent;
+
+// @property pointer: Boolean
+// `true` for all browsers supporting [pointer events](https://msdn.microsoft.com/en-us/library/dn433244%28v=vs.85%29.aspx).
+var pointer = !!(window.PointerEvent || msPointer);
+
+// @property touch: Boolean
+// `true` for all browsers supporting [touch events](https://developer.mozilla.org/docs/Web/API/Touch_events).
+// This does not necessarily mean that the browser is running in a computer with
+// a touchscreen, it only means that the browser is capable of understanding
+// touch events.
+// export var touch = !window.L_NO_TOUCH && (pointer || 'ontouchstart' in window ||
+// 		(window.DocumentTouch && document instanceof window.DocumentTouch));
+var touch = false;
+
+// @property mobileOpera: Boolean; `true` for the Opera browser in a mobile device.
+var mobileOpera = mobile && opera;
+
+// @property mobileGecko: Boolean
+// `true` for gecko-based browsers running in a mobile device.
+
+
+// @property retina: Boolean
+// `true` for browsers on a high-resolution "retina" screen.
+var retina = (window.devicePixelRatio || (window.screen.deviceXDPI / window.screen.logicalXDPI)) > 1;
+
+
+// @property canvas: Boolean
+// `true` when the browser supports [`<canvas>`](https://developer.mozilla.org/docs/Web/API/Canvas_API).
+var canvas = (function () {
+	return !!document.createElement('canvas').getContext;
+}());
+
+// @property svg: Boolean
+// `true` when the browser supports [SVG](https://developer.mozilla.org/docs/Web/SVG).
+var svg = !!(document.createElementNS && svgCreate('svg').createSVGRect);
+
+// @property vml: Boolean
+// `true` if the browser supports [VML](https://en.wikipedia.org/wiki/Vector_Markup_Language).
+var vml = !svg && (function () {
+	try {
+		var div = document.createElement('div');
+		div.innerHTML = '<v:shape adj="1"/>';
+
+		var shape = div.firstChild;
+		shape.style.behavior = 'url(#default#VML)';
+
+		return shape && (typeof shape.adj === 'object');
+
+	} catch (e) {
+		return false;
+	}
+}());
+
+
+function userAgentContains(str) {
+	return navigator.userAgent.toLowerCase().indexOf(str) >= 0;
 }
 
 function Class() {}
@@ -3727,201 +3525,263 @@ Events.hasEventListeners = Events.listens;
 
 var Evented = Class.extend(Events);
 
-var SphericalMercator = {
-
-	R: 6378137,
-	MAX_LATITUDE: 85.0511287798,
-
-	project: function (latlng) {
-		var d = Math.PI / 180,
-		    max = this.MAX_LATITUDE,
-		    lat = Math.max(Math.min(max, latlng.lat), -max),
-		    sin = Math.sin(lat * d);
-
-		return new Point(
-				this.R * latlng.lng * d,
-				this.R * Math.log((1 + sin) / (1 - sin)) / 2);
+var Handler = Class.extend({
+	initialize: function (map) {
+		this._map = map;
 	},
 
-	unproject: function (point) {
-		var d = 180 / Math.PI;
+	// @method enable(): this
+	// Enables the handler
+	enable: function () {
+		if (this._enabled) { return this; }
 
-		return new LatLng(
-			(2 * Math.atan(Math.exp(point.y / this.R)) - (Math.PI / 2)) * d,
-			point.x * d / this.R);
+		this._enabled = true;
+		this.addHooks();
+		return this;
 	},
 
-	bounds: (function () {
-		var d = 6378137 * Math.PI;
-		return new Bounds([-d, -d], [d, d]);
-	})()
-};
+	// @method disable(): this
+	// Disables the handler
+	disable: function () {
+		if (!this._enabled) { return this; }
 
-var EPSG3857 = extend({}, Earth, {
-	code: 'EPSG:3857',
-	projection: SphericalMercator,
+		this._enabled = false;
+		this.removeHooks();
+		return this;
+	},
 
-	transformation: (function () {
-		var scale = 0.5 / (Math.PI * SphericalMercator.R);
-		return toTransformation(scale, 0.5, -scale, 0.5);
-	}())
+	// @method enabled(): Boolean
+	// Returns `true` if the handler is enabled
+	enabled: function () {
+		return !!this._enabled;
+	}
+
+	// @section Extension methods
+	// Classes inheriting from `Handler` must implement the two following methods:
+	// @method addHooks()
+	// Called when the handler is enabled, should add event hooks.
+	// @method removeHooks()
+	// Called when the handler is disabled, should remove the event hooks added previously.
 });
 
-var EPSG900913 = extend({}, EPSG3857, {
-	code: 'EPSG:900913'
-});
+function simplify(points, tolerance) {
+	if (!tolerance || !points.length) {
+		return points.slice();
+	}
 
-function svgCreate(name) {
-	return document.createElementNS('http://www.w3.org/2000/svg', name);
+	var sqTolerance = tolerance * tolerance;
+
+	    // stage 1: vertex reduction
+	    points = _reducePoints(points, sqTolerance);
+
+	    // stage 2: Douglas-Peucker simplification
+	    points = _simplifyDP(points, sqTolerance);
+
+	return points;
 }
 
-// @function pointsToPath(rings: Point[], closed: Boolean): String
-// Generates a SVG path string for multiple rings, with each ring turning
-// into "M..L..L.." instructions
-function pointsToPath(rings, closed) {
-	var str = '',
-	i, j, len, len2, points, p;
+// @function pointToSegmentDistance(p: Point, p1: Point, p2: Point): Number
+// Returns the distance between point `p` and segment `p1` to `p2`.
+function pointToSegmentDistance(p, p1, p2) {
+	return Math.sqrt(_sqClosestPointOnSegment(p, p1, p2, true));
+}
 
-	for (i = 0, len = rings.length; i < len; i++) {
-		points = rings[i];
+// @function closestPointOnSegment(p: Point, p1: Point, p2: Point): Number
+// Returns the closest point from a point `p` on a segment `p1` to `p2`.
 
-		for (j = 0, len2 = points.length; j < len2; j++) {
-			p = points[j];
-			str += (j ? 'L' : 'M') + p.x + ' ' + p.y;
+
+// Douglas-Peucker simplification, see http://en.wikipedia.org/wiki/Douglas-Peucker_algorithm
+function _simplifyDP(points, sqTolerance) {
+
+	var len = points.length,
+	    ArrayConstructor = typeof Uint8Array !== undefined + '' ? Uint8Array : Array,
+	    markers = new ArrayConstructor(len);
+
+	    markers[0] = markers[len - 1] = 1;
+
+	_simplifyDPStep(points, markers, sqTolerance, 0, len - 1);
+
+	var i,
+	    newPoints = [];
+
+	for (i = 0; i < len; i++) {
+		if (markers[i]) {
+			newPoints.push(points[i]);
+		}
+	}
+
+	return newPoints;
+}
+
+function _simplifyDPStep(points, markers, sqTolerance, first, last) {
+
+	var maxSqDist = 0,
+	index, i, sqDist;
+
+	for (i = first + 1; i <= last - 1; i++) {
+		sqDist = _sqClosestPointOnSegment(points[i], points[first], points[last], true);
+
+		if (sqDist > maxSqDist) {
+			index = i;
+			maxSqDist = sqDist;
+		}
+	}
+
+	if (maxSqDist > sqTolerance) {
+		markers[index] = 1;
+
+		_simplifyDPStep(points, markers, sqTolerance, first, index);
+		_simplifyDPStep(points, markers, sqTolerance, index, last);
+	}
+}
+
+// reduce points that are too close to each other to a single point
+function _reducePoints(points, sqTolerance) {
+	var reducedPoints = [points[0]];
+
+	for (var i = 1, prev = 0, len = points.length; i < len; i++) {
+		if (_sqDist(points[i], points[prev]) > sqTolerance) {
+			reducedPoints.push(points[i]);
+			prev = i;
+		}
+	}
+	if (prev < len - 1) {
+		reducedPoints.push(points[len - 1]);
+	}
+	return reducedPoints;
+}
+
+var _lastCode;
+
+// @function clipSegment(a: Point, b: Point, bounds: Bounds, useLastCode?: Boolean, round?: Boolean): Point[]|Boolean
+// Clips the segment a to b by rectangular bounds with the
+// [Cohen-Sutherland algorithm](https://en.wikipedia.org/wiki/Cohen%E2%80%93Sutherland_algorithm)
+// (modifying the segment points directly!). Used by Leaflet to only show polyline
+// points that are on the screen or near, increasing performance.
+function clipSegment(a, b, bounds, useLastCode, round) {
+	var codeA = useLastCode ? _lastCode : _getBitCode(a, bounds),
+	    codeB = _getBitCode(b, bounds),
+
+	    codeOut, p, newCode;
+
+	    // save 2nd code to avoid calculating it on the next segment
+	    _lastCode = codeB;
+
+	while (true) {
+		// if a,b is inside the clip window (trivial accept)
+		if (!(codeA | codeB)) {
+			return [a, b];
 		}
 
-		// closes the ring for polygons; "x" is VML syntax
-		str += closed ? (svg ? 'z' : 'x') : '';
-	}
+		// if a,b is outside the clip window (trivial reject)
+		if (codeA & codeB) {
+			return false;
+		}
 
-	// SVG complains about empty path strings
-	return str || 'M0 0';
+		// other cases
+		codeOut = codeA || codeB;
+		p = _getEdgeIntersection(a, b, codeOut, bounds, round);
+		newCode = _getBitCode(p, bounds);
+
+		if (codeOut === codeA) {
+			a = p;
+			codeA = newCode;
+		} else {
+			b = p;
+			codeB = newCode;
+		}
+	}
 }
 
-var style = document.documentElement.style;
+function _getEdgeIntersection(a, b, code, bounds, round) {
+	var dx = b.x - a.x,
+	    dy = b.y - a.y,
+	    min = bounds.min,
+	    max = bounds.max,
+	    x, y;
 
-// @property ie: Boolean; `true` for all Internet Explorer versions (not Edge).
-var ie = 'ActiveXObject' in window;
+	if (code & 8) { // top
+		x = a.x + dx * (max.y - a.y) / dy;
+		y = max.y;
 
-// @property ielt9: Boolean; `true` for Internet Explorer versions less than 9.
-var ielt9 = ie && !document.addEventListener;
+	} else if (code & 4) { // bottom
+		x = a.x + dx * (min.y - a.y) / dy;
+		y = min.y;
 
-// @property edge: Boolean; `true` for the Edge web browser.
-var edge = 'msLaunchUri' in navigator && !('documentMode' in document);
+	} else if (code & 2) { // right
+		x = max.x;
+		y = a.y + dy * (max.x - a.x) / dx;
 
-// @property webkit: Boolean;
-// `true` for webkit-based browsers like Chrome and Safari (including mobile versions).
-var webkit = userAgentContains('webkit');
-
-// @property android: Boolean
-// `true` for any browser running on an Android platform.
-var android = userAgentContains('android');
-
-// @property android23: Boolean; `true` for browsers running on Android 2 or Android 3.
-var android23 = userAgentContains('android 2') || userAgentContains('android 3');
-
-// @property opera: Boolean; `true` for the Opera browser
-var opera = !!window.opera;
-
-// @property chrome: Boolean; `true` for the Chrome browser.
-var chrome = userAgentContains('chrome');
-
-// @property gecko: Boolean; `true` for gecko-based browsers like Firefox.
-var gecko = userAgentContains('gecko') && !webkit && !opera && !ie;
-
-// @property safari: Boolean; `true` for the Safari browser.
-var safari = !chrome && userAgentContains('safari');
-
-var phantom = userAgentContains('phantom');
-
-// @property opera12: Boolean
-// `true` for the Opera browser supporting CSS transforms (version 12 or later).
-var opera12 = 'OTransition' in style;
-
-// @property win: Boolean; `true` when the browser is running in a Windows platform
-var win = navigator.platform.indexOf('Win') === 0;
-
-// @property ie3d: Boolean; `true` for all Internet Explorer versions supporting CSS transforms.
-var ie3d = ie && ('transition' in style);
-
-// @property webkit3d: Boolean; `true` for webkit-based browsers supporting CSS transforms.
-var webkit3d = ('WebKitCSSMatrix' in window) && ('m11' in new window.WebKitCSSMatrix()) && !android23;
-
-// @property gecko3d: Boolean; `true` for gecko-based browsers supporting CSS transforms.
-var gecko3d = 'MozPerspective' in style;
-
-// @property any3d: Boolean
-// `true` for all browsers supporting CSS transforms.
-var any3d = !window.L_DISABLE_3D && (ie3d || webkit3d || gecko3d) && !opera12 && !phantom;
-
-// @property mobile: Boolean; `true` for all browsers running in a mobile device.
-var mobile = typeof orientation !== 'undefined' || userAgentContains('mobile');
-
-// @property mobileWebkit: Boolean; `true` for all webkit-based browsers in a mobile device.
-
-
-// @property mobileWebkit3d: Boolean
-// `true` for all webkit-based browsers in a mobile device supporting CSS transforms.
-
-
-// @property msPointer: Boolean
-// `true` for browsers implementing the Microsoft touch events model (notably IE10).
-var msPointer = !window.PointerEvent && window.MSPointerEvent;
-
-// @property pointer: Boolean
-// `true` for all browsers supporting [pointer events](https://msdn.microsoft.com/en-us/library/dn433244%28v=vs.85%29.aspx).
-var pointer = !!(window.PointerEvent || msPointer);
-
-// @property touch: Boolean
-// `true` for all browsers supporting [touch events](https://developer.mozilla.org/docs/Web/API/Touch_events).
-// This does not necessarily mean that the browser is running in a computer with
-// a touchscreen, it only means that the browser is capable of understanding
-// touch events.
-var touch = !window.L_NO_TOUCH && (pointer || 'ontouchstart' in window ||
-		(window.DocumentTouch && document instanceof window.DocumentTouch));
-
-// @property mobileOpera: Boolean; `true` for the Opera browser in a mobile device.
-var mobileOpera = mobile && opera;
-
-// @property mobileGecko: Boolean
-// `true` for gecko-based browsers running in a mobile device.
-
-
-// @property retina: Boolean
-// `true` for browsers on a high-resolution "retina" screen.
-var retina = (window.devicePixelRatio || (window.screen.deviceXDPI / window.screen.logicalXDPI)) > 1;
-
-
-// @property canvas: Boolean
-// `true` when the browser supports [`<canvas>`](https://developer.mozilla.org/docs/Web/API/Canvas_API).
-var canvas = (function () {
-	return !!document.createElement('canvas').getContext;
-}());
-
-// @property svg: Boolean
-// `true` when the browser supports [SVG](https://developer.mozilla.org/docs/Web/SVG).
-var svg = !!(document.createElementNS && svgCreate('svg').createSVGRect);
-
-// @property vml: Boolean
-// `true` if the browser supports [VML](https://en.wikipedia.org/wiki/Vector_Markup_Language).
-var vml = !svg && (function () {
-	try {
-		var div = document.createElement('div');
-		div.innerHTML = '<v:shape adj="1"/>';
-
-		var shape = div.firstChild;
-		shape.style.behavior = 'url(#default#VML)';
-
-		return shape && (typeof shape.adj === 'object');
-
-	} catch (e) {
-		return false;
+	} else if (code & 1) { // left
+		x = min.x;
+		y = a.y + dy * (min.x - a.x) / dx;
 	}
-}());
+
+	return new Point(x, y, round);
+}
+
+function _getBitCode(p, bounds) {
+	var code = 0;
+
+	if (p.x < bounds.min.x) { // left
+		code |= 1;
+	} else if (p.x > bounds.max.x) { // right
+		code |= 2;
+	}
+
+	if (p.y < bounds.min.y) { // bottom
+		code |= 4;
+	} else if (p.y > bounds.max.y) { // top
+		code |= 8;
+	}
+
+	return code;
+}
+
+// square distance (to avoid unnecessary Math.sqrt calls)
+function _sqDist(p1, p2) {
+	var dx = p2.x - p1.x,
+	    dy = p2.y - p1.y;
+	return dx * dx + dy * dy;
+}
+
+// return closest point on segment or distance to that point
+function _sqClosestPointOnSegment(p, p1, p2, sqDist) {
+	var x = p1.x,
+	    y = p1.y,
+	    dx = p2.x - x,
+	    dy = p2.y - y,
+	    dot = dx * dx + dy * dy,
+	    t;
+
+	if (dot > 0) {
+		t = ((p.x - x) * dx + (p.y - y) * dy) / dot;
+
+		if (t > 1) {
+			x = p2.x;
+			y = p2.y;
+		} else if (t > 0) {
+			x += dx * t;
+			y += dy * t;
+		}
+	}
+
+	dx = p.x - x;
+	dy = p.y - y;
+
+	return sqDist ? dx * dx + dy * dy : new Point(x, y);
+}
 
 
-function userAgentContains(str) {
-	return navigator.userAgent.toLowerCase().indexOf(str) >= 0;
+// @function isFlat(latlngs: LatLng[]): Boolean
+// Returns true if `latlngs` is a flat array, false is nested.
+function isFlat$1(latlngs) {
+	return !isArray(latlngs[0]) || (typeof latlngs[0][0] !== 'object' && typeof latlngs[0][0] !== 'undefined');
+}
+
+function _flat(latlngs) {
+	console.warn('Deprecated use of _flat, please use L.LineUtil.isFlat instead.');
+	return isFlat$1(latlngs);
 }
 
 var POINTER_DOWN =   msPointer ? 'MSPointerDown'   : 'pointerdown';
@@ -4178,6 +4038,8 @@ function off(obj, types, fn, context) {
 		}
 		delete obj[eventsKey];
 	}
+
+	return this;
 }
 
 function addOne(obj, type, fn, context) {
@@ -4286,12 +4148,19 @@ function stopPropagation(e) {
 
 // @function disableScrollPropagation(el: HTMLElement): this
 // Adds `stopPropagation` to the element's `'mousewheel'` events (plus browser variants).
-
+function disableScrollPropagation(el) {
+	addOne(el, 'mousewheel', stopPropagation);
+	return this;
+}
 
 // @function disableClickPropagation(el: HTMLElement): this
 // Adds `stopPropagation` to the element's `'click'`, `'doubleclick'`,
 // `'mousedown'` and `'touchstart'` events (plus browser variants).
-
+function disableClickPropagation(el) {
+	on(el, 'mousedown touchstart dblclick', stopPropagation);
+	addOne(el, 'click', fakeStop);
+	return this;
+}
 
 // @function preventDefault(ev: DOMEvent): this
 // Prevents the default action of the DOM Event `ev` from happening (such as
@@ -4407,6 +4276,106 @@ function filterClick(e, handler) {
 
 // @function addListener(…): this
 // Alias to [`L.DomEvent.on`](#domevent-on)
+
+var SphericalMercator = {
+
+	R: 6378137,
+	MAX_LATITUDE: 85.0511287798,
+
+	project: function (latlng) {
+		var d = Math.PI / 180,
+		    max = this.MAX_LATITUDE,
+		    lat = Math.max(Math.min(max, latlng.lat), -max),
+		    sin = Math.sin(lat * d);
+
+		return new Point(
+				this.R * latlng.lng * d,
+				this.R * Math.log((1 + sin) / (1 - sin)) / 2);
+	},
+
+	unproject: function (point) {
+		var d = 180 / Math.PI;
+
+		return new LatLng(
+			(2 * Math.atan(Math.exp(point.y / this.R)) - (Math.PI / 2)) * d,
+			point.x * d / this.R);
+	},
+
+	bounds: (function () {
+		var d = 6378137 * Math.PI;
+		return new Bounds([-d, -d], [d, d]);
+	})()
+};
+
+function Transformation(a, b, c, d) {
+	if (isArray(a)) {
+		// use array properties
+		this._a = a[0];
+		this._b = a[1];
+		this._c = a[2];
+		this._d = a[3];
+		return;
+	}
+	this._a = a;
+	this._b = b;
+	this._c = c;
+	this._d = d;
+}
+
+Transformation.prototype = {
+	// @method transform(point: Point, scale?: Number): Point
+	// Returns a transformed point, optionally multiplied by the given scale.
+	// Only accepts actual `L.Point` instances, not arrays.
+	transform: function (point, scale) { // (Point, Number) -> Point
+		return this._transform(point.clone(), scale);
+	},
+
+	// destructive transform (faster)
+	_transform: function (point, scale) {
+		scale = scale || 1;
+		point.x = scale * (this._a * point.x + this._b);
+		point.y = scale * (this._c * point.y + this._d);
+		return point;
+	},
+
+	// @method untransform(point: Point, scale?: Number): Point
+	// Returns the reverse transformation of the given point, optionally divided
+	// by the given scale. Only accepts actual `L.Point` instances, not arrays.
+	untransform: function (point, scale) {
+		scale = scale || 1;
+		return new Point(
+		        (point.x / scale - this._b) / this._a,
+		        (point.y / scale - this._d) / this._c);
+	}
+};
+
+// factory L.transformation(a: Number, b: Number, c: Number, d: Number)
+
+// @factory L.transformation(a: Number, b: Number, c: Number, d: Number)
+// Instantiates a Transformation object with the given coefficients.
+
+// @alternative
+// @factory L.transformation(coefficients: Array): Transformation
+// Expects an coeficients array of the form
+// `[a: Number, b: Number, c: Number, d: Number]`.
+
+function toTransformation(a, b, c, d) {
+	return new Transformation(a, b, c, d);
+}
+
+var EPSG3857 = extend({}, Earth, {
+	code: 'EPSG:3857',
+	projection: SphericalMercator,
+
+	transformation: (function () {
+		var scale = 0.5 / (Math.PI * SphericalMercator.R);
+		return toTransformation(scale, 0.5, -scale, 0.5);
+	}())
+});
+
+var EPSG900913 = extend({}, EPSG3857, {
+	code: 'EPSG:900913'
+});
 
 var TRANSFORM = testProp(
 	['transform', 'WebkitTransform', 'OTransform', 'MozTransform', 'msTransform']);
@@ -6399,45 +6368,6 @@ var Map$1 = Evented.extend({
 // Instantiates a map object given an instance of a `<div>` HTML element
 // and optionally an object literal with `Map options`.
 
-var Handler = Class.extend({
-	initialize: function (map) {
-		this._map = map;
-	},
-
-	// @method enable(): this
-	// Enables the handler
-	enable: function () {
-		if (this._enabled) { return this; }
-
-		this._enabled = true;
-		this.addHooks();
-		return this;
-	},
-
-	// @method disable(): this
-	// Disables the handler
-	disable: function () {
-		if (!this._enabled) { return this; }
-
-		this._enabled = false;
-		this.removeHooks();
-		return this;
-	},
-
-	// @method enabled(): Boolean
-	// Returns `true` if the handler is enabled
-	enabled: function () {
-		return !!this._enabled;
-	}
-
-	// @section Extension methods
-	// Classes inheriting from `Handler` must implement the two following methods:
-	// @method addHooks()
-	// Called when the handler is enabled, should add event hooks.
-	// @method removeHooks()
-	// Called when the handler is disabled, should remove the event hooks added previously.
-});
-
 Map$1.mergeOptions({
 	// @option boxZoom: Boolean = true
 	// Whether the map can be zoomed to a rectangular area specified by
@@ -6620,7 +6550,6 @@ var DoubleClickZoom = Handler.extend({
 // Double click zoom handler.
 Map$1.addInitHook('addHandler', 'doubleClickZoom', DoubleClickZoom);
 
-var _dragging = false;
 var START = touch ? 'touchstart mousedown' : 'mousedown';
 var END = {
 	mousedown: 'mouseup',
@@ -6674,7 +6603,7 @@ var Draggable = Evented.extend({
 
 		// If we're currently dragging this draggable,
 		// disabling it counts as first ending the drag.
-		if (L.Draggable._dragging === this) {
+		if (Draggable._dragging === this) {
 			this.finishDrag();
 		}
 
@@ -6696,8 +6625,8 @@ var Draggable = Evented.extend({
 
 		if (hasClass(this._element, 'leaflet-zoom-anim')) { return; }
 
-		if (_dragging || e.shiftKey || ((e.which !== 1) && (e.button !== 1) && !e.touches)) { return; }
-		_dragging = this;  // Prevent dragging multiple objects at once.
+		if (Draggable._dragging || e.shiftKey || ((e.which !== 1) && (e.button !== 1) && !e.touches)) { return; }
+		Draggable._dragging = this;  // Prevent dragging multiple objects at once.
 
 		if (this._preventOutline) {
 			preventOutline(this._element);
@@ -6821,7 +6750,7 @@ var Draggable = Evented.extend({
 		}
 
 		this._moving = false;
-		_dragging = false;
+		Draggable._dragging = false;
 	}
 
 });
@@ -7541,89 +7470,202 @@ Map$1.ScrollWheelZoom = ScrollWheelZoom;
 Map$1.Tap = Tap;
 Map$1.TouchZoom = TouchZoom;
 
-var LonLat = {
-	project: function (latlng) {
-		return new Point(latlng.lng, latlng.lat);
+var Icon = Class.extend({
+
+	/* @section
+	 * @aka Icon options
+	 *
+	 * @option iconUrl: String = null
+	 * **(required)** The URL to the icon image (absolute or relative to your script path).
+	 *
+	 * @option iconRetinaUrl: String = null
+	 * The URL to a retina sized version of the icon image (absolute or relative to your
+	 * script path). Used for Retina screen devices.
+	 *
+	 * @option iconSize: Point = null
+	 * Size of the icon image in pixels.
+	 *
+	 * @option iconAnchor: Point = null
+	 * The coordinates of the "tip" of the icon (relative to its top left corner). The icon
+	 * will be aligned so that this point is at the marker's geographical location. Centered
+	 * by default if size is specified, also can be set in CSS with negative margins.
+	 *
+	 * @option popupAnchor: Point = null
+	 * The coordinates of the point from which popups will "open", relative to the icon anchor.
+	 *
+	 * @option shadowUrl: String = null
+	 * The URL to the icon shadow image. If not specified, no shadow image will be created.
+	 *
+	 * @option shadowRetinaUrl: String = null
+	 *
+	 * @option shadowSize: Point = null
+	 * Size of the shadow image in pixels.
+	 *
+	 * @option shadowAnchor: Point = null
+	 * The coordinates of the "tip" of the shadow (relative to its top left corner) (the same
+	 * as iconAnchor if not specified).
+	 *
+	 * @option className: String = ''
+	 * A custom class name to assign to both icon and shadow images. Empty by default.
+	 */
+
+	initialize: function (options) {
+		setOptions(this, options);
 	},
 
-	unproject: function (point) {
-		return new LatLng(point.y, point.x);
+	// @method createIcon(oldIcon?: HTMLElement): HTMLElement
+	// Called internally when the icon has to be shown, returns a `<img>` HTML element
+	// styled according to the options.
+	createIcon: function (oldIcon) {
+		return this._createIcon('icon', oldIcon);
 	},
 
-	bounds: new Bounds([-180, -90], [180, 90])
-};
-
-var Simple = extend({}, CRS, {
-	projection: LonLat,
-	transformation: toTransformation(1, 0, -1, 0),
-
-	scale: function (zoom) {
-		return Math.pow(2, zoom);
+	// @method createShadow(oldIcon?: HTMLElement): HTMLElement
+	// As `createIcon`, but for the shadow beneath it.
+	createShadow: function (oldIcon) {
+		return this._createIcon('shadow', oldIcon);
 	},
 
-	zoom: function (scale) {
-		return Math.log(scale) / Math.LN2;
+	_createIcon: function (name, oldIcon) {
+		var src = this._getIconUrl(name);
+
+		if (!src) {
+			if (name === 'icon') {
+				throw new Error('iconUrl not set in Icon options (see the docs).');
+			}
+			return null;
+		}
+
+		var img = this._createImg(src, oldIcon && oldIcon.tagName === 'IMG' ? oldIcon : null);
+		this._setIconStyles(img, name);
+
+		return img;
 	},
 
-	distance: function (latlng1, latlng2) {
-		var dx = latlng2.lng - latlng1.lng,
-		    dy = latlng2.lat - latlng1.lat;
+	_setIconStyles: function (img, name) {
+		var options = this.options;
+		var sizeOption = options[name + 'Size'];
 
-		return Math.sqrt(dx * dx + dy * dy);
+		if (typeof sizeOption === 'number') {
+			sizeOption = [sizeOption, sizeOption];
+		}
+
+		var size = toPoint(sizeOption),
+		    anchor = toPoint(name === 'shadow' && options.shadowAnchor || options.iconAnchor ||
+		            size && size.divideBy(2, true));
+
+		img.className = 'leaflet-marker-' + name + ' ' + (options.className || '');
+
+		if (anchor) {
+			img.style.marginLeft = (-anchor.x) + 'px';
+			img.style.marginTop  = (-anchor.y) + 'px';
+		}
+
+		if (size) {
+			img.style.width  = size.x + 'px';
+			img.style.height = size.y + 'px';
+		}
 	},
 
-	infinite: true
+	_createImg: function (src, el) {
+		el = el || document.createElement('img');
+		el.src = src;
+		return el;
+	},
+
+	_getIconUrl: function (name) {
+		return retina && this.options[name + 'RetinaUrl'] || this.options[name + 'Url'];
+	}
 });
 
-var Map = function(el, store)
-{
-    map$1 = new Map$1(el, 
-    {
-        crs: Simple,
-        zoomControl: false,
-        attributionControl: false,
-        editable: true,
-        // zoomAnimation: false
-    });
-    window.map = map$1;
 
-    map$1.ll2cp = map$1.latLngToContainerPoint;
-    map$1.ll2lp = map$1.latLngToLayerPoint;
+// @factory L.icon(options: Icon options)
+// Creates an icon instance with the given options.
 
-    map$1 = EventHandlerStack(map$1);
-    // gridPanel = GridPanel(map);
+var IconDefault = Icon.extend({
 
-    // we store on server as array [lng, lat]
-    map$1.toPoints = function(latLngs){
-        latLngs = _.flatten(latLngs);
-        return latLngs.map(map$1.snap).map(function(ll){ return [ll.lng, ll.lat] });
-    };
+	options: {
+		iconUrl:       'marker-icon.png',
+		iconRetinaUrl: 'marker-icon-2x.png',
+		shadowUrl:     'marker-shadow.png',
+		iconSize:    [25, 41],
+		iconAnchor:  [12, 41],
+		popupAnchor: [1, -34],
+		tooltipAnchor: [16, -28],
+		shadowSize:  [41, 41]
+	},
 
+	_getIconUrl: function (name) {
+		if (!IconDefault.imagePath) {	// Deprecated, backwards-compatibility only
+			IconDefault.imagePath = this._detectIconPath();
+		}
 
-    map$1.inqueue_on('click', function(){
-        store(UNSELECT_ALL);
-    });
+		// @option imagePath: String
+		// `Icon.Default` will try to auto-detect the absolute location of the
+		// blue icon images. If you are placing these images in a non-standard
+		// way, set this option to point to the right absolute path.
+		return (this.options.imagePath || IconDefault.imagePath) + Icon.prototype._getIconUrl.call(this, name);
+	},
 
-    // State changes
-    store.on('map.size_m', function(e) { updateMapSize(e.new_val); });
-    return map$1;
-};
+	_detectIconPath: function () {
+		var el = create$1('div',  'leaflet-default-icon-path', document.body);
+		var path = getStyle(el, 'background-image') ||
+		           getStyle(el, 'backgroundImage');	// IE8
 
-var map$1  = null;
-function updateMapSize(size_m)
-{
-    if(!size_m) return;
-    var map_size = {x: map$1._container.offsetWidth, y: map$1._container.offsetHeight};
-    var trans =  transformation(map_size, size_m);
-    map$1.options.crs = _.extend({}, Simple, {transformation: trans });  
-    map$1.setMaxBounds([[-size_m.y, -size_m.x], [size_m.y*2, size_m.x*2]]);
-    map$1.setMaxZoom( maxZoom(size_m) );
-    var bounds =  toLatLngBounds([[0,0], [size_m.y, size_m.x]]);
-    if(_.isUndefined(map$1.getZoom()))
-        map$1.fitBounds(bounds);
-    // gridPanel(size_m);
-    return bounds;
-}
+		document.body.removeChild(el);
+
+		if (path === null || path.indexOf('url') !== 0) {
+			path = '';
+		} else {
+			path = path.replace(/^url\([\"\']?/, '').replace(/marker-icon\.png[\"\']?\)$/, '');
+		}
+
+		return path;
+	}
+});
+
+var DivIcon = Icon.extend({
+	options: {
+		// @section
+		// @aka DivIcon options
+		iconSize: [12, 12], // also can be set through CSS
+
+		// iconAnchor: (Point),
+		// popupAnchor: (Point),
+
+		// @option html: String = ''
+		// Custom HTML code to put inside the div element, empty by default.
+		html: false,
+
+		// @option bgPos: Point = [0, 0]
+		// Optional relative position of the background, in pixels
+		bgPos: null,
+
+		className: 'leaflet-div-icon'
+	},
+
+	createIcon: function (oldIcon) {
+		var div = (oldIcon && oldIcon.tagName === 'DIV') ? oldIcon : document.createElement('div'),
+		    options = this.options;
+
+		div.innerHTML = options.html !== false ? options.html : '';
+
+		if (options.bgPos) {
+			var bgPos = toPoint(options.bgPos);
+			div.style.backgroundPosition = (-bgPos.x) + 'px ' + (-bgPos.y) + 'px';
+		}
+		this._setIconStyles(div, 'icon');
+
+		return div;
+	},
+
+	createShadow: function () {
+		return null;
+	}
+});
+
+// @factory L.divIcon(options: DivIcon options)
+// Creates a `DivIcon` instance with the given options.
 
 var Layer = Evented.extend({
 
@@ -7643,8 +7685,8 @@ var Layer = Evented.extend({
 	/* @section
 	 * Classes extending `L.Layer` will inherit the following methods:
 	 *
-	 * @method addTo(map: Map): this
-	 * Adds the layer to the given map
+	 * @method addTo(map: Map|LayerGroup): this
+	 * Adds the layer to the given map or layer group.
 	 */
 	addTo: function (map) {
 		map.addLayer(this);
@@ -7753,6 +7795,10 @@ Map$1.include({
 	// @method addLayer(layer: Layer): this
 	// Adds the given layer to the map
 	addLayer: function (layer) {
+		if (!layer._layerAdd) {
+			throw new Error('The provided object is not a Layer.');
+		}
+
 		var id = stamp(layer);
 		if (this._layers[id]) { return this; }
 		this._layers[id] = layer;
@@ -7872,6 +7918,3551 @@ Map$1.include({
 	}
 });
 
+var MarkerDrag = Handler.extend({
+	initialize: function (marker) {
+		this._marker = marker;
+	},
+
+	addHooks: function () {
+		var icon = this._marker._icon;
+
+		if (!this._draggable) {
+			this._draggable = new Draggable(icon, icon, true);
+		}
+
+		this._draggable.on({
+			dragstart: this._onDragStart,
+			drag: this._onDrag,
+			dragend: this._onDragEnd
+		}, this).enable();
+
+		addClass(icon, 'leaflet-marker-draggable');
+	},
+
+	removeHooks: function () {
+		this._draggable.off({
+			dragstart: this._onDragStart,
+			drag: this._onDrag,
+			dragend: this._onDragEnd
+		}, this).disable();
+
+		if (this._marker._icon) {
+			removeClass(this._marker._icon, 'leaflet-marker-draggable');
+		}
+	},
+
+	moved: function () {
+		return this._draggable && this._draggable._moved;
+	},
+
+	_onDragStart: function () {
+		// @section Dragging events
+		// @event dragstart: Event
+		// Fired when the user starts dragging the marker.
+
+		// @event movestart: Event
+		// Fired when the marker starts moving (because of dragging).
+
+		this._oldLatLng = this._marker.getLatLng();
+		this._marker
+		    .closePopup()
+		    .fire('movestart')
+		    .fire('dragstart');
+	},
+
+	_onDrag: function (e) {
+		var marker = this._marker,
+		    shadow = marker._shadow,
+		iconPos = getPosition(marker._icon),
+		    latlng = marker._map.layerPointToLatLng(iconPos);
+
+		// update shadow position
+		if (shadow) {
+			setPosition(shadow, iconPos);
+		}
+
+		marker._latlng = latlng;
+		e.latlng = latlng;
+		e.oldLatLng = this._oldLatLng;
+
+		// @event drag: Event
+		// Fired repeatedly while the user drags the marker.
+		marker
+		    .fire('move', e)
+		    .fire('drag', e);
+	},
+
+	_onDragEnd: function (e) {
+		// @event dragend: DragEndEvent
+		// Fired when the user stops dragging the marker.
+
+		// @event moveend: Event
+		// Fired when the marker stops moving (because of dragging).
+		delete this._oldLatLng;
+		this._marker
+		    .fire('moveend')
+		    .fire('dragend', e);
+	}
+});
+
+var Marker = Layer.extend({
+
+	// @section
+	// @aka Marker options
+	options: {
+		// @option icon: Icon = *
+		// Icon instance to use for rendering the marker.
+		// See [Icon documentation](#L.Icon) for details on how to customize the marker icon.
+		// If not specified, a common instance of `L.Icon.Default` is used.
+		icon: new IconDefault(),
+
+		// Option inherited from "Interactive layer" abstract class
+		interactive: true,
+
+		// @option draggable: Boolean = false
+		// Whether the marker is draggable with mouse/touch or not.
+		draggable: false,
+
+		// @option keyboard: Boolean = true
+		// Whether the marker can be tabbed to with a keyboard and clicked by pressing enter.
+		keyboard: true,
+
+		// @option title: String = ''
+		// Text for the browser tooltip that appear on marker hover (no tooltip by default).
+		title: '',
+
+		// @option alt: String = ''
+		// Text for the `alt` attribute of the icon image (useful for accessibility).
+		alt: '',
+
+		// @option zIndexOffset: Number = 0
+		// By default, marker images zIndex is set automatically based on its latitude. Use this option if you want to put the marker on top of all others (or below), specifying a high value like `1000` (or high negative value, respectively).
+		zIndexOffset: 0,
+
+		// @option opacity: Number = 1.0
+		// The opacity of the marker.
+		opacity: 1,
+
+		// @option riseOnHover: Boolean = false
+		// If `true`, the marker will get on top of others when you hover the mouse over it.
+		riseOnHover: false,
+
+		// @option riseOffset: Number = 250
+		// The z-index offset used for the `riseOnHover` feature.
+		riseOffset: 250,
+
+		// @option pane: String = 'markerPane'
+		// `Map pane` where the markers icon will be added.
+		pane: 'markerPane',
+
+		// @option bubblingMouseEvents: Boolean = false
+		// When `true`, a mouse event on this marker will trigger the same event on the map
+		// (unless [`L.DomEvent.stopPropagation`](#domevent-stoppropagation) is used).
+		bubblingMouseEvents: false
+	},
+
+	/* @section
+	 *
+	 * In addition to [shared layer methods](#Layer) like `addTo()` and `remove()` and [popup methods](#Popup) like bindPopup() you can also use the following methods:
+	 */
+
+	initialize: function (latlng, options) {
+		setOptions(this, options);
+		this._latlng = toLatLng(latlng);
+	},
+
+	onAdd: function (map) {
+		this._zoomAnimated = this._zoomAnimated && map.options.markerZoomAnimation;
+
+		if (this._zoomAnimated) {
+			map.on('zoomanim', this._animateZoom, this);
+		}
+
+		this._initIcon();
+		this.update();
+	},
+
+	onRemove: function (map) {
+		if (this.dragging && this.dragging.enabled()) {
+			this.options.draggable = true;
+			this.dragging.removeHooks();
+		}
+		delete this.dragging;
+
+		if (this._zoomAnimated) {
+			map.off('zoomanim', this._animateZoom, this);
+		}
+
+		this._removeIcon();
+		this._removeShadow();
+	},
+
+	getEvents: function () {
+		return {
+			zoom: this.update,
+			viewreset: this.update
+		};
+	},
+
+	// @method getLatLng: LatLng
+	// Returns the current geographical position of the marker.
+	getLatLng: function () {
+		return this._latlng;
+	},
+
+	// @method setLatLng(latlng: LatLng): this
+	// Changes the marker position to the given point.
+	setLatLng: function (latlng) {
+		var oldLatLng = this._latlng;
+		this._latlng = toLatLng(latlng);
+		this.update();
+
+		// @event move: Event
+		// Fired when the marker is moved via [`setLatLng`](#marker-setlatlng) or by [dragging](#marker-dragging). Old and new coordinates are included in event arguments as `oldLatLng`, `latlng`.
+		return this.fire('move', {oldLatLng: oldLatLng, latlng: this._latlng});
+	},
+
+	// @method setZIndexOffset(offset: Number): this
+	// Changes the [zIndex offset](#marker-zindexoffset) of the marker.
+	setZIndexOffset: function (offset) {
+		this.options.zIndexOffset = offset;
+		return this.update();
+	},
+
+	// @method setIcon(icon: Icon): this
+	// Changes the marker icon.
+	setIcon: function (icon) {
+
+		this.options.icon = icon;
+
+		if (this._map) {
+			this._initIcon();
+			this.update();
+		}
+
+		if (this._popup) {
+			this.bindPopup(this._popup, this._popup.options);
+		}
+
+		return this;
+	},
+
+	getElement: function () {
+		return this._icon;
+	},
+
+	update: function () {
+
+		if (this._icon) {
+			var pos = this._map.latLngToLayerPoint(this._latlng).round();
+			this._setPos(pos);
+		}
+
+		return this;
+	},
+
+	_initIcon: function () {
+		var options = this.options,
+		    classToAdd = 'leaflet-zoom-' + (this._zoomAnimated ? 'animated' : 'hide');
+
+		var icon = options.icon.createIcon(this._icon),
+		    addIcon = false;
+
+		// if we're not reusing the icon, remove the old one and init new one
+		if (icon !== this._icon) {
+			if (this._icon) {
+				this._removeIcon();
+			}
+			addIcon = true;
+
+			if (options.title) {
+				icon.title = options.title;
+			}
+			if (options.alt) {
+				icon.alt = options.alt;
+			}
+		}
+
+		addClass(icon, classToAdd);
+
+		if (options.keyboard) {
+			icon.tabIndex = '0';
+		}
+
+		this._icon = icon;
+
+		if (options.riseOnHover) {
+			this.on({
+				mouseover: this._bringToFront,
+				mouseout: this._resetZIndex
+			});
+		}
+
+		var newShadow = options.icon.createShadow(this._shadow),
+		    addShadow = false;
+
+		if (newShadow !== this._shadow) {
+			this._removeShadow();
+			addShadow = true;
+		}
+
+		if (newShadow) {
+			addClass(newShadow, classToAdd);
+			newShadow.alt = '';
+		}
+		this._shadow = newShadow;
+
+
+		if (options.opacity < 1) {
+			this._updateOpacity();
+		}
+
+
+		if (addIcon) {
+			this.getPane().appendChild(this._icon);
+		}
+		this._initInteraction();
+		if (newShadow && addShadow) {
+			this.getPane('shadowPane').appendChild(this._shadow);
+		}
+	},
+
+	_removeIcon: function () {
+		if (this.options.riseOnHover) {
+			this.off({
+				mouseover: this._bringToFront,
+				mouseout: this._resetZIndex
+			});
+		}
+
+		remove(this._icon);
+		this.removeInteractiveTarget(this._icon);
+
+		this._icon = null;
+	},
+
+	_removeShadow: function () {
+		if (this._shadow) {
+			remove(this._shadow);
+		}
+		this._shadow = null;
+	},
+
+	_setPos: function (pos) {
+		setPosition(this._icon, pos);
+
+		if (this._shadow) {
+			setPosition(this._shadow, pos);
+		}
+
+		this._zIndex = pos.y + this.options.zIndexOffset;
+
+		this._resetZIndex();
+	},
+
+	_updateZIndex: function (offset) {
+		this._icon.style.zIndex = this._zIndex + offset;
+	},
+
+	_animateZoom: function (opt) {
+		var pos = this._map._latLngToNewLayerPoint(this._latlng, opt.zoom, opt.center).round();
+
+		this._setPos(pos);
+	},
+
+	_initInteraction: function () {
+
+		if (!this.options.interactive) { return; }
+
+		addClass(this._icon, 'leaflet-interactive');
+
+		this.addInteractiveTarget(this._icon);
+
+		if (MarkerDrag) {
+			var draggable = this.options.draggable;
+			if (this.dragging) {
+				draggable = this.dragging.enabled();
+				this.dragging.disable();
+			}
+
+			this.dragging = new MarkerDrag(this);
+
+			if (draggable) {
+				this.dragging.enable();
+			}
+		}
+	},
+
+	// @method setOpacity(opacity: Number): this
+	// Changes the opacity of the marker.
+	setOpacity: function (opacity) {
+		this.options.opacity = opacity;
+		if (this._map) {
+			this._updateOpacity();
+		}
+
+		return this;
+	},
+
+	_updateOpacity: function () {
+		var opacity = this.options.opacity;
+
+		setOpacity(this._icon, opacity);
+
+		if (this._shadow) {
+			setOpacity(this._shadow, opacity);
+		}
+	},
+
+	_bringToFront: function () {
+		this._updateZIndex(this.options.riseOffset);
+	},
+
+	_resetZIndex: function () {
+		this._updateZIndex(0);
+	},
+
+	_getPopupAnchor: function () {
+		return this.options.icon.options.popupAnchor || [0, 0];
+	},
+
+	_getTooltipAnchor: function () {
+		return this.options.icon.options.tooltipAnchor || [0, 0];
+	}
+});
+
+
+// factory L.marker(latlng: LatLng, options? : Marker options)
+
+// @factory L.marker(latlng: LatLng, options? : Marker options)
+// Instantiates a Marker object given a geographical point and optionally an options object.
+
+Icon.Default = IconDefault;
+
+var LayerGroup = Layer.extend({
+
+	initialize: function (layers) {
+		this._layers = {};
+
+		var i, len;
+
+		if (layers) {
+			for (i = 0, len = layers.length; i < len; i++) {
+				this.addLayer(layers[i]);
+			}
+		}
+	},
+
+	// @method addLayer(layer: Layer): this
+	// Adds the given layer to the group.
+	addLayer: function (layer) {
+		var id = this.getLayerId(layer);
+
+		this._layers[id] = layer;
+
+		if (this._map) {
+			this._map.addLayer(layer);
+		}
+
+		return this;
+	},
+
+	// @method removeLayer(layer: Layer): this
+	// Removes the given layer from the group.
+	// @alternative
+	// @method removeLayer(id: Number): this
+	// Removes the layer with the given internal ID from the group.
+	removeLayer: function (layer) {
+		var id = layer in this._layers ? layer : this.getLayerId(layer);
+
+		if (this._map && this._layers[id]) {
+			this._map.removeLayer(this._layers[id]);
+		}
+
+		delete this._layers[id];
+
+		return this;
+	},
+
+	// @method hasLayer(layer: Layer): Boolean
+	// Returns `true` if the given layer is currently added to the group.
+	// @alternative
+	// @method hasLayer(id: Number): Boolean
+	// Returns `true` if the given internal ID is currently added to the group.
+	hasLayer: function (layer) {
+		return !!layer && (layer in this._layers || this.getLayerId(layer) in this._layers);
+	},
+
+	// @method clearLayers(): this
+	// Removes all the layers from the group.
+	clearLayers: function () {
+		for (var i in this._layers) {
+			this.removeLayer(this._layers[i]);
+		}
+		return this;
+	},
+
+	// @method invoke(methodName: String, …): this
+	// Calls `methodName` on every layer contained in this group, passing any
+	// additional parameters. Has no effect if the layers contained do not
+	// implement `methodName`.
+	invoke: function (methodName) {
+		var args = Array.prototype.slice.call(arguments, 1),
+		    i, layer;
+
+		for (i in this._layers) {
+			layer = this._layers[i];
+
+			if (layer[methodName]) {
+				layer[methodName].apply(layer, args);
+			}
+		}
+
+		return this;
+	},
+
+	onAdd: function (map) {
+		for (var i in this._layers) {
+			map.addLayer(this._layers[i]);
+		}
+	},
+
+	onRemove: function (map) {
+		for (var i in this._layers) {
+			map.removeLayer(this._layers[i]);
+		}
+	},
+
+	// @method eachLayer(fn: Function, context?: Object): this
+	// Iterates over the layers of the group, optionally specifying context of the iterator function.
+	// ```js
+	// group.eachLayer(function (layer) {
+	// 	layer.bindPopup('Hello');
+	// });
+	// ```
+	eachLayer: function (method, context) {
+		for (var i in this._layers) {
+			method.call(context, this._layers[i]);
+		}
+		return this;
+	},
+
+	// @method getLayer(id: Number): Layer
+	// Returns the layer with the given internal ID.
+	getLayer: function (id) {
+		return this._layers[id];
+	},
+
+	// @method getLayers(): Layer[]
+	// Returns an array of all the layers added to the group.
+	getLayers: function () {
+		var layers = [];
+
+		for (var i in this._layers) {
+			layers.push(this._layers[i]);
+		}
+		return layers;
+	},
+
+	// @method setZIndex(zIndex: Number): this
+	// Calls `setZIndex` on every layer contained in this group, passing the z-index.
+	setZIndex: function (zIndex) {
+		return this.invoke('setZIndex', zIndex);
+	},
+
+	// @method getLayerId(layer: Layer): Number
+	// Returns the internal ID for a layer
+	getLayerId: function (layer) {
+		return stamp(layer);
+	}
+});
+
+
+// @factory L.layerGroup(layers?: Layer[])
+// Create a layer group, optionally given an initial set of layers.
+
+var Path = Layer.extend({
+
+	// @section
+	// @aka Path options
+	options: {
+		// @option stroke: Boolean = true
+		// Whether to draw stroke along the path. Set it to `false` to disable borders on polygons or circles.
+		stroke: true,
+
+		// @option color: String = '#3388ff'
+		// Stroke color
+		color: '#3388ff',
+
+		// @option weight: Number = 3
+		// Stroke width in pixels
+		weight: 3,
+
+		// @option opacity: Number = 1.0
+		// Stroke opacity
+		opacity: 1,
+
+		// @option lineCap: String= 'round'
+		// A string that defines [shape to be used at the end](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-linecap) of the stroke.
+		lineCap: 'round',
+
+		// @option lineJoin: String = 'round'
+		// A string that defines [shape to be used at the corners](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-linejoin) of the stroke.
+		lineJoin: 'round',
+
+		// @option dashArray: String = null
+		// A string that defines the stroke [dash pattern](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-dasharray). Doesn't work on `Canvas`-powered layers in [some old browsers](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/setLineDash#Browser_compatibility).
+		dashArray: null,
+
+		// @option dashOffset: String = null
+		// A string that defines the [distance into the dash pattern to start the dash](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-dashoffset). Doesn't work on `Canvas`-powered layers in [some old browsers](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/setLineDash#Browser_compatibility).
+		dashOffset: null,
+
+		// @option fill: Boolean = depends
+		// Whether to fill the path with color. Set it to `false` to disable filling on polygons or circles.
+		fill: false,
+
+		// @option fillColor: String = *
+		// Fill color. Defaults to the value of the [`color`](#path-color) option
+		fillColor: null,
+
+		// @option fillOpacity: Number = 0.2
+		// Fill opacity.
+		fillOpacity: 0.2,
+
+		// @option fillRule: String = 'evenodd'
+		// A string that defines [how the inside of a shape](https://developer.mozilla.org/docs/Web/SVG/Attribute/fill-rule) is determined.
+		fillRule: 'evenodd',
+
+		// className: '',
+
+		// Option inherited from "Interactive layer" abstract class
+		interactive: true,
+
+		// @option bubblingMouseEvents: Boolean = true
+		// When `true`, a mouse event on this path will trigger the same event on the map
+		// (unless [`L.DomEvent.stopPropagation`](#domevent-stoppropagation) is used).
+		bubblingMouseEvents: true
+	},
+
+	beforeAdd: function (map) {
+		// Renderer is set here because we need to call renderer.getEvents
+		// before this.getEvents.
+		this._renderer = map.getRenderer(this);
+	},
+
+	onAdd: function () {
+		this._renderer._initPath(this);
+		this._reset();
+		this._renderer._addPath(this);
+	},
+
+	onRemove: function () {
+		this._renderer._removePath(this);
+	},
+
+	// @method redraw(): this
+	// Redraws the layer. Sometimes useful after you changed the coordinates that the path uses.
+	redraw: function () {
+		if (this._map) {
+			this._renderer._updatePath(this);
+		}
+		return this;
+	},
+
+	// @method setStyle(style: Path options): this
+	// Changes the appearance of a Path based on the options in the `Path options` object.
+	setStyle: function (style) {
+		setOptions(this, style);
+		if (this._renderer) {
+			this._renderer._updateStyle(this);
+		}
+		return this;
+	},
+
+	// @method bringToFront(): this
+	// Brings the layer to the top of all path layers.
+	bringToFront: function () {
+		if (this._renderer) {
+			this._renderer._bringToFront(this);
+		}
+		return this;
+	},
+
+	// @method bringToBack(): this
+	// Brings the layer to the bottom of all path layers.
+	bringToBack: function () {
+		if (this._renderer) {
+			this._renderer._bringToBack(this);
+		}
+		return this;
+	},
+
+	getElement: function () {
+		return this._path;
+	},
+
+	_reset: function () {
+		// defined in child classes
+		this._project();
+		this._update();
+	},
+
+	_clickTolerance: function () {
+		// used when doing hit detection for Canvas layers
+		return (this.options.stroke ? this.options.weight / 2 : 0) + (touch ? 10 : 0);
+	}
+});
+
+var CircleMarker = Path.extend({
+
+	// @section
+	// @aka CircleMarker options
+	options: {
+		fill: true,
+
+		// @option radius: Number = 10
+		// Radius of the circle marker, in pixels
+		radius: 10
+	},
+
+	initialize: function (latlng, options) {
+		setOptions(this, options);
+		this._latlng = toLatLng(latlng);
+		this._radius = this.options.radius;
+	},
+
+	// @method setLatLng(latLng: LatLng): this
+	// Sets the position of a circle marker to a new location.
+	setLatLng: function (latlng) {
+		this._latlng = toLatLng(latlng);
+		this.redraw();
+		return this.fire('move', {latlng: this._latlng});
+	},
+
+	// @method getLatLng(): LatLng
+	// Returns the current geographical position of the circle marker
+	getLatLng: function () {
+		return this._latlng;
+	},
+
+	// @method setRadius(radius: Number): this
+	// Sets the radius of a circle marker. Units are in pixels.
+	setRadius: function (radius) {
+		this.options.radius = this._radius = radius;
+		return this.redraw();
+	},
+
+	// @method getRadius(): Number
+	// Returns the current radius of the circle
+	getRadius: function () {
+		return this._radius;
+	},
+
+	setStyle : function (options) {
+		var radius = options && options.radius || this._radius;
+		Path.prototype.setStyle.call(this, options);
+		this.setRadius(radius);
+		return this;
+	},
+
+	_project: function () {
+		this._point = this._map.latLngToLayerPoint(this._latlng);
+		this._updateBounds();
+	},
+
+	_updateBounds: function () {
+		var r = this._radius,
+		    r2 = this._radiusY || r,
+		    w = this._clickTolerance(),
+		    p = [r + w, r2 + w];
+		this._pxBounds = new Bounds(this._point.subtract(p), this._point.add(p));
+	},
+
+	_update: function () {
+		if (this._map) {
+			this._updatePath();
+		}
+	},
+
+	_updatePath: function () {
+		this._renderer._updateCircle(this);
+	},
+
+	_empty: function () {
+		return this._radius && !this._renderer._bounds.intersects(this._pxBounds);
+	},
+
+	// Needed by the `Canvas` renderer for interactivity
+	_containsPoint: function (p) {
+		return p.distanceTo(this._point) <= this._radius + this._clickTolerance();
+	}
+});
+
+
+// @factory L.circleMarker(latlng: LatLng, options?: CircleMarker options)
+// Instantiates a circle marker object given a geographical point, and an optional options object.
+
+var Circle = CircleMarker.extend({
+
+	initialize: function (latlng, options, legacyOptions) {
+		if (typeof options === 'number') {
+			// Backwards compatibility with 0.7.x factory (latlng, radius, options?)
+			options = extend({}, legacyOptions, {radius: options});
+		}
+		setOptions(this, options);
+		this._latlng = toLatLng(latlng);
+
+		if (isNaN(this.options.radius)) { throw new Error('Circle radius cannot be NaN'); }
+
+		// @section
+		// @aka Circle options
+		// @option radius: Number; Radius of the circle, in meters.
+		this._mRadius = this.options.radius;
+	},
+
+	// @method setRadius(radius: Number): this
+	// Sets the radius of a circle. Units are in meters.
+	setRadius: function (radius) {
+		this._mRadius = radius;
+		return this.redraw();
+	},
+
+	// @method getRadius(): Number
+	// Returns the current radius of a circle. Units are in meters.
+	getRadius: function () {
+		return this._mRadius;
+	},
+
+	// @method getBounds(): LatLngBounds
+	// Returns the `LatLngBounds` of the path.
+	getBounds: function () {
+		var half = [this._radius, this._radiusY || this._radius];
+
+		return new LatLngBounds(
+			this._map.layerPointToLatLng(this._point.subtract(half)),
+			this._map.layerPointToLatLng(this._point.add(half)));
+	},
+
+	setStyle: Path.prototype.setStyle,
+
+	_project: function () {
+
+		var lng = this._latlng.lng,
+		    lat = this._latlng.lat,
+		    map = this._map,
+		    crs = map.options.crs;
+
+		if (crs.distance === Earth.distance) {
+			var d = Math.PI / 180,
+			    latR = (this._mRadius / Earth.R) / d,
+			    top = map.project([lat + latR, lng]),
+			    bottom = map.project([lat - latR, lng]),
+			    p = top.add(bottom).divideBy(2),
+			    lat2 = map.unproject(p).lat,
+			    lngR = Math.acos((Math.cos(latR * d) - Math.sin(lat * d) * Math.sin(lat2 * d)) /
+			            (Math.cos(lat * d) * Math.cos(lat2 * d))) / d;
+
+			if (isNaN(lngR) || lngR === 0) {
+				lngR = latR / Math.cos(Math.PI / 180 * lat); // Fallback for edge case, #2425
+			}
+
+			this._point = p.subtract(map.getPixelOrigin());
+			this._radius = isNaN(lngR) ? 0 : Math.max(Math.round(p.x - map.project([lat2, lng - lngR]).x), 1);
+			this._radiusY = Math.max(Math.round(p.y - top.y), 1);
+
+		} else {
+			var latlng2 = crs.unproject(crs.project(this._latlng).subtract([this._mRadius, 0]));
+
+			this._point = map.latLngToLayerPoint(this._latlng);
+			this._radius = this._point.x - map.latLngToLayerPoint(latlng2).x;
+		}
+
+		this._updateBounds();
+	}
+});
+
+// @factory L.circle(latlng: LatLng, options?: Circle options)
+// Instantiates a circle object given a geographical point, and an options object
+// which contains the circle radius.
+// @alternative
+// @factory L.circle(latlng: LatLng, radius: Number, options?: Circle options)
+// Obsolete way of instantiating a circle, for compatibility with 0.7.x code.
+// Do not use in new applications or plugins.
+
+var Polyline = Path.extend({
+
+	// @section
+	// @aka Polyline options
+	options: {
+		// @option smoothFactor: Number = 1.0
+		// How much to simplify the polyline on each zoom level. More means
+		// better performance and smoother look, and less means more accurate representation.
+		smoothFactor: 1.0,
+
+		// @option noClip: Boolean = false
+		// Disable polyline clipping.
+		noClip: false
+	},
+
+	initialize: function (latlngs, options) {
+		setOptions(this, options);
+		this._setLatLngs(latlngs);
+	},
+
+	// @method getLatLngs(): LatLng[]
+	// Returns an array of the points in the path, or nested arrays of points in case of multi-polyline.
+	getLatLngs: function () {
+		return this._latlngs;
+	},
+
+	// @method setLatLngs(latlngs: LatLng[]): this
+	// Replaces all the points in the polyline with the given array of geographical points.
+	setLatLngs: function (latlngs) {
+		this._setLatLngs(latlngs);
+		return this.redraw();
+	},
+
+	// @method isEmpty(): Boolean
+	// Returns `true` if the Polyline has no LatLngs.
+	isEmpty: function () {
+		return !this._latlngs.length;
+	},
+
+	closestLayerPoint: function (p) {
+		var minDistance = Infinity,
+		    minPoint = null,
+		    closest = _sqClosestPointOnSegment,
+		    p1, p2;
+
+		for (var j = 0, jLen = this._parts.length; j < jLen; j++) {
+			var points = this._parts[j];
+
+			for (var i = 1, len = points.length; i < len; i++) {
+				p1 = points[i - 1];
+				p2 = points[i];
+
+				var sqDist = closest(p, p1, p2, true);
+
+				if (sqDist < minDistance) {
+					minDistance = sqDist;
+					minPoint = closest(p, p1, p2);
+				}
+			}
+		}
+		if (minPoint) {
+			minPoint.distance = Math.sqrt(minDistance);
+		}
+		return minPoint;
+	},
+
+	// @method getCenter(): LatLng
+	// Returns the center ([centroid](http://en.wikipedia.org/wiki/Centroid)) of the polyline.
+	getCenter: function () {
+		// throws error when not yet added to map as this center calculation requires projected coordinates
+		if (!this._map) {
+			throw new Error('Must add layer to map before using getCenter()');
+		}
+
+		var i, halfDist, segDist, dist, p1, p2, ratio,
+		    points = this._rings[0],
+		    len = points.length;
+
+		if (!len) { return null; }
+
+		// polyline centroid algorithm; only uses the first ring if there are multiple
+
+		for (i = 0, halfDist = 0; i < len - 1; i++) {
+			halfDist += points[i].distanceTo(points[i + 1]) / 2;
+		}
+
+		// The line is so small in the current view that all points are on the same pixel.
+		if (halfDist === 0) {
+			return this._map.layerPointToLatLng(points[0]);
+		}
+
+		for (i = 0, dist = 0; i < len - 1; i++) {
+			p1 = points[i];
+			p2 = points[i + 1];
+			segDist = p1.distanceTo(p2);
+			dist += segDist;
+
+			if (dist > halfDist) {
+				ratio = (dist - halfDist) / segDist;
+				return this._map.layerPointToLatLng([
+					p2.x - ratio * (p2.x - p1.x),
+					p2.y - ratio * (p2.y - p1.y)
+				]);
+			}
+		}
+	},
+
+	// @method getBounds(): LatLngBounds
+	// Returns the `LatLngBounds` of the path.
+	getBounds: function () {
+		return this._bounds;
+	},
+
+	// @method addLatLng(latlng: LatLng, latlngs? LatLng[]): this
+	// Adds a given point to the polyline. By default, adds to the first ring of
+	// the polyline in case of a multi-polyline, but can be overridden by passing
+	// a specific ring as a LatLng array (that you can earlier access with [`getLatLngs`](#polyline-getlatlngs)).
+	addLatLng: function (latlng, latlngs) {
+		latlngs = latlngs || this._defaultShape();
+		latlng = toLatLng(latlng);
+		latlngs.push(latlng);
+		this._bounds.extend(latlng);
+		return this.redraw();
+	},
+
+	_setLatLngs: function (latlngs) {
+		this._bounds = new LatLngBounds();
+		this._latlngs = this._convertLatLngs(latlngs);
+	},
+
+	_defaultShape: function () {
+		return isFlat$1(this._latlngs) ? this._latlngs : this._latlngs[0];
+	},
+
+	// recursively convert latlngs input into actual LatLng instances; calculate bounds along the way
+	_convertLatLngs: function (latlngs) {
+		var result = [],
+		    flat = isFlat$1(latlngs);
+
+		for (var i = 0, len = latlngs.length; i < len; i++) {
+			if (flat) {
+				result[i] = toLatLng(latlngs[i]);
+				this._bounds.extend(result[i]);
+			} else {
+				result[i] = this._convertLatLngs(latlngs[i]);
+			}
+		}
+
+		return result;
+	},
+
+	_project: function () {
+		var pxBounds = new Bounds();
+		this._rings = [];
+		this._projectLatlngs(this._latlngs, this._rings, pxBounds);
+
+		var w = this._clickTolerance(),
+		    p = new Point(w, w);
+
+		if (this._bounds.isValid() && pxBounds.isValid()) {
+			pxBounds.min._subtract(p);
+			pxBounds.max._add(p);
+			this._pxBounds = pxBounds;
+		}
+	},
+
+	// recursively turns latlngs into a set of rings with projected coordinates
+	_projectLatlngs: function (latlngs, result, projectedBounds) {
+		var flat = latlngs[0] instanceof LatLng,
+		    len = latlngs.length,
+		    i, ring;
+
+		if (flat) {
+			ring = [];
+			for (i = 0; i < len; i++) {
+				ring[i] = this._map.latLngToLayerPoint(latlngs[i]);
+				projectedBounds.extend(ring[i]);
+			}
+			result.push(ring);
+		} else {
+			for (i = 0; i < len; i++) {
+				this._projectLatlngs(latlngs[i], result, projectedBounds);
+			}
+		}
+	},
+
+	// clip polyline by renderer bounds so that we have less to render for performance
+	_clipPoints: function () {
+		var bounds = this._renderer._bounds;
+
+		this._parts = [];
+		if (!this._pxBounds || !this._pxBounds.intersects(bounds)) {
+			return;
+		}
+
+		if (this.options.noClip) {
+			this._parts = this._rings;
+			return;
+		}
+
+		var parts = this._parts,
+		    i, j, k, len, len2, segment, points;
+
+		for (i = 0, k = 0, len = this._rings.length; i < len; i++) {
+			points = this._rings[i];
+
+			for (j = 0, len2 = points.length; j < len2 - 1; j++) {
+				segment = clipSegment(points[j], points[j + 1], bounds, j, true);
+
+				if (!segment) { continue; }
+
+				parts[k] = parts[k] || [];
+				parts[k].push(segment[0]);
+
+				// if segment goes out of screen, or it's the last one, it's the end of the line part
+				if ((segment[1] !== points[j + 1]) || (j === len2 - 2)) {
+					parts[k].push(segment[1]);
+					k++;
+				}
+			}
+		}
+	},
+
+	// simplify each clipped part of the polyline for performance
+	_simplifyPoints: function () {
+		var parts = this._parts,
+		    tolerance = this.options.smoothFactor;
+
+		for (var i = 0, len = parts.length; i < len; i++) {
+			parts[i] = simplify(parts[i], tolerance);
+		}
+	},
+
+	_update: function () {
+		if (!this._map) { return; }
+
+		this._clipPoints();
+		this._simplifyPoints();
+		this._updatePath();
+	},
+
+	_updatePath: function () {
+		this._renderer._updatePoly(this);
+	},
+
+	// Needed by the `Canvas` renderer for interactivity
+	_containsPoint: function (p, closed) {
+		var i, j, k, len, len2, part,
+		    w = this._clickTolerance();
+
+		if (!this._pxBounds || !this._pxBounds.contains(p)) { return false; }
+
+		// hit detection for polylines
+		for (i = 0, len = this._parts.length; i < len; i++) {
+			part = this._parts[i];
+
+			for (j = 0, len2 = part.length, k = len2 - 1; j < len2; k = j++) {
+				if (!closed && (j === 0)) { continue; }
+
+				if (pointToSegmentDistance(p, part[k], part[j]) <= w) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+});
+
+// @factory L.polyline(latlngs: LatLng[], options?: Polyline options)
+// Instantiates a polyline object given an array of geographical points and
+// optionally an options object. You can create a `Polyline` object with
+// multiple separate lines (`MultiPolyline`) by passing an array of arrays
+// of geographic points.
+function polyline(latlngs, options) {
+	return new Polyline(latlngs, options);
+}
+
+// Retrocompat. Allow plugins to support Leaflet versions before and after 1.1.
+Polyline._flat = _flat;
+
+function clipPolygon(points, bounds, round) {
+	var clippedPoints,
+	    edges = [1, 4, 2, 8],
+	    i, j, k,
+	    a, b,
+	    len, edge, p;
+
+	for (i = 0, len = points.length; i < len; i++) {
+		points[i]._code = _getBitCode(points[i], bounds);
+	}
+
+	// for each edge (left, bottom, right, top)
+	for (k = 0; k < 4; k++) {
+		edge = edges[k];
+		clippedPoints = [];
+
+		for (i = 0, len = points.length, j = len - 1; i < len; j = i++) {
+			a = points[i];
+			b = points[j];
+
+			// if a is inside the clip window
+			if (!(a._code & edge)) {
+				// if b is outside the clip window (a->b goes out of screen)
+				if (b._code & edge) {
+					p = _getEdgeIntersection(b, a, edge, bounds, round);
+					p._code = _getBitCode(p, bounds);
+					clippedPoints.push(p);
+				}
+				clippedPoints.push(a);
+
+			// else if b is inside the clip window (a->b enters the screen)
+			} else if (!(b._code & edge)) {
+				p = _getEdgeIntersection(b, a, edge, bounds, round);
+				p._code = _getBitCode(p, bounds);
+				clippedPoints.push(p);
+			}
+		}
+		points = clippedPoints;
+	}
+
+	return points;
+}
+
+var Polygon = Polyline.extend({
+
+	options: {
+		fill: true
+	},
+
+	isEmpty: function () {
+		return !this._latlngs.length || !this._latlngs[0].length;
+	},
+
+	getCenter: function () {
+		// throws error when not yet added to map as this center calculation requires projected coordinates
+		if (!this._map) {
+			throw new Error('Must add layer to map before using getCenter()');
+		}
+
+		var i, j, p1, p2, f, area, x, y, center,
+		    points = this._rings[0],
+		    len = points.length;
+
+		if (!len) { return null; }
+
+		// polygon centroid algorithm; only uses the first ring if there are multiple
+
+		area = x = y = 0;
+
+		for (i = 0, j = len - 1; i < len; j = i++) {
+			p1 = points[i];
+			p2 = points[j];
+
+			f = p1.y * p2.x - p2.y * p1.x;
+			x += (p1.x + p2.x) * f;
+			y += (p1.y + p2.y) * f;
+			area += f * 3;
+		}
+
+		if (area === 0) {
+			// Polygon is so small that all points are on same pixel.
+			center = points[0];
+		} else {
+			center = [x / area, y / area];
+		}
+		return this._map.layerPointToLatLng(center);
+	},
+
+	_convertLatLngs: function (latlngs) {
+		var result = Polyline.prototype._convertLatLngs.call(this, latlngs),
+		    len = result.length;
+
+		// remove last point if it equals first one
+		if (len >= 2 && result[0] instanceof LatLng && result[0].equals(result[len - 1])) {
+			result.pop();
+		}
+		return result;
+	},
+
+	_setLatLngs: function (latlngs) {
+		Polyline.prototype._setLatLngs.call(this, latlngs);
+		if (isFlat$1(this._latlngs)) {
+			this._latlngs = [this._latlngs];
+		}
+	},
+
+	_defaultShape: function () {
+		return isFlat$1(this._latlngs[0]) ? this._latlngs[0] : this._latlngs[0][0];
+	},
+
+	_clipPoints: function () {
+		// polygons need a different clipping algorithm so we redefine that
+
+		var bounds = this._renderer._bounds,
+		    w = this.options.weight,
+		    p = new Point(w, w);
+
+		// increase clip padding by stroke width to avoid stroke on clip edges
+		bounds = new Bounds(bounds.min.subtract(p), bounds.max.add(p));
+
+		this._parts = [];
+		if (!this._pxBounds || !this._pxBounds.intersects(bounds)) {
+			return;
+		}
+
+		if (this.options.noClip) {
+			this._parts = this._rings;
+			return;
+		}
+
+		for (var i = 0, len = this._rings.length, clipped; i < len; i++) {
+			clipped = clipPolygon(this._rings[i], bounds, true);
+			if (clipped.length) {
+				this._parts.push(clipped);
+			}
+		}
+	},
+
+	_updatePath: function () {
+		this._renderer._updatePoly(this, true);
+	},
+
+	// Needed by the `Canvas` renderer for interactivity
+	_containsPoint: function (p) {
+		var inside = false,
+		    part, p1, p2, i, j, k, len, len2;
+
+		if (!this._pxBounds.contains(p)) { return false; }
+
+		// ray casting algorithm for detecting if point is in polygon
+		for (i = 0, len = this._parts.length; i < len; i++) {
+			part = this._parts[i];
+
+			for (j = 0, len2 = part.length, k = len2 - 1; j < len2; k = j++) {
+				p1 = part[j];
+				p2 = part[k];
+
+				if (((p1.y > p.y) !== (p2.y > p.y)) && (p.x < (p2.x - p1.x) * (p.y - p1.y) / (p2.y - p1.y) + p1.x)) {
+					inside = !inside;
+				}
+			}
+		}
+
+		// also check if it's on polygon stroke
+		return inside || Polyline.prototype._containsPoint.call(this, p, true);
+	}
+
+});
+
+
+// @factory L.polygon(latlngs: LatLng[], options?: Polyline options)
+
+var Rectangle = Polygon.extend({
+	initialize: function (latLngBounds, options) {
+		Polygon.prototype.initialize.call(this, this._boundsToLatLngs(latLngBounds), options);
+	},
+
+	// @method setBounds(latLngBounds: LatLngBounds): this
+	// Redraws the rectangle with the passed bounds.
+	setBounds: function (latLngBounds) {
+		return this.setLatLngs(this._boundsToLatLngs(latLngBounds));
+	},
+
+	_boundsToLatLngs: function (latLngBounds) {
+		latLngBounds = toLatLngBounds(latLngBounds);
+		return [
+			latLngBounds.getSouthWest(),
+			latLngBounds.getNorthWest(),
+			latLngBounds.getNorthEast(),
+			latLngBounds.getSouthEast()
+		];
+	}
+});
+
+
+// @factory L.rectangle(latLngBounds: LatLngBounds, options?: Polyline options)
+
+var Editable = Evented.extend({
+
+    statics: {
+        FORWARD: 1,
+        BACKWARD: -1
+    },
+
+    options: {
+
+        // You can pass them when creating a map using the `editOptions` key.
+        // 🍂option zIndex: int = 1000
+        // The default zIndex of the editing tools.
+        zIndex: 1000,
+
+        // 🍂option polygonClass: class = L.Polygon
+        // Class to be used when creating a new Polygon.
+        polygonClass: Polygon,
+
+        // 🍂option polylineClass: class = L.Polyline
+        // Class to be used when creating a new Polyline.
+        polylineClass: Polyline,
+
+        // 🍂option markerClass: class = Marker
+        // Class to be used when creating a new Marker.
+        markerClass: Marker,
+
+        // 🍂option rectangleClass: class = L.Rectangle
+        // Class to be used when creating a new Rectangle.
+        rectangleClass: Rectangle,
+
+        // 🍂option circleClass: class = L.Circle
+        // Class to be used when creating a new Circle.
+        circleClass: Circle,
+
+        // 🍂option drawingCSSClass: string = 'leaflet-editable-drawing'
+        // CSS class to be added to the map container while drawing.
+        drawingCSSClass: 'leaflet-editable-drawing',
+
+        // 🍂option drawingCursor: const = 'crosshair'
+        // Cursor mode set to the map while drawing.
+        drawingCursor: 'crosshair',
+
+        // 🍂option editLayer: Layer = new LayerGroup()
+        // Layer used to store edit tools (vertex, line guide…).
+        editLayer: undefined,
+
+        // 🍂option featuresLayer: Layer = new LayerGroup()
+        // Default layer used to store drawn features (Marker, Polyline…).
+        featuresLayer: undefined,
+
+        // 🍂option polylineEditorClass: class = PolylineEditor
+        // Class to be used as Polyline editor.
+        polylineEditorClass: undefined,
+
+        // 🍂option polygonEditorClass: class = PolygonEditor
+        // Class to be used as Polygon editor.
+        polygonEditorClass: undefined,
+
+        // 🍂option markerEditorClass: class = MarkerEditor
+        // Class to be used as Marker editor.
+        markerEditorClass: undefined,
+
+        // 🍂option rectangleEditorClass: class = RectangleEditor
+        // Class to be used as Rectangle editor.
+        rectangleEditorClass: undefined,
+
+        // 🍂option circleEditorClass: class = CircleEditor
+        // Class to be used as Circle editor.
+        circleEditorClass: undefined,
+
+        // 🍂option lineGuideOptions: hash = {}
+        // Options to be passed to the line guides.
+        lineGuideOptions: {},
+
+        // 🍂option skipMiddleMarkers: boolean = false
+        // Set this to true if you don't want middle markers.
+        skipMiddleMarkers: false
+
+    },
+
+    initialize: function (map, options) {
+        setOptions(this, options);
+        this._lastZIndex = this.options.zIndex;
+        this.map = map;
+        this.editLayer = this.createEditLayer();
+        this.featuresLayer = this.createFeaturesLayer();
+        this.forwardLineGuide = this.createLineGuide();
+        this.backwardLineGuide = this.createLineGuide();
+    },
+
+    fireAndForward: function (type, e) {
+        e = e || {};
+        e.editTools = this;
+        this.fire(type, e);
+        this.map.fire(type, e);
+    },
+
+    createLineGuide: function () {
+        var options = extend({dashArray: '5,10', weight: 1, interactive: false}, this.options.lineGuideOptions);
+        return polyline([], options);
+    },
+
+    createVertexIcon: function (options) {
+        return touch ? new Editable.TouchVertexIcon(options) : new Editable.VertexIcon(options);
+    },
+
+    createEditLayer: function () {
+        return this.options.editLayer || new LayerGroup().addTo(this.map);
+    },
+
+    createFeaturesLayer: function () {
+        return this.options.featuresLayer || new LayerGroup().addTo(this.map);
+    },
+
+    moveForwardLineGuide: function (latlng) {
+        if (this.forwardLineGuide._latlngs.length) {
+            this.forwardLineGuide._latlngs[1] = latlng;
+            this.forwardLineGuide._bounds.extend(latlng);
+            this.forwardLineGuide.redraw();
+        }
+    },
+
+    moveBackwardLineGuide: function (latlng) {
+        if (this.backwardLineGuide._latlngs.length) {
+            this.backwardLineGuide._latlngs[1] = latlng;
+            this.backwardLineGuide._bounds.extend(latlng);
+            this.backwardLineGuide.redraw();
+        }
+    },
+
+    anchorForwardLineGuide: function (latlng) {
+        this.forwardLineGuide._latlngs[0] = latlng;
+        this.forwardLineGuide._bounds.extend(latlng);
+        this.forwardLineGuide.redraw();
+    },
+
+    anchorBackwardLineGuide: function (latlng) {
+        this.backwardLineGuide._latlngs[0] = latlng;
+        this.backwardLineGuide._bounds.extend(latlng);
+        this.backwardLineGuide.redraw();
+    },
+
+    attachForwardLineGuide: function () {
+        this.editLayer.addLayer(this.forwardLineGuide);
+    },
+
+    attachBackwardLineGuide: function () {
+        this.editLayer.addLayer(this.backwardLineGuide);
+    },
+
+    detachForwardLineGuide: function () {
+        this.forwardLineGuide.setLatLngs([]);
+        this.editLayer.removeLayer(this.forwardLineGuide);
+    },
+
+    detachBackwardLineGuide: function () {
+        this.backwardLineGuide.setLatLngs([]);
+        this.editLayer.removeLayer(this.backwardLineGuide);
+    },
+
+    blockEvents: function () {
+        // Hack: force map not to listen to other layers events while drawing.
+        if (!this._oldTargets) {
+            this._oldTargets = this.map._targets;
+            this.map._targets = {};
+        }
+    },
+
+    unblockEvents: function () {
+        if (this._oldTargets) {
+            // Reset, but keep targets created while drawing.
+            this.map._targets = extend(this.map._targets, this._oldTargets);
+            delete this._oldTargets;
+        }
+    },
+
+    registerForDrawing: function (editor) {
+        if (this._drawingEditor) this.unregisterForDrawing(this._drawingEditor);
+        this.blockEvents();
+        editor.reset();  // Make sure editor tools still receive events.
+        this._drawingEditor = editor;
+        this.map.on('mousemove touchmove', editor.onDrawingMouseMove, editor);
+        this.map.on('mousedown', this.onMousedown, this);
+        this.map.on('mouseup', this.onMouseup, this);
+        addClass(this.map._container, this.options.drawingCSSClass);
+        this.defaultMapCursor = this.map._container.style.cursor;
+        this.map._container.style.cursor = this.options.drawingCursor;
+    },
+
+    unregisterForDrawing: function (editor) {
+        this.unblockEvents();
+        removeClass(this.map._container, this.options.drawingCSSClass);
+        this.map._container.style.cursor = this.defaultMapCursor;
+        editor = editor || this._drawingEditor;
+        if (!editor) return;
+        this.map.off('mousemove touchmove', editor.onDrawingMouseMove, editor);
+        this.map.off('mousedown', this.onMousedown, this);
+        this.map.off('mouseup', this.onMouseup, this);
+        if (editor !== this._drawingEditor) return;
+        delete this._drawingEditor;
+        if (editor._drawing) editor.cancelDrawing();
+    },
+
+    onMousedown: function (e) {
+        this._mouseDown = e;
+        this._drawingEditor.onDrawingMouseDown(e);
+    },
+
+    onMouseup: function (e) {
+        if (this._mouseDown) {
+            var editor = this._drawingEditor,
+                mouseDown = this._mouseDown;
+            this._mouseDown = null;
+            editor.onDrawingMouseUp(e);
+            if (this._drawingEditor !== editor) return;  // onDrawingMouseUp may call unregisterFromDrawing.
+            var origin = toPoint(mouseDown.originalEvent.clientX, mouseDown.originalEvent.clientY);
+            var distance = toPoint(e.originalEvent.clientX, e.originalEvent.clientY).distanceTo(origin);
+            if (Math.abs(distance) < 9 * (window.devicePixelRatio || 1)) this._drawingEditor.onDrawingClick(e);
+        }
+    },
+
+    // 🍂section Public methods
+    // You will generally access them by the `map.editTools`
+    // instance:
+    //
+    // `map.editTools.startPolyline();`
+
+    // 🍂method drawing(): boolean
+    // Return true if any drawing action is ongoing.
+    drawing: function () {
+        return this._drawingEditor && this._drawingEditor.drawing();
+    },
+
+    // 🍂method stopDrawing()
+    // When you need to stop any ongoing drawing, without needing to know which editor is active.
+    stopDrawing: function () {
+        this.unregisterForDrawing();
+    },
+
+    // 🍂method commitDrawing()
+    // When you need to commit any ongoing drawing, without needing to know which editor is active.
+    commitDrawing: function (e) {
+        if (!this._drawingEditor) return;
+        this._drawingEditor.commitDrawing(e);
+    },
+
+    connectCreatedToMap: function (layer) {
+        return this.featuresLayer.addLayer(layer);
+    },
+
+    // 🍂method startPolyline(latlng: L.LatLng, options: hash): L.Polyline
+    // Start drawing a Polyline. If `latlng` is given, a first point will be added. In any case, continuing on user click.
+    // If `options` is given, it will be passed to the Polyline class constructor.
+    startPolyline: function (latlng, options) {
+        var line = this.createPolyline([], options);
+        line.enableEdit(this.map).newShape(latlng);
+        return line;
+    },
+
+    // 🍂method startPolygon(latlng: L.LatLng, options: hash): L.Polygon
+    // Start drawing a Polygon. If `latlng` is given, a first point will be added. In any case, continuing on user click.
+    // If `options` is given, it will be passed to the Polygon class constructor.
+    startPolygon: function (latlng, options) {
+        var polygon$$1 = this.createPolygon([], options);
+        polygon$$1.enableEdit(this.map).newShape(latlng);
+        return polygon$$1;
+    },
+
+    // 🍂method startMarker(latlng: L.LatLng, options: hash): L.Marker
+    // Start adding a Marker. If `latlng` is given, the Marker will be shown first at this point.
+    // In any case, it will follow the user mouse, and will have a final `latlng` on next click (or touch).
+    // If `options` is given, it will be passed to the Marker class constructor.
+    startMarker: function (latlng, options) {
+        latlng = latlng || this.map.getCenter().clone();
+        var marker$$1 = this.createMarker(latlng, options);
+        marker$$1.enableEdit(this.map).startDrawing();
+        return marker$$1;
+    },
+
+    // 🍂method startRectangle(latlng: L.LatLng, options: hash): L.Rectangle
+    // Start drawing a Rectangle. If `latlng` is given, the Rectangle anchor will be added. In any case, continuing on user drag.
+    // If `options` is given, it will be passed to the Rectangle class constructor.
+    startRectangle: function(latlng, options) {
+        var corner = latlng || toLatLng([0, 0]);
+        var bounds = toLatLngBounds(corner, corner);
+        var rectangle$$1 = this.createRectangle(bounds, options);
+        rectangle$$1.enableEdit(this.map).startDrawing();
+        return rectangle$$1;
+    },
+
+    // 🍂method startCircle(latlng: L.LatLng, options: hash): L.Circle
+    // Start drawing a Circle. If `latlng` is given, the Circle anchor will be added. In any case, continuing on user drag.
+    // If `options` is given, it will be passed to the Circle class constructor.
+    startCircle: function (latlng, options) {
+        latlng = latlng || this.map.getCenter().clone();
+        var circle$$1 = this.createCircle(latlng, options);
+        circle$$1.enableEdit(this.map).startDrawing();
+        return circle$$1;
+    },
+
+    startHole: function (editor, latlng) {
+        editor.newHole(latlng);
+    },
+
+    createLayer: function (klass, latlngs, options) {
+        options = extend({editOptions: {editTools: this}}, options);
+        var layer = new klass(latlngs, options);
+        // 🍂namespace Editable
+        // 🍂event editable:created: LayerEvent
+        // Fired when a new feature (Marker, Polyline…) is created.
+        this.fireAndForward('editable:created', {layer: layer});
+        return layer;
+    },
+
+    createPolyline: function (latlngs, options) {
+        return this.createLayer(options && options.polylineClass || this.options.polylineClass, latlngs, options);
+    },
+
+    createPolygon: function (latlngs, options) {
+        return this.createLayer(options && options.polygonClass || this.options.polygonClass, latlngs, options);
+    },
+
+    createMarker: function (latlng, options) {
+        return this.createLayer(options && options.markerClass || this.options.markerClass, latlng, options);
+    },
+
+    createRectangle: function (bounds, options) {
+        return this.createLayer(options && options.rectangleClass || this.options.rectangleClass, bounds, options);
+    },
+
+    createCircle: function (latlng, options) {
+        return this.createLayer(options && options.circleClass || this.options.circleClass, latlng, options);
+    }
+
+});
+
+extend(Editable, {
+
+    makeCancellable: function (e) {
+        e.cancel = function () {
+            e._cancelled = true;
+        };
+    }
+
+});
+
+// 🍂namespace Map; 🍂class Map
+// Leaflet.Editable add options and events to the `L.Map` object.
+// See `Editable` events for the list of events fired on the Map.
+// 🍂example
+//
+// ```js
+// var map = L.map('map', {
+//  editable: true,
+//  editOptions: {
+//    …
+// }
+// });
+// ```
+// 🍂section Editable Map Options
+Map$1.mergeOptions({
+
+    // 🍂namespace Map
+    // 🍂section Map Options
+    // 🍂option editToolsClass: class = Editable
+    // Class to be used as vertex, for path editing.
+    editToolsClass: Editable,
+
+    // 🍂option editable: boolean = false
+    // Whether to create a Editable instance at map init.
+    editable: false,
+
+    // 🍂option editOptions: hash = {}
+    // Options to pass to Editable when instanciating.
+    editOptions: {}
+
+});
+
+Map$1.addInitHook(function () {
+
+    this.whenReady(function () {
+        if (this.options.editable) {
+            this.editTools = new this.options.editToolsClass(this, this.options.editOptions);
+        }
+    });
+
+});
+
+Editable.VertexIcon = DivIcon.extend({
+
+    options: {
+        iconSize: toPoint(8, 8)
+    }
+
+});
+
+Editable.TouchVertexIcon = Editable.VertexIcon.extend({
+
+    options: {
+        iconSize: toPoint(20, 20)
+    }
+
+});
+
+
+// 🍂namespace Editable; 🍂class VertexMarker; Handler for dragging path vertices.
+Editable.VertexMarker = Marker.extend({
+
+    options: {
+        draggable: true,
+        className: 'leaflet-div-icon leaflet-vertex-icon'
+    },
+
+
+    // 🍂section Public methods
+    // The marker used to handle path vertex. You will usually interact with a `VertexMarker`
+    // instance when listening for events like `editable:vertex:ctrlclick`.
+
+    initialize: function (latlng, latlngs, editor, options) {
+        // We don't use this._latlng, because on drag Leaflet replace it while
+        // we want to keep reference.
+        this.latlng = latlng;
+        this.latlngs = latlngs;
+        this.editor = editor;
+        Marker.prototype.initialize.call(this, latlng, options);
+        this.options.icon = this.editor.tools.createVertexIcon({className: this.options.className});
+        this.latlng.__vertex = this;
+        this.editor.editLayer.addLayer(this);
+        this.setZIndexOffset(editor.tools._lastZIndex + 1);
+    },
+
+    onAdd: function (map) {
+        Marker.prototype.onAdd.call(this, map);
+        this.on('drag', this.onDrag);
+        this.on('dragstart', this.onDragStart);
+        this.on('dragend', this.onDragEnd);
+        this.on('mouseup', this.onMouseup);
+        this.on('click', this.onClick);
+        this.on('contextmenu', this.onContextMenu);
+        this.on('mousedown touchstart', this.onMouseDown);
+        this.addMiddleMarkers();
+    },
+
+    onRemove: function (map) {
+        if (this.middleMarker) this.middleMarker.delete();
+        delete this.latlng.__vertex;
+        this.off('drag', this.onDrag);
+        this.off('dragstart', this.onDragStart);
+        this.off('dragend', this.onDragEnd);
+        this.off('mouseup', this.onMouseup);
+        this.off('click', this.onClick);
+        this.off('contextmenu', this.onContextMenu);
+        this.off('mousedown touchstart', this.onMouseDown);
+        Marker.prototype.onRemove.call(this, map);
+    },
+
+    onDrag: function (e) {
+        e.vertex = this;
+        this.editor.onVertexMarkerDrag(e);
+        var iconPos = getPosition(this._icon),
+            latlng = this._map.layerPointToLatLng(iconPos);
+        this.latlng.update(latlng);
+        this._latlng = this.latlng;  // Push back to Leaflet our reference.
+        this.editor.refresh();
+        if (this.middleMarker) this.middleMarker.updateLatLng();
+        var next = this.getNext();
+        if (next && next.middleMarker) next.middleMarker.updateLatLng();
+    },
+
+    onDragStart: function (e) {
+        e.vertex = this;
+        this.editor.onVertexMarkerDragStart(e);
+    },
+
+    onDragEnd: function (e) {
+        e.vertex = this;
+        this.editor.onVertexMarkerDragEnd(e);
+    },
+
+    onClick: function (e) {
+        e.vertex = this;
+        this.editor.onVertexMarkerClick(e);
+    },
+
+    onMouseup: function (e) {
+        stop(e);
+        e.vertex = this;
+        this.editor.map.fire('mouseup', e);
+    },
+
+    onContextMenu: function (e) {
+        e.vertex = this;
+        this.editor.onVertexMarkerContextMenu(e);
+    },
+
+    onMouseDown: function (e) {
+        e.vertex = this;
+        this.editor.onVertexMarkerMouseDown(e);
+    },
+
+    // 🍂method delete()
+    // Delete a vertex and the related LatLng.
+    delete: function () {
+        var next = this.getNext();  // Compute before changing latlng
+        this.latlngs.splice(this.getIndex(), 1);
+        this.editor.editLayer.removeLayer(this);
+        this.editor.onVertexDeleted({latlng: this.latlng, vertex: this});
+        if (!this.latlngs.length) this.editor.deleteShape(this.latlngs);
+        if (next) next.resetMiddleMarker();
+        this.editor.refresh();
+    },
+
+    // 🍂method getIndex(): int
+    // Get the index of the current vertex among others of the same LatLngs group.
+    getIndex: function () {
+        return this.latlngs.indexOf(this.latlng);
+    },
+
+    // 🍂method getLastIndex(): int
+    // Get last vertex index of the LatLngs group of the current vertex.
+    getLastIndex: function () {
+        return this.latlngs.length - 1;
+    },
+
+    // 🍂method getPrevious(): VertexMarker
+    // Get the previous VertexMarker in the same LatLngs group.
+    getPrevious: function () {
+        if (this.latlngs.length < 2) return;
+        var index = this.getIndex(),
+            previousIndex = index - 1;
+        if (index === 0 && this.editor.CLOSED) previousIndex = this.getLastIndex();
+        var previous = this.latlngs[previousIndex];
+        if (previous) return previous.__vertex;
+    },
+
+    // 🍂method getNext(): VertexMarker
+    // Get the next VertexMarker in the same LatLngs group.
+    getNext: function () {
+        if (this.latlngs.length < 2) return;
+        var index = this.getIndex(),
+            nextIndex = index + 1;
+        if (index === this.getLastIndex() && this.editor.CLOSED) nextIndex = 0;
+        var next = this.latlngs[nextIndex];
+        if (next) return next.__vertex;
+    },
+
+    addMiddleMarker: function (previous) {
+        if (!this.editor.hasMiddleMarkers()) return;
+        previous = previous || this.getPrevious();
+        if (previous && !this.middleMarker) this.middleMarker = this.editor.addMiddleMarker(previous, this, this.latlngs, this.editor);
+    },
+
+    addMiddleMarkers: function () {
+        if (!this.editor.hasMiddleMarkers()) return;
+        var previous = this.getPrevious();
+        if (previous) this.addMiddleMarker(previous);
+        var next = this.getNext();
+        if (next) next.resetMiddleMarker();
+    },
+
+    resetMiddleMarker: function () {
+        if (this.middleMarker) this.middleMarker.delete();
+        this.addMiddleMarker();
+    },
+
+    // 🍂method split()
+    // Split the vertex LatLngs group at its index, if possible.
+    split: function () {
+        if (!this.editor.splitShape) return;  // Only for PolylineEditor
+        this.editor.splitShape(this.latlngs, this.getIndex());
+    },
+
+    // 🍂method continue()
+    // Continue the vertex LatLngs from this vertex. Only active for first and last vertices of a Polyline.
+    continue: function () {
+        if (!this.editor.continueBackward) return;  // Only for PolylineEditor
+        var index = this.getIndex();
+        if (index === 0) this.editor.continueBackward(this.latlngs);
+        else if (index === this.getLastIndex()) this.editor.continueForward(this.latlngs);
+    }
+
+});
+
+Editable.mergeOptions({
+
+    // 🍂namespace Editable
+    // 🍂option vertexMarkerClass: class = VertexMarker
+    // Class to be used as vertex, for path editing.
+    vertexMarkerClass: Editable.VertexMarker
+});
+
+Editable.MiddleMarker = Marker.extend({
+
+    options: {
+        opacity: 0.5,
+        className: 'leaflet-div-icon leaflet-middle-icon',
+        draggable: true
+    },
+
+    initialize: function (left, right, latlngs, editor, options) {
+        this.left = left;
+        this.right = right;
+        this.editor = editor;
+        this.latlngs = latlngs;
+        Marker.prototype.initialize.call(this, this.computeLatLng(), options);
+        this._opacity = this.options.opacity;
+        this.options.icon = this.editor.tools.createVertexIcon({className: this.options.className});
+        this.editor.editLayer.addLayer(this);
+        this.setVisibility();
+    },
+
+    setVisibility: function () {
+        var leftPoint = this._map.latLngToContainerPoint(this.left.latlng),
+            rightPoint = this._map.latLngToContainerPoint(this.right.latlng),
+            size = toPoint(this.options.icon.options.iconSize);
+        if (leftPoint.distanceTo(rightPoint) < size.x * 3) this.hide();
+        else this.show();
+    },
+
+    show: function () {
+        this.setOpacity(this._opacity);
+    },
+
+    hide: function () {
+        this.setOpacity(0);
+    },
+
+    updateLatLng: function () {
+        this.setLatLng(this.computeLatLng());
+        this.setVisibility();
+    },
+
+    computeLatLng: function () {
+        var leftPoint = this.editor.map.latLngToContainerPoint(this.left.latlng),
+            rightPoint = this.editor.map.latLngToContainerPoint(this.right.latlng),
+            y = (leftPoint.y + rightPoint.y) / 2,
+            x = (leftPoint.x + rightPoint.x) / 2;
+        return this.editor.map.containerPointToLatLng([x, y]);
+    },
+
+    onAdd: function (map) {
+        Marker.prototype.onAdd.call(this, map);
+        on(this._icon, 'mousedown touchstart', this.onMouseDown, this);
+        map.on('zoomend', this.setVisibility, this);
+    },
+
+    onRemove: function (map) {
+        delete this.right.middleMarker;
+        off(this._icon, 'mousedown touchstart', this.onMouseDown, this);
+        map.off('zoomend', this.setVisibility, this);
+        Marker.prototype.onRemove.call(this, map);
+    },
+
+    onMouseDown: function (e) {
+        var iconPos = getPosition(this._icon),
+            latlng = this.editor.map.layerPointToLatLng(iconPos);
+        e = {
+            originalEvent: e,
+            latlng: latlng
+        };
+        if (this.options.opacity === 0) return;
+        Editable.makeCancellable(e);
+        this.editor.onMiddleMarkerMouseDown(e);
+        if (e._cancelled) return;
+        this.latlngs.splice(this.index(), 0, e.latlng);
+        this.editor.refresh();
+        var icon$$1 = this._icon;
+        var marker$$1 = this.editor.addVertexMarker(e.latlng, this.latlngs);
+        this.editor.onNewVertex(marker$$1);
+        /* Hack to workaround browser not firing touchend when element is no more on DOM */
+        var parent = marker$$1._icon.parentNode;
+        parent.removeChild(marker$$1._icon);
+        marker$$1._icon = icon$$1;
+        parent.appendChild(marker$$1._icon);
+        marker$$1._initIcon();
+        marker$$1._initInteraction();
+        marker$$1.setOpacity(1);
+        /* End hack */
+        // Transfer ongoing dragging to real marker
+        Draggable._dragging = false;
+        marker$$1.dragging._draggable._onDown(e.originalEvent);
+        this.delete();
+    },
+
+    delete: function () {
+        this.editor.editLayer.removeLayer(this);
+    },
+
+    index: function () {
+        return this.latlngs.indexOf(this.right.latlng);
+    }
+
+});
+
+Editable.mergeOptions({
+
+    // 🍂namespace Editable
+    // 🍂option middleMarkerClass: class = VertexMarker
+    // Class to be used as middle vertex, pulled by the user to create a new point in the middle of a path.
+    middleMarkerClass: Editable.MiddleMarker
+
+});
+
+// 🍂namespace Editable; 🍂class BaseEditor; 🍂aka Editable.BaseEditor
+// When editing a feature (Marker, Polyline…), an editor is attached to it. This
+// editor basically knows how to handle the edition.
+Editable.BaseEditor = Handler.extend({
+
+    initialize: function (map, feature, options) {
+        setOptions(this, options);
+        this.map = map;
+        this.feature = feature;
+        this.feature.editor = this;
+        this.editLayer = new LayerGroup();
+        this.tools = this.options.editTools || map.editTools;
+    },
+
+    // 🍂method enable(): this
+    // Set up the drawing tools for the feature to be editable.
+    addHooks: function () {
+        if (this.isConnected()) this.onFeatureAdd();
+        else this.feature.once('add', this.onFeatureAdd, this);
+        this.onEnable();
+        this.feature.on(this._getEvents(), this);
+        return;
+    },
+
+    // 🍂method disable(): this
+    // Remove the drawing tools for the feature.
+    removeHooks: function () {
+        this.feature.off(this._getEvents(), this);
+        if (this.feature.dragging) this.feature.dragging.disable();
+        this.editLayer.clearLayers();
+        this.tools.editLayer.removeLayer(this.editLayer);
+        this.onDisable();
+        if (this._drawing) this.cancelDrawing();
+        return;
+    },
+
+    // 🍂method drawing(): boolean
+    // Return true if any drawing action is ongoing with this editor.
+    drawing: function () {
+        return !!this._drawing;
+    },
+
+    reset: function () {},
+
+    onFeatureAdd: function () {
+        this.tools.editLayer.addLayer(this.editLayer);
+        if (this.feature.dragging) this.feature.dragging.enable();
+    },
+
+    hasMiddleMarkers: function () {
+        return !this.options.skipMiddleMarkers && !this.tools.options.skipMiddleMarkers;
+    },
+
+    fireAndForward: function (type, e) {
+        e = e || {};
+        e.layer = this.feature;
+        this.feature.fire(type, e);
+        this.tools.fireAndForward(type, e);
+    },
+
+    onEnable: function () {
+        // 🍂namespace Editable
+        // 🍂event editable:enable: Event
+        // Fired when an existing feature is ready to be edited.
+        this.fireAndForward('editable:enable');
+    },
+
+    onDisable: function () {
+        // 🍂namespace Editable
+        // 🍂event editable:disable: Event
+        // Fired when an existing feature is not ready anymore to be edited.
+        this.fireAndForward('editable:disable');
+    },
+
+    onEditing: function () {
+        // 🍂namespace Editable
+        // 🍂event editable:editing: Event
+        // Fired as soon as any change is made to the feature geometry.
+        this.fireAndForward('editable:editing');
+    },
+
+    onStartDrawing: function () {
+        // 🍂namespace Editable
+        // 🍂section Drawing events
+        // 🍂event editable:drawing:start: Event
+        // Fired when a feature is to be drawn.
+        this.fireAndForward('editable:drawing:start');
+    },
+
+    onEndDrawing: function () {
+        // 🍂namespace Editable
+        // 🍂section Drawing events
+        // 🍂event editable:drawing:end: Event
+        // Fired when a feature is not drawn anymore.
+        this.fireAndForward('editable:drawing:end');
+    },
+
+    onCancelDrawing: function () {
+        // 🍂namespace Editable
+        // 🍂section Drawing events
+        // 🍂event editable:drawing:cancel: Event
+        // Fired when user cancel drawing while a feature is being drawn.
+        this.fireAndForward('editable:drawing:cancel');
+    },
+
+    onCommitDrawing: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Drawing events
+        // 🍂event editable:drawing:commit: Event
+        // Fired when user finish drawing a feature.
+        this.fireAndForward('editable:drawing:commit', e);
+    },
+
+    onDrawingMouseDown: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Drawing events
+        // 🍂event editable:drawing:mousedown: Event
+        // Fired when user `mousedown` while drawing.
+        this.fireAndForward('editable:drawing:mousedown', e);
+    },
+
+    onDrawingMouseUp: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Drawing events
+        // 🍂event editable:drawing:mouseup: Event
+        // Fired when user `mouseup` while drawing.
+        this.fireAndForward('editable:drawing:mouseup', e);
+    },
+
+    startDrawing: function () {
+        if (!this._drawing) this._drawing = Editable.FORWARD;
+        this.tools.registerForDrawing(this);
+        this.onStartDrawing();
+    },
+
+    commitDrawing: function (e) {
+        this.onCommitDrawing(e);
+        this.endDrawing();
+    },
+
+    cancelDrawing: function () {
+        // If called during a vertex drag, the vertex will be removed before
+        // the mouseup fires on it. This is a workaround. Maybe better fix is
+        // To have Draggable reset it's status on disable (Leaflet side).
+        Draggable._dragging = false;
+        this.onCancelDrawing();
+        this.endDrawing();
+    },
+
+    endDrawing: function () {
+        this._drawing = false;
+        this.tools.unregisterForDrawing(this);
+        this.onEndDrawing();
+    },
+
+    onDrawingClick: function (e) {
+        if (!this.drawing()) return;
+        Editable.makeCancellable(e);
+        // 🍂namespace Editable
+        // 🍂section Drawing events
+        // 🍂event editable:drawing:click: CancelableEvent
+        // Fired when user `click` while drawing, before any internal action is being processed.
+        this.fireAndForward('editable:drawing:click', e);
+        if (e._cancelled) return;
+        if (!this.isConnected()) this.connect(e);
+        this.processDrawingClick(e);
+    },
+
+    isConnected: function () {
+        return this.map.hasLayer(this.feature);
+    },
+
+    connect: function (e) {
+        this.tools.connectCreatedToMap(this.feature);
+        this.tools.editLayer.addLayer(this.editLayer);
+    },
+
+    onMove: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Drawing events
+        // 🍂event editable:drawing:move: Event
+        // Fired when `move` mouse while drawing, while dragging a marker, and while dragging a vertex.
+        this.fireAndForward('editable:drawing:move', e);
+    },
+
+    onDrawingMouseMove: function (e) {
+        this.onMove(e);
+    },
+
+    _getEvents: function () {
+        return {
+            dragstart: this.onDragStart,
+            drag: this.onDrag,
+            dragend: this.onDragEnd,
+            remove: this.disable
+        };
+    },
+
+    onDragStart: function (e) {
+        this.onEditing();
+        // 🍂namespace Editable
+        // 🍂event editable:dragstart: Event
+        // Fired before a path feature is dragged.
+        this.fireAndForward('editable:dragstart', e);
+    },
+
+    onDrag: function (e) {
+        this.onMove(e);
+        // 🍂namespace Editable
+        // 🍂event editable:drag: Event
+        // Fired when a path feature is being dragged.
+        this.fireAndForward('editable:drag', e);
+    },
+
+    onDragEnd: function (e) {
+        // 🍂namespace Editable
+        // 🍂event editable:dragend: Event
+        // Fired after a path feature has been dragged.
+        this.fireAndForward('editable:dragend', e);
+    }
+
+});
+
+// 🍂namespace Editable; 🍂class MarkerEditor; 🍂aka Editable.MarkerEditor
+// 🍂inherits BaseEditor
+// Editor for Marker.
+Editable.MarkerEditor = Editable.BaseEditor.extend({
+
+    onDrawingMouseMove: function (e) {
+        Editable.BaseEditor.prototype.onDrawingMouseMove.call(this, e);
+        if (this._drawing) this.feature.setLatLng(e.latlng);
+    },
+
+    processDrawingClick: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Drawing events
+        // 🍂event editable:drawing:clicked: Event
+        // Fired when user `click` while drawing, after all internal actions.
+        this.fireAndForward('editable:drawing:clicked', e);
+        this.commitDrawing(e);
+    },
+
+    connect: function (e) {
+        // On touch, the latlng has not been updated because there is
+        // no mousemove.
+        if (e) this.feature._latlng = e.latlng;
+        Editable.BaseEditor.prototype.connect.call(this, e);
+    }
+
+});
+
+// 🍂namespace Editable; 🍂class PathEditor; 🍂aka Editable.PathEditor
+// 🍂inherits BaseEditor
+// Base class for all path editors.
+Editable.PathEditor = Editable.BaseEditor.extend({
+
+    CLOSED: false,
+    MIN_VERTEX: 2,
+
+    addHooks: function () {
+        Editable.BaseEditor.prototype.addHooks.call(this);
+        if (this.feature) this.initVertexMarkers();
+        return this;
+    },
+
+    initVertexMarkers: function (latlngs) {
+        if (!this.enabled()) return;
+        latlngs = latlngs || this.getLatLngs();
+        if (isFlat(latlngs)) this.addVertexMarkers(latlngs);
+        else for (var i = 0; i < latlngs.length; i++) this.initVertexMarkers(latlngs[i]);
+    },
+
+    getLatLngs: function () {
+        return this.feature.getLatLngs();
+    },
+
+    // 🍂method reset()
+    // Rebuild edit elements (Vertex, MiddleMarker, etc.).
+    reset: function () {
+        this.editLayer.clearLayers();
+        this.initVertexMarkers();
+    },
+
+    addVertexMarker: function (latlng, latlngs) {
+        return new this.tools.options.vertexMarkerClass(latlng, latlngs, this);
+    },
+
+    onNewVertex: function (vertex) {
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:new: VertexEvent
+        // Fired when a new vertex is created.
+        this.fireAndForward('editable:vertex:new', {latlng: vertex.latlng, vertex: vertex});
+    },
+
+    addVertexMarkers: function (latlngs) {
+        for (var i = 0; i < latlngs.length; i++) {
+            this.addVertexMarker(latlngs[i], latlngs);
+        }
+    },
+
+    refreshVertexMarkers: function (latlngs) {
+        latlngs = latlngs || this.getDefaultLatLngs();
+        for (var i = 0; i < latlngs.length; i++) {
+            latlngs[i].__vertex.update();
+        }
+    },
+
+    addMiddleMarker: function (left, right, latlngs) {
+        return new this.tools.options.middleMarkerClass(left, right, latlngs, this);
+    },
+
+    onVertexMarkerClick: function (e) {
+        Editable.makeCancellable(e);
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:click: CancelableVertexEvent
+        // Fired when a `click` is issued on a vertex, before any internal action is being processed.
+        this.fireAndForward('editable:vertex:click', e);
+        if (e._cancelled) return;
+        if (this.tools.drawing() && this.tools._drawingEditor !== this) return;
+        var index = e.vertex.getIndex(), commit;
+        if (e.originalEvent.ctrlKey) {
+            this.onVertexMarkerCtrlClick(e);
+        } else if (e.originalEvent.altKey) {
+            this.onVertexMarkerAltClick(e);
+        } else if (e.originalEvent.shiftKey) {
+            this.onVertexMarkerShiftClick(e);
+        } else if (e.originalEvent.metaKey) {
+            this.onVertexMarkerMetaKeyClick(e);
+        } else if (index === e.vertex.getLastIndex() && this._drawing === Editable.FORWARD) {
+            if (index >= this.MIN_VERTEX - 1) commit = true;
+        } else if (index === 0 && this._drawing === Editable.BACKWARD && this._drawnLatLngs.length >= this.MIN_VERTEX) {
+            commit = true;
+        } else if (index === 0 && this._drawing === Editable.FORWARD && this._drawnLatLngs.length >= this.MIN_VERTEX && this.CLOSED) {
+            commit = true;  // Allow to close on first point also for polygons
+        } else {
+            this.onVertexRawMarkerClick(e);
+        }
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:clicked: VertexEvent
+        // Fired when a `click` is issued on a vertex, after all internal actions.
+        this.fireAndForward('editable:vertex:clicked', e);
+        if (commit) this.commitDrawing(e);
+    },
+
+    onVertexRawMarkerClick: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:rawclick: CancelableVertexEvent
+        // Fired when a `click` is issued on a vertex without any special key and without being in drawing mode.
+        this.fireAndForward('editable:vertex:rawclick', e);
+        if (e._cancelled) return;
+        if (!this.vertexCanBeDeleted(e.vertex)) return;
+        e.vertex.delete();
+    },
+
+    vertexCanBeDeleted: function (vertex) {
+        return vertex.latlngs.length > this.MIN_VERTEX;
+    },
+
+    onVertexDeleted: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:deleted: VertexEvent
+        // Fired after a vertex has been deleted by user.
+        this.fireAndForward('editable:vertex:deleted', e);
+    },
+
+    onVertexMarkerCtrlClick: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:ctrlclick: VertexEvent
+        // Fired when a `click` with `ctrlKey` is issued on a vertex.
+        this.fireAndForward('editable:vertex:ctrlclick', e);
+    },
+
+    onVertexMarkerShiftClick: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:shiftclick: VertexEvent
+        // Fired when a `click` with `shiftKey` is issued on a vertex.
+        this.fireAndForward('editable:vertex:shiftclick', e);
+    },
+
+    onVertexMarkerMetaKeyClick: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:metakeyclick: VertexEvent
+        // Fired when a `click` with `metaKey` is issued on a vertex.
+        this.fireAndForward('editable:vertex:metakeyclick', e);
+    },
+
+    onVertexMarkerAltClick: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:altclick: VertexEvent
+        // Fired when a `click` with `altKey` is issued on a vertex.
+        this.fireAndForward('editable:vertex:altclick', e);
+    },
+
+    onVertexMarkerContextMenu: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:contextmenu: VertexEvent
+        // Fired when a `contextmenu` is issued on a vertex.
+        this.fireAndForward('editable:vertex:contextmenu', e);
+    },
+
+    onVertexMarkerMouseDown: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:mousedown: VertexEvent
+        // Fired when user `mousedown` a vertex.
+        this.fireAndForward('editable:vertex:mousedown', e);
+    },
+
+    onMiddleMarkerMouseDown: function (e) {
+        // 🍂namespace Editable
+        // 🍂section MiddleMarker events
+        // 🍂event editable:middlemarker:mousedown: VertexEvent
+        // Fired when user `mousedown` a middle marker.
+        this.fireAndForward('editable:middlemarker:mousedown', e);
+    },
+
+    onVertexMarkerDrag: function (e) {
+        this.onMove(e);
+        if (this.feature._bounds) this.extendBounds(e);
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:drag: VertexEvent
+        // Fired when a vertex is dragged by user.
+        this.fireAndForward('editable:vertex:drag', e);
+    },
+
+    onVertexMarkerDragStart: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:dragstart: VertexEvent
+        // Fired before a vertex is dragged by user.
+        this.fireAndForward('editable:vertex:dragstart', e);
+    },
+
+    onVertexMarkerDragEnd: function (e) {
+        // 🍂namespace Editable
+        // 🍂section Vertex events
+        // 🍂event editable:vertex:dragend: VertexEvent
+        // Fired after a vertex is dragged by user.
+        this.fireAndForward('editable:vertex:dragend', e);
+    },
+
+    setDrawnLatLngs: function (latlngs) {
+        this._drawnLatLngs = latlngs || this.getDefaultLatLngs();
+    },
+
+    startDrawing: function () {
+        if (!this._drawnLatLngs) this.setDrawnLatLngs();
+        Editable.BaseEditor.prototype.startDrawing.call(this);
+    },
+
+    startDrawingForward: function () {
+        this.startDrawing();
+    },
+
+    endDrawing: function () {
+        this.tools.detachForwardLineGuide();
+        this.tools.detachBackwardLineGuide();
+        if (this._drawnLatLngs && this._drawnLatLngs.length < this.MIN_VERTEX) this.deleteShape(this._drawnLatLngs);
+        Editable.BaseEditor.prototype.endDrawing.call(this);
+        delete this._drawnLatLngs;
+    },
+
+    addLatLng: function (latlng) {
+        if (this._drawing === Editable.FORWARD) this._drawnLatLngs.push(latlng);
+        else this._drawnLatLngs.unshift(latlng);
+        this.feature._bounds.extend(latlng);
+        var vertex = this.addVertexMarker(latlng, this._drawnLatLngs);
+        this.onNewVertex(vertex);
+        this.refresh();
+    },
+
+    newPointForward: function (latlng) {
+        this.addLatLng(latlng);
+        this.tools.attachForwardLineGuide();
+        this.tools.anchorForwardLineGuide(latlng);
+    },
+
+    newPointBackward: function (latlng) {
+        this.addLatLng(latlng);
+        this.tools.anchorBackwardLineGuide(latlng);
+    },
+
+    // 🍂namespace PathEditor
+    // 🍂method push()
+    // Programmatically add a point while drawing.
+    push: function (latlng) {
+        if (!latlng) return console.error('Editable.PathEditor.push expect a vaild latlng as parameter');
+        if (this._drawing === Editable.FORWARD) this.newPointForward(latlng);
+        else this.newPointBackward(latlng);
+    },
+
+    removeLatLng: function (latlng) {
+        latlng.__vertex.delete();
+        this.refresh();
+    },
+
+    // 🍂method pop(): L.LatLng or null
+    // Programmatically remove last point (if any) while drawing.
+    pop: function () {
+        if (this._drawnLatLngs.length <= 1) return;
+        var latlng;
+        if (this._drawing === Editable.FORWARD) latlng = this._drawnLatLngs[this._drawnLatLngs.length - 1];
+        else latlng = this._drawnLatLngs[0];
+        this.removeLatLng(latlng);
+        if (this._drawing === Editable.FORWARD) this.tools.anchorForwardLineGuide(this._drawnLatLngs[this._drawnLatLngs.length - 1]);
+        else this.tools.anchorForwardLineGuide(this._drawnLatLngs[0]);
+        return latlng;
+    },
+
+    processDrawingClick: function (e) {
+        if (e.vertex && e.vertex.editor === this) return;
+        if (this._drawing === Editable.FORWARD) this.newPointForward(e.latlng);
+        else this.newPointBackward(e.latlng);
+        this.fireAndForward('editable:drawing:clicked', e);
+    },
+
+    onDrawingMouseMove: function (e) {
+        Editable.BaseEditor.prototype.onDrawingMouseMove.call(this, e);
+        if (this._drawing) {
+            this.tools.moveForwardLineGuide(e.latlng);
+            this.tools.moveBackwardLineGuide(e.latlng);
+        }
+    },
+
+    refresh: function () {
+        this.feature.redraw();
+        this.onEditing();
+    },
+
+    // 🍂namespace PathEditor
+    // 🍂method newShape(latlng?: L.LatLng)
+    // Add a new shape (Polyline, Polygon) in a multi, and setup up drawing tools to draw it;
+    // if optional `latlng` is given, start a path at this point.
+    newShape: function (latlng) {
+        var shape = this.addNewEmptyShape();
+        if (!shape) return;
+        this.setDrawnLatLngs(shape[0] || shape);  // Polygon or polyline
+        this.startDrawingForward();
+        // 🍂namespace Editable
+        // 🍂section Shape events
+        // 🍂event editable:shape:new: ShapeEvent
+        // Fired when a new shape is created in a multi (Polygon or Polyline).
+        this.fireAndForward('editable:shape:new', {shape: shape});
+        if (latlng) this.newPointForward(latlng);
+    },
+
+    deleteShape: function (shape, latlngs) {
+        var e = {shape: shape};
+        Editable.makeCancellable(e);
+        // 🍂namespace Editable
+        // 🍂section Shape events
+        // 🍂event editable:shape:delete: CancelableShapeEvent
+        // Fired before a new shape is deleted in a multi (Polygon or Polyline).
+        this.fireAndForward('editable:shape:delete', e);
+        if (e._cancelled) return;
+        shape = this._deleteShape(shape, latlngs);
+        if (this.ensureNotFlat) this.ensureNotFlat();  // Polygon.
+        this.feature.setLatLngs(this.getLatLngs());  // Force bounds reset.
+        this.refresh();
+        this.reset();
+        // 🍂namespace Editable
+        // 🍂section Shape events
+        // 🍂event editable:shape:deleted: ShapeEvent
+        // Fired after a new shape is deleted in a multi (Polygon or Polyline).
+        this.fireAndForward('editable:shape:deleted', {shape: shape});
+        return shape;
+    },
+
+    _deleteShape: function (shape, latlngs) {
+        latlngs = latlngs || this.getLatLngs();
+        if (!latlngs.length) return;
+        var self = this,
+            inplaceDelete = function (latlngs, shape) {
+                // Called when deleting a flat latlngs
+                shape = latlngs.splice(0, Number.MAX_VALUE);
+                return shape;
+            },
+            spliceDelete = function (latlngs, shape) {
+                // Called when removing a latlngs inside an array
+                latlngs.splice(latlngs.indexOf(shape), 1);
+                if (!latlngs.length) self._deleteShape(latlngs);
+                return shape;
+            };
+        if (latlngs === shape) return inplaceDelete(latlngs, shape);
+        for (var i = 0; i < latlngs.length; i++) {
+            if (latlngs[i] === shape) return spliceDelete(latlngs, shape);
+            else if (latlngs[i].indexOf(shape) !== -1) return spliceDelete(latlngs[i], shape);
+        }
+    },
+
+    // 🍂namespace PathEditor
+    // 🍂method deleteShapeAt(latlng: L.LatLng): Array
+    // Remove a path shape at the given `latlng`.
+    deleteShapeAt: function (latlng) {
+        var shape = this.feature.shapeAt(latlng);
+        if (shape) return this.deleteShape(shape);
+    },
+
+    // 🍂method appendShape(shape: Array)
+    // Append a new shape to the Polygon or Polyline.
+    appendShape: function (shape) {
+        this.insertShape(shape);
+    },
+
+    // 🍂method prependShape(shape: Array)
+    // Prepend a new shape to the Polygon or Polyline.
+    prependShape: function (shape) {
+        this.insertShape(shape, 0);
+    },
+
+    // 🍂method insertShape(shape: Array, index: int)
+    // Insert a new shape to the Polygon or Polyline at given index (default is to append).
+    insertShape: function (shape, index) {
+        this.ensureMulti();
+        shape = this.formatShape(shape);
+        if (typeof index === 'undefined') index = this.feature._latlngs.length;
+        this.feature._latlngs.splice(index, 0, shape);
+        this.feature.redraw();
+        if (this._enabled) this.reset();
+    },
+
+    extendBounds: function (e) {
+        this.feature._bounds.extend(e.vertex.latlng);
+    },
+
+    onDragStart: function (e) {
+        this.editLayer.clearLayers();
+        Editable.BaseEditor.prototype.onDragStart.call(this, e);
+    },
+
+    onDragEnd: function (e) {
+        this.initVertexMarkers();
+        Editable.BaseEditor.prototype.onDragEnd.call(this, e);
+    }
+
+});
+
+// 🍂namespace Editable; 🍂class PolylineEditor; 🍂aka Editable.PolylineEditor
+// 🍂inherits PathEditor
+Editable.PolylineEditor = Editable.PathEditor.extend({
+
+    startDrawingBackward: function () {
+        this._drawing = Editable.BACKWARD;
+        this.startDrawing();
+    },
+
+    // 🍂method continueBackward(latlngs?: Array)
+    // Set up drawing tools to continue the line backward.
+    continueBackward: function (latlngs) {
+        if (this.drawing()) return;
+        latlngs = latlngs || this.getDefaultLatLngs();
+        this.setDrawnLatLngs(latlngs);
+        if (latlngs.length > 0) {
+            this.tools.attachBackwardLineGuide();
+            this.tools.anchorBackwardLineGuide(latlngs[0]);
+        }
+        this.startDrawingBackward();
+    },
+
+    // 🍂method continueForward(latlngs?: Array)
+    // Set up drawing tools to continue the line forward.
+    continueForward: function (latlngs) {
+        if (this.drawing()) return;
+        latlngs = latlngs || this.getDefaultLatLngs();
+        this.setDrawnLatLngs(latlngs);
+        if (latlngs.length > 0) {
+            this.tools.attachForwardLineGuide();
+            this.tools.anchorForwardLineGuide(latlngs[latlngs.length - 1]);
+        }
+        this.startDrawingForward();
+    },
+
+    getDefaultLatLngs: function (latlngs) {
+        latlngs = latlngs || this.feature._latlngs;
+        if (!latlngs.length || latlngs[0] instanceof LatLng) return latlngs;
+        else return this.getDefaultLatLngs(latlngs[0]);
+    },
+
+    ensureMulti: function () {
+        if (this.feature._latlngs.length && isFlat(this.feature._latlngs)) {
+            this.feature._latlngs = [this.feature._latlngs];
+        }
+    },
+
+    addNewEmptyShape: function () {
+        if (this.feature._latlngs.length) {
+            var shape = [];
+            this.appendShape(shape);
+            return shape;
+        } else {
+            return this.feature._latlngs;
+        }
+    },
+
+    formatShape: function (shape) {
+        if (isFlat(shape)) return shape;
+        else if (shape[0]) return this.formatShape(shape[0]);
+    },
+
+    // 🍂method splitShape(latlngs?: Array, index: int)
+    // Split the given `latlngs` shape at index `index` and integrate new shape in instance `latlngs`.
+    splitShape: function (shape, index) {
+        if (!index || index >= shape.length - 1) return;
+        this.ensureMulti();
+        var shapeIndex = this.feature._latlngs.indexOf(shape);
+        if (shapeIndex === -1) return;
+        var first = shape.slice(0, index + 1),
+            second = shape.slice(index);
+        // We deal with reference, we don't want twice the same latlng around.
+        second[0] = toLatLng(second[0].lat, second[0].lng, second[0].alt);
+        this.feature._latlngs.splice(shapeIndex, 1, first, second);
+        this.refresh();
+        this.reset();
+    }
+
+});
+
+// 🍂namespace Editable; 🍂class PolygonEditor; 🍂aka Editable.PolygonEditor
+// 🍂inherits PathEditor
+Editable.PolygonEditor = Editable.PathEditor.extend({
+
+    CLOSED: true,
+    MIN_VERTEX: 3,
+
+    newPointForward: function (latlng) {
+        Editable.PathEditor.prototype.newPointForward.call(this, latlng);
+        if (!this.tools.backwardLineGuide._latlngs.length) this.tools.anchorBackwardLineGuide(latlng);
+        if (this._drawnLatLngs.length === 2) this.tools.attachBackwardLineGuide();
+    },
+
+    addNewEmptyHole: function (latlng) {
+        this.ensureNotFlat();
+        var latlngs = this.feature.shapeAt(latlng);
+        if (!latlngs) return;
+        var holes = [];
+        latlngs.push(holes);
+        return holes;
+    },
+
+    // 🍂method newHole(latlng?: L.LatLng, index: int)
+    // Set up drawing tools for creating a new hole on the Polygon. If the `latlng` param is given, a first point is created.
+    newHole: function (latlng) {
+        var holes = this.addNewEmptyHole(latlng);
+        if (!holes) return;
+        this.setDrawnLatLngs(holes);
+        this.startDrawingForward();
+        if (latlng) this.newPointForward(latlng);
+    },
+
+    addNewEmptyShape: function () {
+        if (this.feature._latlngs.length && this.feature._latlngs[0].length) {
+            var shape = [];
+            this.appendShape(shape);
+            return shape;
+        } else {
+            return this.feature._latlngs;
+        }
+    },
+
+    ensureMulti: function () {
+        if (this.feature._latlngs.length && isFlat(this.feature._latlngs[0])) {
+            this.feature._latlngs = [this.feature._latlngs];
+        }
+    },
+
+    ensureNotFlat: function () {
+        if (!this.feature._latlngs.length || isFlat(this.feature._latlngs)) this.feature._latlngs = [this.feature._latlngs];
+    },
+
+    vertexCanBeDeleted: function (vertex) {
+        var parent = this.feature.parentShape(vertex.latlngs),
+            idx = indexOf(parent, vertex.latlngs);
+        if (idx > 0) return true;  // Holes can be totally deleted without removing the layer itself.
+        return Editable.PathEditor.prototype.vertexCanBeDeleted.call(this, vertex);
+    },
+
+    getDefaultLatLngs: function () {
+        if (!this.feature._latlngs.length) this.feature._latlngs.push([]);
+        return this.feature._latlngs[0];
+    },
+
+    formatShape: function (shape) {
+        // [[1, 2], [3, 4]] => must be nested
+        // [] => must be nested
+        // [[]] => is already nested
+        if (isFlat(shape) && (!shape[0] || shape[0].length !== 0)) return [shape];
+        else return shape;
+    }
+
+});
+
+// 🍂namespace Editable; 🍂class RectangleEditor; 🍂aka Editable.RectangleEditor
+// 🍂inherits PathEditor
+Editable.RectangleEditor = Editable.PathEditor.extend({
+
+    CLOSED: true,
+    MIN_VERTEX: 4,
+
+    options: {
+        skipMiddleMarkers: true
+    },
+
+    extendBounds: function (e) {
+        var index = e.vertex.getIndex(),
+            next = e.vertex.getNext(),
+            previous = e.vertex.getPrevious(),
+            oppositeIndex = (index + 2) % 4,
+            opposite = e.vertex.latlngs[oppositeIndex],
+            bounds = toLatLngBounds(e.latlng, opposite);
+        // Update latlngs by hand to preserve order.
+        previous.latlng.update([e.latlng.lat, opposite.lng]);
+        next.latlng.update([opposite.lat, e.latlng.lng]);
+        this.updateBounds(bounds);
+        this.refreshVertexMarkers();
+    },
+
+    onDrawingMouseDown: function (e) {
+        Editable.PathEditor.prototype.onDrawingMouseDown.call(this, e);
+        this.connect();
+        var latlngs = this.getDefaultLatLngs();
+        // L.Polygon._convertLatLngs removes last latlng if it equals first point,
+        // which is the case here as all latlngs are [0, 0]
+        if (latlngs.length === 3) latlngs.push(e.latlng);
+        var bounds = toLatLngBounds(e.latlng, e.latlng);
+        this.updateBounds(bounds);
+        this.updateLatLngs(bounds);
+        this.refresh();
+        this.reset();
+        // Stop dragging map.
+        // Draggable has two workflows:
+        // - mousedown => mousemove => mouseup
+        // - touchstart => touchmove => touchend
+        // Problem: L.Map.Tap does not allow us to listen to touchstart, so we only
+        // can deal with mousedown, but then when in a touch device, we are dealing with
+        // simulated events (actually simulated by L.Map.Tap), which are no more taken
+        // into account by Draggable.
+        // Ref.: https://github.com/Leaflet/Leaflet.Editable/issues/103
+        e.originalEvent._simulated = false;
+        this.map.dragging._draggable._onUp(e.originalEvent);
+        // Now transfer ongoing drag action to the bottom right corner.
+        // Should we refine which corne will handle the drag according to
+        // drag direction?
+        latlngs[3].__vertex.dragging._draggable._onDown(e.originalEvent);
+    },
+
+    onDrawingMouseUp: function (e) {
+        this.commitDrawing(e);
+        e.originalEvent._simulated = false;
+        Editable.PathEditor.prototype.onDrawingMouseUp.call(this, e);
+    },
+
+    onDrawingMouseMove: function (e) {
+        e.originalEvent._simulated = false;
+        Editable.PathEditor.prototype.onDrawingMouseMove.call(this, e);
+    },
+
+
+    getDefaultLatLngs: function (latlngs) {
+        return latlngs || this.feature._latlngs[0];
+    },
+
+    updateBounds: function (bounds) {
+        this.feature._bounds = bounds;
+    },
+
+    updateLatLngs: function (bounds) {
+        var latlngs = this.getDefaultLatLngs(),
+            newLatlngs = this.feature._boundsToLatLngs(bounds);
+        // Keep references.
+        for (var i = 0; i < latlngs.length; i++) {
+            latlngs[i].update(newLatlngs[i]);
+        }
+    }
+
+});
+
+// 🍂namespace Editable; 🍂class CircleEditor; 🍂aka Editable.CircleEditor
+// 🍂inherits PathEditor
+Editable.CircleEditor = Editable.PathEditor.extend({
+
+    MIN_VERTEX: 2,
+
+    options: {
+        skipMiddleMarkers: true
+    },
+
+    initialize: function (map, feature, options) {
+        Editable.PathEditor.prototype.initialize.call(this, map, feature, options);
+        this._resizeLatLng = this.computeResizeLatLng();
+    },
+
+    computeResizeLatLng: function () {
+        // While circle is not added to the map, _radius is not set.
+        var delta = (this.feature._radius || this.feature._mRadius) * Math.cos(Math.PI / 4),
+            point = this.map.project(this.feature._latlng);
+        return this.map.unproject([point.x + delta, point.y - delta]);
+    },
+
+    updateResizeLatLng: function () {
+        this._resizeLatLng.update(this.computeResizeLatLng());
+        this._resizeLatLng.__vertex.update();
+    },
+
+    getLatLngs: function () {
+        return [this.feature._latlng, this._resizeLatLng];
+    },
+
+    getDefaultLatLngs: function () {
+        return this.getLatLngs();
+    },
+
+    onVertexMarkerDrag: function (e) {
+        if (e.vertex.getIndex() === 1) this.resize(e);
+        else this.updateResizeLatLng(e);
+        Editable.PathEditor.prototype.onVertexMarkerDrag.call(this, e);
+    },
+
+    resize: function (e) {
+        var radius = this.feature._latlng.distanceTo(e.latlng);
+        this.feature.setRadius(radius);
+    },
+
+    onDrawingMouseDown: function (e) {
+        Editable.PathEditor.prototype.onDrawingMouseDown.call(this, e);
+        this._resizeLatLng.update(e.latlng);
+        this.feature._latlng.update(e.latlng);
+        this.connect();
+        // Stop dragging map.
+        e.originalEvent._simulated = false;
+        this.map.dragging._draggable._onUp(e.originalEvent);
+        // Now transfer ongoing drag action to the radius handler.
+        this._resizeLatLng.__vertex.dragging._draggable._onDown(e.originalEvent);
+    },
+
+    onDrawingMouseUp: function (e) {
+        this.commitDrawing(e);
+        e.originalEvent._simulated = false;
+        Editable.PathEditor.prototype.onDrawingMouseUp.call(this, e);
+    },
+
+    onDrawingMouseMove: function (e) {
+        e.originalEvent._simulated = false;
+        Editable.PathEditor.prototype.onDrawingMouseMove.call(this, e);
+    },
+
+    onDrag: function (e) {
+        Editable.PathEditor.prototype.onDrag.call(this, e);
+        this.feature.dragging.updateLatLng(this._resizeLatLng);
+    }
+
+});
+
+// 🍂namespace Editable; 🍂class EditableMixin
+// `EditableMixin` is included to `L.Polyline`, `L.Polygon`, `L.Rectangle`, `L.Circle`
+// and `Marker`. It adds some methods to them.
+// *When editing is enabled, the editor is accessible on the instance with the
+// `editor` property.*
+var EditableMixin = {
+
+    createEditor: function (map) {
+        map = map || this._map;
+        var tools = (this.options.editOptions || {}).editTools || map.editTools;
+        if (!tools) throw Error('Unable to detect Editable instance.')
+        var Klass = this.options.editorClass || this.getEditorClass(tools);
+        return new Klass(map, this, this.options.editOptions);
+    },
+
+    // 🍂method enableEdit(map?: L.Map): this.editor
+    // Enable editing, by creating an editor if not existing, and then calling `enable` on it.
+    enableEdit: function (map) {
+        if (!this.editor) this.createEditor(map);
+        this.editor.enable();
+        return this.editor;
+    },
+
+    // 🍂method editEnabled(): boolean
+    // Return true if current instance has an editor attached, and this editor is enabled.
+    editEnabled: function () {
+        return this.editor && this.editor.enabled();
+    },
+
+    // 🍂method disableEdit()
+    // Disable editing, also remove the editor property reference.
+    disableEdit: function () {
+        if (this.editor) {
+            this.editor.disable();
+            delete this.editor;
+        }
+    },
+
+    // 🍂method toggleEdit()
+    // Enable or disable editing, according to current status.
+    toggleEdit: function () {
+        if (this.editEnabled()) this.disableEdit();
+        else this.enableEdit();
+    },
+
+    _onEditableAdd: function () {
+        if (this.editor) this.enableEdit();
+    }
+
+};
+
+var PolylineMixin = {
+
+    getEditorClass: function (tools) {
+        return (tools && tools.options.polylineEditorClass) ? tools.options.polylineEditorClass : Editable.PolylineEditor;
+    },
+
+    shapeAt: function (latlng, latlngs) {
+        // We can have those cases:
+        // - latlngs are just a flat array of latlngs, use this
+        // - latlngs is an array of arrays of latlngs, loop over
+        var shape = null;
+        latlngs = latlngs || this._latlngs;
+        if (!latlngs.length) return shape;
+        else if (isFlat(latlngs) && this.isInLatLngs(latlng, latlngs)) shape = latlngs;
+        else for (var i = 0; i < latlngs.length; i++) if (this.isInLatLngs(latlng, latlngs[i])) return latlngs[i];
+        return shape;
+    },
+
+    isInLatLngs: function (l, latlngs) {
+        if (!latlngs) return false;
+        var i, k, len, part = [], p,
+            w = this._clickTolerance();
+        this._projectLatlngs(latlngs, part, this._pxBounds);
+        part = part[0];
+        p = this._map.latLngToLayerPoint(l);
+
+        if (!this._pxBounds.contains(p)) { return false; }
+        for (i = 1, len = part.length, k = 0; i < len; k = i++) {
+
+            if (pointToSegmentDistance(p, part[k], part[i]) <= w) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+};
+
+var PolygonMixin = {
+
+    getEditorClass: function (tools) {
+        return (tools && tools.options.polygonEditorClass) ? tools.options.polygonEditorClass : Editable.PolygonEditor;
+    },
+
+    shapeAt: function (latlng, latlngs) {
+        // We can have those cases:
+        // - latlngs are just a flat array of latlngs, use this
+        // - latlngs is an array of arrays of latlngs, this is a simple polygon (maybe with holes), use the first
+        // - latlngs is an array of arrays of arrays, this is a multi, loop over
+        var shape = null;
+        latlngs = latlngs || this._latlngs;
+        if (!latlngs.length) return shape;
+        else if (isFlat(latlngs) && this.isInLatLngs(latlng, latlngs)) shape = latlngs;
+        else if (isFlat(latlngs[0]) && this.isInLatLngs(latlng, latlngs[0])) shape = latlngs;
+        else for (var i = 0; i < latlngs.length; i++) if (this.isInLatLngs(latlng, latlngs[i][0])) return latlngs[i];
+        return shape;
+    },
+
+    isInLatLngs: function (l, latlngs) {
+        var inside = false, l1, l2, j, k, len2;
+
+        for (j = 0, len2 = latlngs.length, k = len2 - 1; j < len2; k = j++) {
+            l1 = latlngs[j];
+            l2 = latlngs[k];
+
+            if (((l1.lat > l.lat) !== (l2.lat > l.lat)) &&
+                    (l.lng < (l2.lng - l1.lng) * (l.lat - l1.lat) / (l2.lat - l1.lat) + l1.lng)) {
+                inside = !inside;
+            }
+        }
+
+        return inside;
+    },
+
+    parentShape: function (shape, latlngs) {
+        latlngs = latlngs || this._latlngs;
+        if (!latlngs) return;
+        var idx = indexOf(latlngs, shape);
+        if (idx !== -1) return latlngs;
+        for (var i = 0; i < latlngs.length; i++) {
+            idx = indexOf(latlngs[i], shape);
+            if (idx !== -1) return latlngs[i];
+        }
+    }
+
+};
+
+
+var MarkerMixin = {
+
+    getEditorClass: function (tools) {
+        return (tools && tools.options.markerEditorClass) ? tools.options.markerEditorClass : Editable.MarkerEditor;
+    }
+
+};
+
+var RectangleMixin = {
+
+    getEditorClass: function (tools) {
+        return (tools && tools.options.rectangleEditorClass) ? tools.options.rectangleEditorClass : Editable.RectangleEditor;
+    }
+
+};
+
+var CircleMixin = {
+
+    getEditorClass: function (tools) {
+        return (tools && tools.options.circleEditorClass) ? tools.options.circleEditorClass : Editable.CircleEditor;
+    }
+
+};
+
+var keepEditable = function () {
+    // Make sure you can remove/readd an editable layer.
+    this.on('add', this._onEditableAdd);
+};
+
+var isFlat = isFlat$1 || _flat || Polyline._flat;  // <=> 1.1 compat.
+
+
+if (Polyline) {
+    Polyline.include(EditableMixin);
+    Polyline.include(PolylineMixin);
+    Polyline.addInitHook(keepEditable);
+}
+if (Polygon) {
+    Polygon.include(EditableMixin);
+    Polygon.include(PolygonMixin);
+}
+if (Marker) {
+    Marker.include(EditableMixin);
+    Marker.include(MarkerMixin);
+    Marker.addInitHook(keepEditable);
+}
+if (Rectangle) {
+    Rectangle.include(EditableMixin);
+    Rectangle.include(RectangleMixin);
+}
+if (Circle) {
+    Circle.include(EditableMixin);
+    Circle.include(CircleMixin);
+}
+
+LatLng.prototype.update = function (latlng) {
+    latlng = toLatLng(latlng);
+    this.lat = latlng.lat;
+    this.lng = latlng.lng;
+};
+
+function transformation(map_size, img_size){
+   
+    var x_ratio = map_size.x / img_size.x;
+    var y_ratio = map_size.y / img_size.y;
+    if(x_ratio <= y_ratio){
+        var a = x_ratio;
+        var b = 0;
+        var c = x_ratio;
+        var d = (map_size.y - (x_ratio * img_size.y)) / 2;
+    }
+    else { 
+        var a = y_ratio;
+        var b = (map_size.x - (y_ratio * img_size.x)) / 2;
+        var c = y_ratio;
+        var d = 0;
+    }
+    return new Transformation(a,b,c,d);        
+}
+
+/**
+ * Calculate max zoom
+ * @param {Size} img_size - size of images in custom unit (meters)
+ * @param {int} min_width - length of min visible width (default 10)
+ */
+function maxZoom(img_size, min_width){
+    min_width = min_width || 10;
+    var max_width = Math.max(img_size.y, img_size.x);
+    // var maxZoom = Math.log2( max_width / (1 * min_width) )   -- IE 11 not supported log2
+    var maxZoom = Math.log( max_width / (1 * min_width) )  / Math.log(2);
+    return Math.round(maxZoom);
+}
+
+/**
+ * Constructor of Envelope
+ * @param {*} min_x 
+ * @param {*} min_y 
+ * @param {*} max_x 
+ * @param {*} max_y 
+ */
+
+function EventHandlerStack(obj)
+{
+    var stack = {};
+    obj.inqueue_on = function(event_type, handler, context){
+        var q = stack[event_type];
+        if(!q){
+            q = {};
+            q.handlers = [];
+            q.fn = function(event){
+                var q = stack[event_type] || {handlers: []};
+                for(var i=q.handlers.length-1; i>=0; i--){
+                    var h = q.handlers[i];
+                    if( h.call(h._context || this, event) === true )
+                        break;
+                }
+            };
+            stack[event_type] = q;
+            obj.on(event_type, q.fn);
+        }
+        handler._context = context;
+        q.handlers.push(handler);
+    };
+
+    obj.inqueue_off = function(event_type, handler){
+        var q = stack[event_type];
+        if(q){
+            q.handlers = _.without(q.handlers, handler);
+            if(!q.handlers.length){
+                obj.off(event_type, q.fn);
+                delete stack[event_type];
+            }
+        }
+    };
+
+    return obj;
+
+}
+
+var LonLat = {
+	project: function (latlng) {
+		return new Point(latlng.lng, latlng.lat);
+	},
+
+	unproject: function (point) {
+		return new LatLng(point.y, point.x);
+	},
+
+	bounds: new Bounds([-180, -90], [180, 90])
+};
+
+var Simple = extend({}, CRS, {
+	projection: LonLat,
+	transformation: toTransformation(1, 0, -1, 0),
+
+	scale: function (zoom) {
+		return Math.pow(2, zoom);
+	},
+
+	zoom: function (scale) {
+		return Math.log(scale) / Math.LN2;
+	},
+
+	distance: function (latlng1, latlng2) {
+		var dx = latlng2.lng - latlng1.lng,
+		    dy = latlng2.lat - latlng1.lat;
+
+		return Math.sqrt(dx * dx + dy * dy);
+	},
+
+	infinite: true
+});
+
+var Map = function(el, store)
+{
+    map$1 = new Map$1(el, 
+    {
+        crs: Simple,
+        zoomControl: false,
+        attributionControl: false,
+        editable: true,
+        // zoomAnimation: false
+    });
+    window.map = map$1;
+
+    map$1.ll2cp = map$1.latLngToContainerPoint;
+    map$1.ll2lp = map$1.latLngToLayerPoint;
+
+    map$1 = EventHandlerStack(map$1);
+    // gridPanel = GridPanel(map);
+
+    // we store on server as array [lng, lat]
+    map$1.toPoints = function(latLngs){
+        latLngs = _.flatten(latLngs);
+        return latLngs.map(map$1.snap).map(function(ll){ return [ll.lng, ll.lat] });
+    };
+
+
+    map$1.inqueue_on('click', function(){
+        store(UNSELECT_ALL);
+    });
+
+    // State changes
+    store.on('map.size_m', function(e) { updateMapSize(e.new_val); });
+    return map$1;
+};
+
+var map$1  = null;
+function updateMapSize(size_m)
+{
+    if(!size_m) return;
+    var map_size = {x: map$1._container.offsetWidth, y: map$1._container.offsetHeight};
+    var trans =  transformation(map_size, size_m);
+    map$1.options.crs = _.extend({}, Simple, {transformation: trans });  
+    map$1.setMaxBounds([[-size_m.y, -size_m.x], [size_m.y*2, size_m.x*2]]);
+    map$1.setMaxZoom( maxZoom(size_m) );
+    var bounds =  toLatLngBounds([[0,0], [size_m.y, size_m.x]]);
+    if(_.isUndefined(map$1.getZoom()))
+        map$1.fitBounds(bounds);
+    // gridPanel(size_m);
+    return bounds;
+}
+
+var cur_locale = 'ru';
+
+function t(s, o, loc){
+    loc = loc || cur_locale;
+    var rep = translations[s] &&  translations[s][loc];
+    if(!rep) 
+        return 'Missing ' + loc + ' translation: ' + s;
+    if(o) for(var k in o)  rep = rep.replace('{' + k + '}', o[k]);
+    return rep
+}
+
+var translations = 
+{
+    "invalid_svg_type": {
+        "ru": "Не верный тип файла: {type}"
+    },
+    "invalid_svg_content": {
+        "ru": "SVG-документ с ошибками"
+    },
+    "no_svg_size":{
+        "ru": 'SVG-документ должен содержать атрибуты "width" и "height"'
+    },
+    "no_svg_dimensions": {
+        "ru": 'В SVG-документе отсутствуют и атрибуты "width", "height" и атрибут "viewBox"'
+    }
+};
+
+var DRAW_DISTANCE = 'draw-distance';
+var EDIT_GRID = 'edit-grid';
+
+var hidenElement = null;
+
+function getHidenEl(){
+    if(hidenElement)
+        return hidenElement;
+    hidenElement = document.createElement("div");    
+    hidenElement.style = 'visibility: hidden; position: absolute; top:0; left:0;';
+    hidenElement = document.body.appendChild(hidenElement);
+    return hidenElement;
+}
+
+function svgToBase64(svg_text)
+{
+    if(!svg_text || svg_text.length < 7) 
+        return Either.left(t('invalid_svg_content'))
+      
+    var parser = new DOMParser();    
+    var svg_document = parser.parseFromString(svg_text, "image/svg+xml").documentElement;
+    if( !svg_document ||
+        !svg_document.getAttribute ||
+        !startswith(svg_document.getAttribute('xmlns'), 'http://www.w3.org/2000/svg'))
+        return Either.left(t('invalid_svg_content'))
+    if(!svg_document.height || !svg_document.width)
+        return Either.left(t('no_svg_size'))
+
+    var viewBox = null;
+    if(svg_document.viewBox.baseVal && svg_document.viewBox.baseVal.width != 0) {
+        var vb = svg_document.viewBox.baseVal;
+        viewBox = [vb.x, vb.y, vb.width, vb.height];
+    }
+    var raw_svg =   new XMLSerializer().serializeToString(svg_document); 
+    var data_uri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(raw_svg)));
+    
+    if(!viewBox && (svg_document.width.baseVal.value == 0 || svg_document.height.baseVal.value == 0 )){
+        var node = document.importNode(svg_document, true);
+        node = getHidenEl().appendChild(node);
+        var box = node.getBBox();
+        viewBox = [0,0,box.x + box.width, box.y + box.height];
+        getHidenEl().removeChild(node);
+        // return Either.left(t('no_svg_dimensions'))
+    }
+    var width = 0, height = 0;
+    if(viewBox){
+        width = viewBox[2];
+        height = viewBox[3];
+    }
+    if(svg_document.width.baseVal.value != 0)
+        width = svg_document.width.baseVal.value;
+    if(svg_document.height.baseVal.value != 0)
+        height = svg_document.height.baseVal.value;
+    return Either.right({
+        svg_document: svg_document,
+        raw_svg: raw_svg,
+        width: width,
+        height: height,
+        data_uri: data_uri
+    })    
+}
+
+function FileHandler(store, error_fn)
+{
+    return function(e){
+        error_fn('');
+        var file = e.target.files[0];
+        if(!file) return; 
+        if(file.type !== 'image/svg+xml') {
+            error_fn(t('invalid_svg_type', {type: file.type}));
+        }
+        else  
+        {
+            var reader = new FileReader();
+            reader.onloadend = function(e){
+                svgToBase64(reader.result).fold(
+                    error_fn ,
+                    function(e) {
+                        store(BASE_LAYER_SET, {
+                            raw_svg: e.raw_svg,
+                            url: e.data_uri,
+                            size_m: {x: Math.round(e.width), y: Math.round(e.height)},
+                            size_px: {x: e.width, y: e.height}
+                        });
+                    }
+                );
+            };
+            reader.readAsText(file);
+        }
+        
+    }
+}
+
+function BaseView(store) {
+
+    var el = function(id) { return document.getElementById(id) };
+    var show = function(id) { el(id).style['display'] = ''; };
+    var hide = function(id) { el(id).style['display'] = 'none'; };
+    var html = function(id, t$$1) {  el(id).innerHTML = t$$1; };
+    var text = function(id, t$$1) {  el(id).innerText = t$$1; };
+    var value = function(id, t$$1) {  el(id).value = t$$1; };
+
+
+    el('file').onchange = FileHandler(store, function(error){ 
+        html('error', error);
+    });
+
+    el('draw_line').onclick = function(){
+        store(DRAWING_MODE_SET, DRAW_DISTANCE);
+    };
+
+    el('grid_edit').onclick = function(){
+        store(DRAWING_MODE_SET, EDIT_GRID);
+    };
+
+    el('distance_input').oninput = _.debounce( function(e){
+        var v = parseInt(el('distance_input').value);
+        if(!Number.isNaN(v) && v > 0)
+            store(BASE_DISTANCE_LENGTH_SET, v);
+    }, 500);
+
+    store.on('selectedBase.size_m', function(e){
+        if(e.new_val) {
+            var size = e.new_val;
+            show('toolbar');
+            show('size');
+            text('size_input', Math.round(size.x) + 'x' + Math.round(size.y));
+        }
+    }); 
+
+    store.on('selectedBase.distance', function(e){
+        if(e.new_val){
+            show('distance');
+            value('distance_input', e.new_val.length_m);
+        }
+        else {
+            hide('distance');
+        }
+    });
+}
+
 var ImageOverlay = Layer.extend({
 
 	// @section
@@ -7988,7 +11579,7 @@ var ImageOverlay = Layer.extend({
 	// @method setBounds(bounds: LatLngBounds): this
 	// Update the bounds that this ImageOverlay covers
 	setBounds: function (bounds) {
-		this._bounds = bounds;
+		this._bounds = toLatLngBounds(bounds);
 
 		if (this._map) {
 			this._reset();
@@ -9023,1000 +12614,6 @@ Map$1.include({
 		return renderer;
 	}
 });
-
-var Path = Layer.extend({
-
-	// @section
-	// @aka Path options
-	options: {
-		// @option stroke: Boolean = true
-		// Whether to draw stroke along the path. Set it to `false` to disable borders on polygons or circles.
-		stroke: true,
-
-		// @option color: String = '#3388ff'
-		// Stroke color
-		color: '#3388ff',
-
-		// @option weight: Number = 3
-		// Stroke width in pixels
-		weight: 3,
-
-		// @option opacity: Number = 1.0
-		// Stroke opacity
-		opacity: 1,
-
-		// @option lineCap: String= 'round'
-		// A string that defines [shape to be used at the end](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-linecap) of the stroke.
-		lineCap: 'round',
-
-		// @option lineJoin: String = 'round'
-		// A string that defines [shape to be used at the corners](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-linejoin) of the stroke.
-		lineJoin: 'round',
-
-		// @option dashArray: String = null
-		// A string that defines the stroke [dash pattern](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-dasharray). Doesn't work on `Canvas`-powered layers in [some old browsers](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/setLineDash#Browser_compatibility).
-		dashArray: null,
-
-		// @option dashOffset: String = null
-		// A string that defines the [distance into the dash pattern to start the dash](https://developer.mozilla.org/docs/Web/SVG/Attribute/stroke-dashoffset). Doesn't work on `Canvas`-powered layers in [some old browsers](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/setLineDash#Browser_compatibility).
-		dashOffset: null,
-
-		// @option fill: Boolean = depends
-		// Whether to fill the path with color. Set it to `false` to disable filling on polygons or circles.
-		fill: false,
-
-		// @option fillColor: String = *
-		// Fill color. Defaults to the value of the [`color`](#path-color) option
-		fillColor: null,
-
-		// @option fillOpacity: Number = 0.2
-		// Fill opacity.
-		fillOpacity: 0.2,
-
-		// @option fillRule: String = 'evenodd'
-		// A string that defines [how the inside of a shape](https://developer.mozilla.org/docs/Web/SVG/Attribute/fill-rule) is determined.
-		fillRule: 'evenodd',
-
-		// className: '',
-
-		// Option inherited from "Interactive layer" abstract class
-		interactive: true,
-
-		// @option bubblingMouseEvents: Boolean = true
-		// When `true`, a mouse event on this path will trigger the same event on the map
-		// (unless [`L.DomEvent.stopPropagation`](#domevent-stoppropagation) is used).
-		bubblingMouseEvents: true
-	},
-
-	beforeAdd: function (map) {
-		// Renderer is set here because we need to call renderer.getEvents
-		// before this.getEvents.
-		this._renderer = map.getRenderer(this);
-	},
-
-	onAdd: function () {
-		this._renderer._initPath(this);
-		this._reset();
-		this._renderer._addPath(this);
-	},
-
-	onRemove: function () {
-		this._renderer._removePath(this);
-	},
-
-	// @method redraw(): this
-	// Redraws the layer. Sometimes useful after you changed the coordinates that the path uses.
-	redraw: function () {
-		if (this._map) {
-			this._renderer._updatePath(this);
-		}
-		return this;
-	},
-
-	// @method setStyle(style: Path options): this
-	// Changes the appearance of a Path based on the options in the `Path options` object.
-	setStyle: function (style) {
-		setOptions(this, style);
-		if (this._renderer) {
-			this._renderer._updateStyle(this);
-		}
-		return this;
-	},
-
-	// @method bringToFront(): this
-	// Brings the layer to the top of all path layers.
-	bringToFront: function () {
-		if (this._renderer) {
-			this._renderer._bringToFront(this);
-		}
-		return this;
-	},
-
-	// @method bringToBack(): this
-	// Brings the layer to the bottom of all path layers.
-	bringToBack: function () {
-		if (this._renderer) {
-			this._renderer._bringToBack(this);
-		}
-		return this;
-	},
-
-	getElement: function () {
-		return this._path;
-	},
-
-	_reset: function () {
-		// defined in child classes
-		this._project();
-		this._update();
-	},
-
-	_clickTolerance: function () {
-		// used when doing hit detection for Canvas layers
-		return (this.options.stroke ? this.options.weight / 2 : 0) + (touch ? 10 : 0);
-	}
-});
-
-var CircleMarker = Path.extend({
-
-	// @section
-	// @aka CircleMarker options
-	options: {
-		fill: true,
-
-		// @option radius: Number = 10
-		// Radius of the circle marker, in pixels
-		radius: 10
-	},
-
-	initialize: function (latlng, options) {
-		setOptions(this, options);
-		this._latlng = toLatLng(latlng);
-		this._radius = this.options.radius;
-	},
-
-	// @method setLatLng(latLng: LatLng): this
-	// Sets the position of a circle marker to a new location.
-	setLatLng: function (latlng) {
-		this._latlng = toLatLng(latlng);
-		this.redraw();
-		return this.fire('move', {latlng: this._latlng});
-	},
-
-	// @method getLatLng(): LatLng
-	// Returns the current geographical position of the circle marker
-	getLatLng: function () {
-		return this._latlng;
-	},
-
-	// @method setRadius(radius: Number): this
-	// Sets the radius of a circle marker. Units are in pixels.
-	setRadius: function (radius) {
-		this.options.radius = this._radius = radius;
-		return this.redraw();
-	},
-
-	// @method getRadius(): Number
-	// Returns the current radius of the circle
-	getRadius: function () {
-		return this._radius;
-	},
-
-	setStyle : function (options) {
-		var radius = options && options.radius || this._radius;
-		Path.prototype.setStyle.call(this, options);
-		this.setRadius(radius);
-		return this;
-	},
-
-	_project: function () {
-		this._point = this._map.latLngToLayerPoint(this._latlng);
-		this._updateBounds();
-	},
-
-	_updateBounds: function () {
-		var r = this._radius,
-		    r2 = this._radiusY || r,
-		    w = this._clickTolerance(),
-		    p = [r + w, r2 + w];
-		this._pxBounds = new Bounds(this._point.subtract(p), this._point.add(p));
-	},
-
-	_update: function () {
-		if (this._map) {
-			this._updatePath();
-		}
-	},
-
-	_updatePath: function () {
-		this._renderer._updateCircle(this);
-	},
-
-	_empty: function () {
-		return this._radius && !this._renderer._bounds.intersects(this._pxBounds);
-	},
-
-	// Needed by the `Canvas` renderer for interactivity
-	_containsPoint: function (p) {
-		return p.distanceTo(this._point) <= this._radius + this._clickTolerance();
-	}
-});
-
-
-// @factory L.circleMarker(latlng: LatLng, options?: CircleMarker options)
-// Instantiates a circle marker object given a geographical point, and an optional options object.
-
-var Circle = CircleMarker.extend({
-
-	initialize: function (latlng, options, legacyOptions) {
-		if (typeof options === 'number') {
-			// Backwards compatibility with 0.7.x factory (latlng, radius, options?)
-			options = extend({}, legacyOptions, {radius: options});
-		}
-		setOptions(this, options);
-		this._latlng = toLatLng(latlng);
-
-		if (isNaN(this.options.radius)) { throw new Error('Circle radius cannot be NaN'); }
-
-		// @section
-		// @aka Circle options
-		// @option radius: Number; Radius of the circle, in meters.
-		this._mRadius = this.options.radius;
-	},
-
-	// @method setRadius(radius: Number): this
-	// Sets the radius of a circle. Units are in meters.
-	setRadius: function (radius) {
-		this._mRadius = radius;
-		return this.redraw();
-	},
-
-	// @method getRadius(): Number
-	// Returns the current radius of a circle. Units are in meters.
-	getRadius: function () {
-		return this._mRadius;
-	},
-
-	// @method getBounds(): LatLngBounds
-	// Returns the `LatLngBounds` of the path.
-	getBounds: function () {
-		var half = [this._radius, this._radiusY || this._radius];
-
-		return new LatLngBounds(
-			this._map.layerPointToLatLng(this._point.subtract(half)),
-			this._map.layerPointToLatLng(this._point.add(half)));
-	},
-
-	setStyle: Path.prototype.setStyle,
-
-	_project: function () {
-
-		var lng = this._latlng.lng,
-		    lat = this._latlng.lat,
-		    map = this._map,
-		    crs = map.options.crs;
-
-		if (crs.distance === Earth.distance) {
-			var d = Math.PI / 180,
-			    latR = (this._mRadius / Earth.R) / d,
-			    top = map.project([lat + latR, lng]),
-			    bottom = map.project([lat - latR, lng]),
-			    p = top.add(bottom).divideBy(2),
-			    lat2 = map.unproject(p).lat,
-			    lngR = Math.acos((Math.cos(latR * d) - Math.sin(lat * d) * Math.sin(lat2 * d)) /
-			            (Math.cos(lat * d) * Math.cos(lat2 * d))) / d;
-
-			if (isNaN(lngR) || lngR === 0) {
-				lngR = latR / Math.cos(Math.PI / 180 * lat); // Fallback for edge case, #2425
-			}
-
-			this._point = p.subtract(map.getPixelOrigin());
-			this._radius = isNaN(lngR) ? 0 : Math.max(Math.round(p.x - map.project([lat2, lng - lngR]).x), 1);
-			this._radiusY = Math.max(Math.round(p.y - top.y), 1);
-
-		} else {
-			var latlng2 = crs.unproject(crs.project(this._latlng).subtract([this._mRadius, 0]));
-
-			this._point = map.latLngToLayerPoint(this._latlng);
-			this._radius = this._point.x - map.latLngToLayerPoint(latlng2).x;
-		}
-
-		this._updateBounds();
-	}
-});
-
-// @factory L.circle(latlng: LatLng, options?: Circle options)
-// Instantiates a circle object given a geographical point, and an options object
-// which contains the circle radius.
-// @alternative
-// @factory L.circle(latlng: LatLng, radius: Number, options?: Circle options)
-// Obsolete way of instantiating a circle, for compatibility with 0.7.x code.
-// Do not use in new applications or plugins.
-
-function simplify(points, tolerance) {
-	if (!tolerance || !points.length) {
-		return points.slice();
-	}
-
-	var sqTolerance = tolerance * tolerance;
-
-	    // stage 1: vertex reduction
-	    points = _reducePoints(points, sqTolerance);
-
-	    // stage 2: Douglas-Peucker simplification
-	    points = _simplifyDP(points, sqTolerance);
-
-	return points;
-}
-
-// @function pointToSegmentDistance(p: Point, p1: Point, p2: Point): Number
-// Returns the distance between point `p` and segment `p1` to `p2`.
-function pointToSegmentDistance(p, p1, p2) {
-	return Math.sqrt(_sqClosestPointOnSegment(p, p1, p2, true));
-}
-
-// @function closestPointOnSegment(p: Point, p1: Point, p2: Point): Number
-// Returns the closest point from a point `p` on a segment `p1` to `p2`.
-
-
-// Douglas-Peucker simplification, see http://en.wikipedia.org/wiki/Douglas-Peucker_algorithm
-function _simplifyDP(points, sqTolerance) {
-
-	var len = points.length,
-	    ArrayConstructor = typeof Uint8Array !== undefined + '' ? Uint8Array : Array,
-	    markers = new ArrayConstructor(len);
-
-	    markers[0] = markers[len - 1] = 1;
-
-	_simplifyDPStep(points, markers, sqTolerance, 0, len - 1);
-
-	var i,
-	    newPoints = [];
-
-	for (i = 0; i < len; i++) {
-		if (markers[i]) {
-			newPoints.push(points[i]);
-		}
-	}
-
-	return newPoints;
-}
-
-function _simplifyDPStep(points, markers, sqTolerance, first, last) {
-
-	var maxSqDist = 0,
-	index, i, sqDist;
-
-	for (i = first + 1; i <= last - 1; i++) {
-		sqDist = _sqClosestPointOnSegment(points[i], points[first], points[last], true);
-
-		if (sqDist > maxSqDist) {
-			index = i;
-			maxSqDist = sqDist;
-		}
-	}
-
-	if (maxSqDist > sqTolerance) {
-		markers[index] = 1;
-
-		_simplifyDPStep(points, markers, sqTolerance, first, index);
-		_simplifyDPStep(points, markers, sqTolerance, index, last);
-	}
-}
-
-// reduce points that are too close to each other to a single point
-function _reducePoints(points, sqTolerance) {
-	var reducedPoints = [points[0]];
-
-	for (var i = 1, prev = 0, len = points.length; i < len; i++) {
-		if (_sqDist(points[i], points[prev]) > sqTolerance) {
-			reducedPoints.push(points[i]);
-			prev = i;
-		}
-	}
-	if (prev < len - 1) {
-		reducedPoints.push(points[len - 1]);
-	}
-	return reducedPoints;
-}
-
-var _lastCode;
-
-// @function clipSegment(a: Point, b: Point, bounds: Bounds, useLastCode?: Boolean, round?: Boolean): Point[]|Boolean
-// Clips the segment a to b by rectangular bounds with the
-// [Cohen-Sutherland algorithm](https://en.wikipedia.org/wiki/Cohen%E2%80%93Sutherland_algorithm)
-// (modifying the segment points directly!). Used by Leaflet to only show polyline
-// points that are on the screen or near, increasing performance.
-function clipSegment(a, b, bounds, useLastCode, round) {
-	var codeA = useLastCode ? _lastCode : _getBitCode(a, bounds),
-	    codeB = _getBitCode(b, bounds),
-
-	    codeOut, p, newCode;
-
-	    // save 2nd code to avoid calculating it on the next segment
-	    _lastCode = codeB;
-
-	while (true) {
-		// if a,b is inside the clip window (trivial accept)
-		if (!(codeA | codeB)) {
-			return [a, b];
-		}
-
-		// if a,b is outside the clip window (trivial reject)
-		if (codeA & codeB) {
-			return false;
-		}
-
-		// other cases
-		codeOut = codeA || codeB;
-		p = _getEdgeIntersection(a, b, codeOut, bounds, round);
-		newCode = _getBitCode(p, bounds);
-
-		if (codeOut === codeA) {
-			a = p;
-			codeA = newCode;
-		} else {
-			b = p;
-			codeB = newCode;
-		}
-	}
-}
-
-function _getEdgeIntersection(a, b, code, bounds, round) {
-	var dx = b.x - a.x,
-	    dy = b.y - a.y,
-	    min = bounds.min,
-	    max = bounds.max,
-	    x, y;
-
-	if (code & 8) { // top
-		x = a.x + dx * (max.y - a.y) / dy;
-		y = max.y;
-
-	} else if (code & 4) { // bottom
-		x = a.x + dx * (min.y - a.y) / dy;
-		y = min.y;
-
-	} else if (code & 2) { // right
-		x = max.x;
-		y = a.y + dy * (max.x - a.x) / dx;
-
-	} else if (code & 1) { // left
-		x = min.x;
-		y = a.y + dy * (min.x - a.x) / dx;
-	}
-
-	return new Point(x, y, round);
-}
-
-function _getBitCode(p, bounds) {
-	var code = 0;
-
-	if (p.x < bounds.min.x) { // left
-		code |= 1;
-	} else if (p.x > bounds.max.x) { // right
-		code |= 2;
-	}
-
-	if (p.y < bounds.min.y) { // bottom
-		code |= 4;
-	} else if (p.y > bounds.max.y) { // top
-		code |= 8;
-	}
-
-	return code;
-}
-
-// square distance (to avoid unnecessary Math.sqrt calls)
-function _sqDist(p1, p2) {
-	var dx = p2.x - p1.x,
-	    dy = p2.y - p1.y;
-	return dx * dx + dy * dy;
-}
-
-// return closest point on segment or distance to that point
-function _sqClosestPointOnSegment(p, p1, p2, sqDist) {
-	var x = p1.x,
-	    y = p1.y,
-	    dx = p2.x - x,
-	    dy = p2.y - y,
-	    dot = dx * dx + dy * dy,
-	    t;
-
-	if (dot > 0) {
-		t = ((p.x - x) * dx + (p.y - y) * dy) / dot;
-
-		if (t > 1) {
-			x = p2.x;
-			y = p2.y;
-		} else if (t > 0) {
-			x += dx * t;
-			y += dy * t;
-		}
-	}
-
-	dx = p.x - x;
-	dy = p.y - y;
-
-	return sqDist ? dx * dx + dy * dy : new Point(x, y);
-}
-
-
-function _flat(latlngs) {
-	// true if it's a flat array of latlngs; false if nested
-	return !isArray(latlngs[0]) || (typeof latlngs[0][0] !== 'object' && typeof latlngs[0][0] !== 'undefined');
-}
-
-var Polyline = Path.extend({
-
-	// @section
-	// @aka Polyline options
-	options: {
-		// @option smoothFactor: Number = 1.0
-		// How much to simplify the polyline on each zoom level. More means
-		// better performance and smoother look, and less means more accurate representation.
-		smoothFactor: 1.0,
-
-		// @option noClip: Boolean = false
-		// Disable polyline clipping.
-		noClip: false
-	},
-
-	initialize: function (latlngs, options) {
-		setOptions(this, options);
-		this._setLatLngs(latlngs);
-	},
-
-	// @method getLatLngs(): LatLng[]
-	// Returns an array of the points in the path, or nested arrays of points in case of multi-polyline.
-	getLatLngs: function () {
-		return this._latlngs;
-	},
-
-	// @method setLatLngs(latlngs: LatLng[]): this
-	// Replaces all the points in the polyline with the given array of geographical points.
-	setLatLngs: function (latlngs) {
-		this._setLatLngs(latlngs);
-		return this.redraw();
-	},
-
-	// @method isEmpty(): Boolean
-	// Returns `true` if the Polyline has no LatLngs.
-	isEmpty: function () {
-		return !this._latlngs.length;
-	},
-
-	closestLayerPoint: function (p) {
-		var minDistance = Infinity,
-		    minPoint = null,
-		    closest = _sqClosestPointOnSegment,
-		    p1, p2;
-
-		for (var j = 0, jLen = this._parts.length; j < jLen; j++) {
-			var points = this._parts[j];
-
-			for (var i = 1, len = points.length; i < len; i++) {
-				p1 = points[i - 1];
-				p2 = points[i];
-
-				var sqDist = closest(p, p1, p2, true);
-
-				if (sqDist < minDistance) {
-					minDistance = sqDist;
-					minPoint = closest(p, p1, p2);
-				}
-			}
-		}
-		if (minPoint) {
-			minPoint.distance = Math.sqrt(minDistance);
-		}
-		return minPoint;
-	},
-
-	// @method getCenter(): LatLng
-	// Returns the center ([centroid](http://en.wikipedia.org/wiki/Centroid)) of the polyline.
-	getCenter: function () {
-		// throws error when not yet added to map as this center calculation requires projected coordinates
-		if (!this._map) {
-			throw new Error('Must add layer to map before using getCenter()');
-		}
-
-		var i, halfDist, segDist, dist, p1, p2, ratio,
-		    points = this._rings[0],
-		    len = points.length;
-
-		if (!len) { return null; }
-
-		// polyline centroid algorithm; only uses the first ring if there are multiple
-
-		for (i = 0, halfDist = 0; i < len - 1; i++) {
-			halfDist += points[i].distanceTo(points[i + 1]) / 2;
-		}
-
-		// The line is so small in the current view that all points are on the same pixel.
-		if (halfDist === 0) {
-			return this._map.layerPointToLatLng(points[0]);
-		}
-
-		for (i = 0, dist = 0; i < len - 1; i++) {
-			p1 = points[i];
-			p2 = points[i + 1];
-			segDist = p1.distanceTo(p2);
-			dist += segDist;
-
-			if (dist > halfDist) {
-				ratio = (dist - halfDist) / segDist;
-				return this._map.layerPointToLatLng([
-					p2.x - ratio * (p2.x - p1.x),
-					p2.y - ratio * (p2.y - p1.y)
-				]);
-			}
-		}
-	},
-
-	// @method getBounds(): LatLngBounds
-	// Returns the `LatLngBounds` of the path.
-	getBounds: function () {
-		return this._bounds;
-	},
-
-	// @method addLatLng(latlng: LatLng, latlngs? LatLng[]): this
-	// Adds a given point to the polyline. By default, adds to the first ring of
-	// the polyline in case of a multi-polyline, but can be overridden by passing
-	// a specific ring as a LatLng array (that you can earlier access with [`getLatLngs`](#polyline-getlatlngs)).
-	addLatLng: function (latlng, latlngs) {
-		latlngs = latlngs || this._defaultShape();
-		latlng = toLatLng(latlng);
-		latlngs.push(latlng);
-		this._bounds.extend(latlng);
-		return this.redraw();
-	},
-
-	_setLatLngs: function (latlngs) {
-		this._bounds = new LatLngBounds();
-		this._latlngs = this._convertLatLngs(latlngs);
-	},
-
-	_defaultShape: function () {
-		return _flat(this._latlngs) ? this._latlngs : this._latlngs[0];
-	},
-
-	// recursively convert latlngs input into actual LatLng instances; calculate bounds along the way
-	_convertLatLngs: function (latlngs) {
-		var result = [],
-		    flat = _flat(latlngs);
-
-		for (var i = 0, len = latlngs.length; i < len; i++) {
-			if (flat) {
-				result[i] = toLatLng(latlngs[i]);
-				this._bounds.extend(result[i]);
-			} else {
-				result[i] = this._convertLatLngs(latlngs[i]);
-			}
-		}
-
-		return result;
-	},
-
-	_project: function () {
-		var pxBounds = new Bounds();
-		this._rings = [];
-		this._projectLatlngs(this._latlngs, this._rings, pxBounds);
-
-		var w = this._clickTolerance(),
-		    p = new Point(w, w);
-
-		if (this._bounds.isValid() && pxBounds.isValid()) {
-			pxBounds.min._subtract(p);
-			pxBounds.max._add(p);
-			this._pxBounds = pxBounds;
-		}
-	},
-
-	// recursively turns latlngs into a set of rings with projected coordinates
-	_projectLatlngs: function (latlngs, result, projectedBounds) {
-		var flat = latlngs[0] instanceof LatLng,
-		    len = latlngs.length,
-		    i, ring;
-
-		if (flat) {
-			ring = [];
-			for (i = 0; i < len; i++) {
-				ring[i] = this._map.latLngToLayerPoint(latlngs[i]);
-				projectedBounds.extend(ring[i]);
-			}
-			result.push(ring);
-		} else {
-			for (i = 0; i < len; i++) {
-				this._projectLatlngs(latlngs[i], result, projectedBounds);
-			}
-		}
-	},
-
-	// clip polyline by renderer bounds so that we have less to render for performance
-	_clipPoints: function () {
-		var bounds = this._renderer._bounds;
-
-		this._parts = [];
-		if (!this._pxBounds || !this._pxBounds.intersects(bounds)) {
-			return;
-		}
-
-		if (this.options.noClip) {
-			this._parts = this._rings;
-			return;
-		}
-
-		var parts = this._parts,
-		    i, j, k, len, len2, segment, points;
-
-		for (i = 0, k = 0, len = this._rings.length; i < len; i++) {
-			points = this._rings[i];
-
-			for (j = 0, len2 = points.length; j < len2 - 1; j++) {
-				segment = clipSegment(points[j], points[j + 1], bounds, j, true);
-
-				if (!segment) { continue; }
-
-				parts[k] = parts[k] || [];
-				parts[k].push(segment[0]);
-
-				// if segment goes out of screen, or it's the last one, it's the end of the line part
-				if ((segment[1] !== points[j + 1]) || (j === len2 - 2)) {
-					parts[k].push(segment[1]);
-					k++;
-				}
-			}
-		}
-	},
-
-	// simplify each clipped part of the polyline for performance
-	_simplifyPoints: function () {
-		var parts = this._parts,
-		    tolerance = this.options.smoothFactor;
-
-		for (var i = 0, len = parts.length; i < len; i++) {
-			parts[i] = simplify(parts[i], tolerance);
-		}
-	},
-
-	_update: function () {
-		if (!this._map) { return; }
-
-		this._clipPoints();
-		this._simplifyPoints();
-		this._updatePath();
-	},
-
-	_updatePath: function () {
-		this._renderer._updatePoly(this);
-	},
-
-	// Needed by the `Canvas` renderer for interactivity
-	_containsPoint: function (p, closed) {
-		var i, j, k, len, len2, part,
-		    w = this._clickTolerance();
-
-		if (!this._pxBounds || !this._pxBounds.contains(p)) { return false; }
-
-		// hit detection for polylines
-		for (i = 0, len = this._parts.length; i < len; i++) {
-			part = this._parts[i];
-
-			for (j = 0, len2 = part.length, k = len2 - 1; j < len2; k = j++) {
-				if (!closed && (j === 0)) { continue; }
-
-				if (pointToSegmentDistance(p, part[k], part[j]) <= w) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-});
-
-// @factory L.polyline(latlngs: LatLng[], options?: Polyline options)
-// Instantiates a polyline object given an array of geographical points and
-// optionally an options object. You can create a `Polyline` object with
-// multiple separate lines (`MultiPolyline`) by passing an array of arrays
-// of geographic points.
-
-function clipPolygon(points, bounds, round) {
-	var clippedPoints,
-	    edges = [1, 4, 2, 8],
-	    i, j, k,
-	    a, b,
-	    len, edge, p;
-
-	for (i = 0, len = points.length; i < len; i++) {
-		points[i]._code = _getBitCode(points[i], bounds);
-	}
-
-	// for each edge (left, bottom, right, top)
-	for (k = 0; k < 4; k++) {
-		edge = edges[k];
-		clippedPoints = [];
-
-		for (i = 0, len = points.length, j = len - 1; i < len; j = i++) {
-			a = points[i];
-			b = points[j];
-
-			// if a is inside the clip window
-			if (!(a._code & edge)) {
-				// if b is outside the clip window (a->b goes out of screen)
-				if (b._code & edge) {
-					p = _getEdgeIntersection(b, a, edge, bounds, round);
-					p._code = _getBitCode(p, bounds);
-					clippedPoints.push(p);
-				}
-				clippedPoints.push(a);
-
-			// else if b is inside the clip window (a->b enters the screen)
-			} else if (!(b._code & edge)) {
-				p = _getEdgeIntersection(b, a, edge, bounds, round);
-				p._code = _getBitCode(p, bounds);
-				clippedPoints.push(p);
-			}
-		}
-		points = clippedPoints;
-	}
-
-	return points;
-}
-
-var Polygon = Polyline.extend({
-
-	options: {
-		fill: true
-	},
-
-	isEmpty: function () {
-		return !this._latlngs.length || !this._latlngs[0].length;
-	},
-
-	getCenter: function () {
-		// throws error when not yet added to map as this center calculation requires projected coordinates
-		if (!this._map) {
-			throw new Error('Must add layer to map before using getCenter()');
-		}
-
-		var i, j, p1, p2, f, area, x, y, center,
-		    points = this._rings[0],
-		    len = points.length;
-
-		if (!len) { return null; }
-
-		// polygon centroid algorithm; only uses the first ring if there are multiple
-
-		area = x = y = 0;
-
-		for (i = 0, j = len - 1; i < len; j = i++) {
-			p1 = points[i];
-			p2 = points[j];
-
-			f = p1.y * p2.x - p2.y * p1.x;
-			x += (p1.x + p2.x) * f;
-			y += (p1.y + p2.y) * f;
-			area += f * 3;
-		}
-
-		if (area === 0) {
-			// Polygon is so small that all points are on same pixel.
-			center = points[0];
-		} else {
-			center = [x / area, y / area];
-		}
-		return this._map.layerPointToLatLng(center);
-	},
-
-	_convertLatLngs: function (latlngs) {
-		var result = Polyline.prototype._convertLatLngs.call(this, latlngs),
-		    len = result.length;
-
-		// remove last point if it equals first one
-		if (len >= 2 && result[0] instanceof LatLng && result[0].equals(result[len - 1])) {
-			result.pop();
-		}
-		return result;
-	},
-
-	_setLatLngs: function (latlngs) {
-		Polyline.prototype._setLatLngs.call(this, latlngs);
-		if (_flat(this._latlngs)) {
-			this._latlngs = [this._latlngs];
-		}
-	},
-
-	_defaultShape: function () {
-		return _flat(this._latlngs[0]) ? this._latlngs[0] : this._latlngs[0][0];
-	},
-
-	_clipPoints: function () {
-		// polygons need a different clipping algorithm so we redefine that
-
-		var bounds = this._renderer._bounds,
-		    w = this.options.weight,
-		    p = new Point(w, w);
-
-		// increase clip padding by stroke width to avoid stroke on clip edges
-		bounds = new Bounds(bounds.min.subtract(p), bounds.max.add(p));
-
-		this._parts = [];
-		if (!this._pxBounds || !this._pxBounds.intersects(bounds)) {
-			return;
-		}
-
-		if (this.options.noClip) {
-			this._parts = this._rings;
-			return;
-		}
-
-		for (var i = 0, len = this._rings.length, clipped; i < len; i++) {
-			clipped = clipPolygon(this._rings[i], bounds, true);
-			if (clipped.length) {
-				this._parts.push(clipped);
-			}
-		}
-	},
-
-	_updatePath: function () {
-		this._renderer._updatePoly(this, true);
-	},
-
-	// Needed by the `Canvas` renderer for interactivity
-	_containsPoint: function (p) {
-		var inside = false,
-		    part, p1, p2, i, j, k, len, len2;
-
-		if (!this._pxBounds.contains(p)) { return false; }
-
-		// ray casting algorithm for detecting if point is in polygon
-		for (i = 0, len = this._parts.length; i < len; i++) {
-			part = this._parts[i];
-
-			for (j = 0, len2 = part.length, k = len2 - 1; j < len2; k = j++) {
-				p1 = part[j];
-				p2 = part[k];
-
-				if (((p1.y > p.y) !== (p2.y > p.y)) && (p.x < (p2.x - p1.x) * (p.y - p1.y) / (p2.y - p1.y) + p1.x)) {
-					inside = !inside;
-				}
-			}
-		}
-
-		// also check if it's on polygon stroke
-		return inside || Polyline.prototype._containsPoint.call(this, p, true);
-	}
-
-});
-
-
-// @factory L.polygon(latlngs: LatLng[], options?: Polyline options)
-
-var Rectangle = Polygon.extend({
-	initialize: function (latLngBounds, options) {
-		Polygon.prototype.initialize.call(this, this._boundsToLatLngs(latLngBounds), options);
-	},
-
-	// @method setBounds(latLngBounds: LatLngBounds): this
-	// Redraws the rectangle with the passed bounds.
-	setBounds: function (latLngBounds) {
-		return this.setLatLngs(this._boundsToLatLngs(latLngBounds));
-	},
-
-	_boundsToLatLngs: function (latLngBounds) {
-		latLngBounds = toLatLngBounds(latLngBounds);
-		return [
-			latLngBounds.getSouthWest(),
-			latLngBounds.getNorthWest(),
-			latLngBounds.getNorthEast(),
-			latLngBounds.getSouthEast()
-		];
-	}
-});
-
-
-// @factory L.rectangle(latLngBounds: LatLngBounds, options?: Polyline options)
 
 SVG.create = create$2;
 SVG.pointsToPath = pointsToPath;
@@ -12545,6 +15142,14 @@ var Grid = Rectangle.extend({
         Rectangle.prototype.onRemove.call(this, map);
     },
 
+    getPoints: function(){
+        var ll = this._boundsToLatLngs(this.getLatLngs());
+        return {
+            topLeft: { x: ll[0].lng, y: ll[0].lat },
+            bottomRight: { x: ll[2].lng, y: ll[2].lat },
+        }
+    },
+
     _addAxis: function(map){
         var format_meters = function(d) { return d + ' м'};
         var map_size = map._container.getBoundingClientRect();
@@ -12569,7 +15174,7 @@ var Grid = Rectangle.extend({
         this.$axisY = this.$graphPanel.append('g')
                         .attr('class', 'y axis')
                         .attr("transform", "translate("+ (margin.left) +"," + margin.top + ")");
-        this.scaleY = linear().range([0, map_size.height ]);
+        this.scaleY = linear().range([map_size.height, 0 ]);
         this.axisY = axisLeft(this.scaleY).ticks(10).tickFormat(format_meters);
     },
 
@@ -12579,7 +15184,8 @@ var Grid = Rectangle.extend({
         this.scaleX.domain([b.getWest() - myb.getWest(), b.getEast() - myb.getWest()]);
         this.$axisX.call(this.axisX);
 
-        this.scaleY.domain([b.getSouth()-myb.getSouth(), b.getNorth()-myb.getSouth() ]);
+        // this.scaleY.domain([b.getSouth()-myb.getSouth(), b.getNorth()-myb.getSouth() ]);
+        this.scaleY.domain([myb.getNorth()-b.getNorth(), myb.getNorth()-b.getSouth() ]);
         this.$axisY.call(this.axisY);
     },
 
@@ -12648,7 +15254,7 @@ var Grid = Rectangle.extend({
                 }
             // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
             }
-            this.step = d;
+            this.step = d > 5 ? d : 5;
         }
         Rectangle.prototype._project.call(this);
     }
@@ -12656,55 +15262,1211 @@ var Grid = Rectangle.extend({
 
 var BaseMapView = function (store, map)
 {
-    var baseLayer$$1 = null;
-    var grid = null;
+    var m ={
+        baseLayer: null,
+        grid: null
+    };
 
     store.on('selectedBase.url', function(e){
         var url = e.new_val;        
-        if(baseLayer$$1) {
-            map.removeLayer(baseLayer$$1);
-            baseLayer$$1 = null;
-            map.removeLayer(grid);
-            grid = null;
+        if(m.baseLayer) {
+            map.removeLayer(m.baseLayer);
+            m.baseLayer = null;
+            map.removeLayer(m.grid);
+            m.grid = null;
         }
         if(url) {
             var size_m = selectedBase(store).size_m;
-            var bounds =  toLatLngBounds([[0,0], [size_m.y, size_m.x]]);
-            baseLayer$$1 = imageOverlay(url, bounds, {crossOrigin: true}).addTo(map);
-            map.fitBounds(bounds);
-            var latlngs = [bounds.getSouthWest(),
-			bounds.getNorthWest(),
-			bounds.getNorthEast(),
-            bounds.getSouthEast()];
-            grid = new Grid(latlngs).addTo(map);
+            var b =  toLatLngBounds([[0,0], [size_m.y, size_m.x]]);
+            m.baseLayer = imageOverlay(url, b, {crossOrigin: true}).addTo(map);
+            map.fitBounds(b);
         }
     });
 
     store.on('selectedBase.size_m', function(e){
         var size_m = e.new_val;
-        if(baseLayer$$1 && size_m) {
-            var bounds =  toLatLngBounds([[0,0], [size_m.y, size_m.x]]);
-            baseLayer$$1.setBounds(bounds);    
+        if(m.baseLayer && size_m) {
+            var b =  toLatLngBounds([[0,0], [size_m.y, size_m.x]]);
+            m.baseLayer.setBounds(b);  
         }
     });
+
+    store.on('selectedBase.grid', function(e){
+        if(e.new_val) {
+            var d = e.new_val;
+            var b = toLatLngBounds(toLatLngs([d.topLeft, d.bottomRight]));
+            var latlngs = [b.getSouthWest(), b.getNorthWest(),b.getNorthEast(),b.getSouthEast()];
+            if(m.grid) {
+                if(!m.grid.editor || !m.grid.editor.enabled())
+                    m.grid.setLatLngs(latlngs);
+            }
+            else 
+                m.grid = new Grid(latlngs).addTo(map);
+        }
+    });
+
+    return m;
 };
 
-var DRAW_DISTANCE = 'draw-distance';
+var DivOverlay = Layer.extend({
+
+	// @section
+	// @aka DivOverlay options
+	options: {
+		// @option offset: Point = Point(0, 7)
+		// The offset of the popup position. Useful to control the anchor
+		// of the popup when opening it on some overlays.
+		offset: [0, 7],
+
+		// @option className: String = ''
+		// A custom CSS class name to assign to the popup.
+		className: '',
+
+		// @option pane: String = 'popupPane'
+		// `Map pane` where the popup will be added.
+		pane: 'popupPane'
+	},
+
+	initialize: function (options, source) {
+		setOptions(this, options);
+
+		this._source = source;
+	},
+
+	onAdd: function (map) {
+		this._zoomAnimated = map._zoomAnimated;
+
+		if (!this._container) {
+			this._initLayout();
+		}
+
+		if (map._fadeAnimated) {
+			setOpacity(this._container, 0);
+		}
+
+		clearTimeout(this._removeTimeout);
+		this.getPane().appendChild(this._container);
+		this.update();
+
+		if (map._fadeAnimated) {
+			setOpacity(this._container, 1);
+		}
+
+		this.bringToFront();
+	},
+
+	onRemove: function (map) {
+		if (map._fadeAnimated) {
+			setOpacity(this._container, 0);
+			this._removeTimeout = setTimeout(bind(remove, undefined, this._container), 200);
+		} else {
+			remove(this._container);
+		}
+	},
+
+	// @namespace Popup
+	// @method getLatLng: LatLng
+	// Returns the geographical point of popup.
+	getLatLng: function () {
+		return this._latlng;
+	},
+
+	// @method setLatLng(latlng: LatLng): this
+	// Sets the geographical point where the popup will open.
+	setLatLng: function (latlng) {
+		this._latlng = toLatLng(latlng);
+		if (this._map) {
+			this._updatePosition();
+			this._adjustPan();
+		}
+		return this;
+	},
+
+	// @method getContent: String|HTMLElement
+	// Returns the content of the popup.
+	getContent: function () {
+		return this._content;
+	},
+
+	// @method setContent(htmlContent: String|HTMLElement|Function): this
+	// Sets the HTML content of the popup. If a function is passed the source layer will be passed to the function. The function should return a `String` or `HTMLElement` to be used in the popup.
+	setContent: function (content) {
+		this._content = content;
+		this.update();
+		return this;
+	},
+
+	// @method getElement: String|HTMLElement
+	// Alias for [getContent()](#popup-getcontent)
+	getElement: function () {
+		return this._container;
+	},
+
+	// @method update: null
+	// Updates the popup content, layout and position. Useful for updating the popup after something inside changed, e.g. image loaded.
+	update: function () {
+		if (!this._map) { return; }
+
+		this._container.style.visibility = 'hidden';
+
+		this._updateContent();
+		this._updateLayout();
+		this._updatePosition();
+
+		this._container.style.visibility = '';
+
+		this._adjustPan();
+	},
+
+	getEvents: function () {
+		var events = {
+			zoom: this._updatePosition,
+			viewreset: this._updatePosition
+		};
+
+		if (this._zoomAnimated) {
+			events.zoomanim = this._animateZoom;
+		}
+		return events;
+	},
+
+	// @method isOpen: Boolean
+	// Returns `true` when the popup is visible on the map.
+	isOpen: function () {
+		return !!this._map && this._map.hasLayer(this);
+	},
+
+	// @method bringToFront: this
+	// Brings this popup in front of other popups (in the same map pane).
+	bringToFront: function () {
+		if (this._map) {
+			toFront(this._container);
+		}
+		return this;
+	},
+
+	// @method bringToBack: this
+	// Brings this popup to the back of other popups (in the same map pane).
+	bringToBack: function () {
+		if (this._map) {
+			toBack(this._container);
+		}
+		return this;
+	},
+
+	_updateContent: function () {
+		if (!this._content) { return; }
+
+		var node = this._contentNode;
+		var content = (typeof this._content === 'function') ? this._content(this._source || this) : this._content;
+
+		if (typeof content === 'string') {
+			node.innerHTML = content;
+		} else {
+			while (node.hasChildNodes()) {
+				node.removeChild(node.firstChild);
+			}
+			node.appendChild(content);
+		}
+		this.fire('contentupdate');
+	},
+
+	_updatePosition: function () {
+		if (!this._map) { return; }
+
+		var pos = this._map.latLngToLayerPoint(this._latlng),
+		    offset = toPoint(this.options.offset),
+		    anchor = this._getAnchor();
+
+		if (this._zoomAnimated) {
+			setPosition(this._container, pos.add(anchor));
+		} else {
+			offset = offset.add(pos).add(anchor);
+		}
+
+		var bottom = this._containerBottom = -offset.y,
+		    left = this._containerLeft = -Math.round(this._containerWidth / 2) + offset.x;
+
+		// bottom position the popup in case the height of the popup changes (images loading etc)
+		this._container.style.bottom = bottom + 'px';
+		this._container.style.left = left + 'px';
+	},
+
+	_getAnchor: function () {
+		return [0, 0];
+	}
+
+});
+
+var FeatureGroup = LayerGroup.extend({
+
+	addLayer: function (layer) {
+		if (this.hasLayer(layer)) {
+			return this;
+		}
+
+		layer.addEventParent(this);
+
+		LayerGroup.prototype.addLayer.call(this, layer);
+
+		// @event layeradd: LayerEvent
+		// Fired when a layer is added to this `FeatureGroup`
+		return this.fire('layeradd', {layer: layer});
+	},
+
+	removeLayer: function (layer) {
+		if (!this.hasLayer(layer)) {
+			return this;
+		}
+		if (layer in this._layers) {
+			layer = this._layers[layer];
+		}
+
+		layer.removeEventParent(this);
+
+		LayerGroup.prototype.removeLayer.call(this, layer);
+
+		// @event layerremove: LayerEvent
+		// Fired when a layer is removed from this `FeatureGroup`
+		return this.fire('layerremove', {layer: layer});
+	},
+
+	// @method setStyle(style: Path options): this
+	// Sets the given path options to each layer of the group that has a `setStyle` method.
+	setStyle: function (style) {
+		return this.invoke('setStyle', style);
+	},
+
+	// @method bringToFront(): this
+	// Brings the layer group to the top of all other layers
+	bringToFront: function () {
+		return this.invoke('bringToFront');
+	},
+
+	// @method bringToBack(): this
+	// Brings the layer group to the top of all other layers
+	bringToBack: function () {
+		return this.invoke('bringToBack');
+	},
+
+	// @method getBounds(): LatLngBounds
+	// Returns the LatLngBounds of the Feature Group (created from bounds and coordinates of its children).
+	getBounds: function () {
+		var bounds = new LatLngBounds();
+
+		for (var id in this._layers) {
+			var layer = this._layers[id];
+			bounds.extend(layer.getBounds ? layer.getBounds() : layer.getLatLng());
+		}
+		return bounds;
+	}
+});
+
+// @factory L.featureGroup(layers: Layer[])
+// Create a feature group, optionally given an initial set of layers.
+
+var Tooltip = DivOverlay.extend({
+
+	// @section
+	// @aka Tooltip options
+	options: {
+		// @option pane: String = 'tooltipPane'
+		// `Map pane` where the tooltip will be added.
+		pane: 'tooltipPane',
+
+		// @option offset: Point = Point(0, 0)
+		// Optional offset of the tooltip position.
+		offset: [0, 0],
+
+		// @option direction: String = 'auto'
+		// Direction where to open the tooltip. Possible values are: `right`, `left`,
+		// `top`, `bottom`, `center`, `auto`.
+		// `auto` will dynamicaly switch between `right` and `left` according to the tooltip
+		// position on the map.
+		direction: 'auto',
+
+		// @option permanent: Boolean = false
+		// Whether to open the tooltip permanently or only on mouseover.
+		permanent: false,
+
+		// @option sticky: Boolean = false
+		// If true, the tooltip will follow the mouse instead of being fixed at the feature center.
+		sticky: false,
+
+		// @option interactive: Boolean = false
+		// If true, the tooltip will listen to the feature events.
+		interactive: false,
+
+		// @option opacity: Number = 0.9
+		// Tooltip container opacity.
+		opacity: 0.9
+	},
+
+	onAdd: function (map) {
+		DivOverlay.prototype.onAdd.call(this, map);
+		this.setOpacity(this.options.opacity);
+
+		// @namespace Map
+		// @section Tooltip events
+		// @event tooltipopen: TooltipEvent
+		// Fired when a tooltip is opened in the map.
+		map.fire('tooltipopen', {tooltip: this});
+
+		if (this._source) {
+			// @namespace Layer
+			// @section Tooltip events
+			// @event tooltipopen: TooltipEvent
+			// Fired when a tooltip bound to this layer is opened.
+			this._source.fire('tooltipopen', {tooltip: this}, true);
+		}
+	},
+
+	onRemove: function (map) {
+		DivOverlay.prototype.onRemove.call(this, map);
+
+		// @namespace Map
+		// @section Tooltip events
+		// @event tooltipclose: TooltipEvent
+		// Fired when a tooltip in the map is closed.
+		map.fire('tooltipclose', {tooltip: this});
+
+		if (this._source) {
+			// @namespace Layer
+			// @section Tooltip events
+			// @event tooltipclose: TooltipEvent
+			// Fired when a tooltip bound to this layer is closed.
+			this._source.fire('tooltipclose', {tooltip: this}, true);
+		}
+	},
+
+	getEvents: function () {
+		var events = DivOverlay.prototype.getEvents.call(this);
+
+		if (touch && !this.options.permanent) {
+			events.preclick = this._close;
+		}
+
+		return events;
+	},
+
+	_close: function () {
+		if (this._map) {
+			this._map.closeTooltip(this);
+		}
+	},
+
+	_initLayout: function () {
+		var prefix = 'leaflet-tooltip',
+		    className = prefix + ' ' + (this.options.className || '') + ' leaflet-zoom-' + (this._zoomAnimated ? 'animated' : 'hide');
+
+		this._contentNode = this._container = create$1('div', className);
+	},
+
+	_updateLayout: function () {},
+
+	_adjustPan: function () {},
+
+	_setPosition: function (pos) {
+		var map = this._map,
+		    container = this._container,
+		    centerPoint = map.latLngToContainerPoint(map.getCenter()),
+		    tooltipPoint = map.layerPointToContainerPoint(pos),
+		    direction = this.options.direction,
+		    tooltipWidth = container.offsetWidth,
+		    tooltipHeight = container.offsetHeight,
+		    offset = toPoint(this.options.offset),
+		    anchor = this._getAnchor();
+
+		if (direction === 'top') {
+			pos = pos.add(toPoint(-tooltipWidth / 2 + offset.x, -tooltipHeight + offset.y + anchor.y, true));
+		} else if (direction === 'bottom') {
+			pos = pos.subtract(toPoint(tooltipWidth / 2 - offset.x, -offset.y, true));
+		} else if (direction === 'center') {
+			pos = pos.subtract(toPoint(tooltipWidth / 2 + offset.x, tooltipHeight / 2 - anchor.y + offset.y, true));
+		} else if (direction === 'right' || direction === 'auto' && tooltipPoint.x < centerPoint.x) {
+			direction = 'right';
+			pos = pos.add(toPoint(offset.x + anchor.x, anchor.y - tooltipHeight / 2 + offset.y, true));
+		} else {
+			direction = 'left';
+			pos = pos.subtract(toPoint(tooltipWidth + anchor.x - offset.x, tooltipHeight / 2 - anchor.y - offset.y, true));
+		}
+
+		removeClass(container, 'leaflet-tooltip-right');
+		removeClass(container, 'leaflet-tooltip-left');
+		removeClass(container, 'leaflet-tooltip-top');
+		removeClass(container, 'leaflet-tooltip-bottom');
+		addClass(container, 'leaflet-tooltip-' + direction);
+		setPosition(container, pos);
+	},
+
+	_updatePosition: function () {
+		var pos = this._map.latLngToLayerPoint(this._latlng);
+		this._setPosition(pos);
+	},
+
+	setOpacity: function (opacity) {
+		this.options.opacity = opacity;
+
+		if (this._container) {
+			setOpacity(this._container, opacity);
+		}
+	},
+
+	_animateZoom: function (e) {
+		var pos = this._map._latLngToNewLayerPoint(this._latlng, e.zoom, e.center);
+		this._setPosition(pos);
+	},
+
+	_getAnchor: function () {
+		// Where should we anchor the tooltip on the source layer?
+		return toPoint(this._source && this._source._getTooltipAnchor && !this.options.sticky ? this._source._getTooltipAnchor() : [0, 0]);
+	}
+
+});
+
+// @namespace Tooltip
+// @factory L.tooltip(options?: Tooltip options, source?: Layer)
+// Instantiates a Tooltip object given an optional `options` object that describes its appearance and location and an optional `source` object that is used to tag the tooltip with a reference to the Layer to which it refers.
+var tooltip = function (options, source) {
+	return new Tooltip(options, source);
+};
+
+// @namespace Map
+// @section Methods for Layers and Controls
+Map$1.include({
+
+	// @method openTooltip(tooltip: Tooltip): this
+	// Opens the specified tooltip.
+	// @alternative
+	// @method openTooltip(content: String|HTMLElement, latlng: LatLng, options?: Tooltip options): this
+	// Creates a tooltip with the specified content and options and open it.
+	openTooltip: function (tooltip, latlng, options) {
+		if (!(tooltip instanceof Tooltip)) {
+			tooltip = new Tooltip(options).setContent(tooltip);
+		}
+
+		if (latlng) {
+			tooltip.setLatLng(latlng);
+		}
+
+		if (this.hasLayer(tooltip)) {
+			return this;
+		}
+
+		return this.addLayer(tooltip);
+	},
+
+	// @method closeTooltip(tooltip?: Tooltip): this
+	// Closes the tooltip given as parameter.
+	closeTooltip: function (tooltip) {
+		if (tooltip) {
+			this.removeLayer(tooltip);
+		}
+		return this;
+	}
+
+});
+
+/*
+ * @namespace Layer
+ * @section Tooltip methods example
+ *
+ * All layers share a set of methods convenient for binding tooltips to it.
+ *
+ * ```js
+ * var layer = L.Polygon(latlngs).bindTooltip('Hi There!').addTo(map);
+ * layer.openTooltip();
+ * layer.closeTooltip();
+ * ```
+ */
+
+// @section Tooltip methods
+Layer.include({
+
+	// @method bindTooltip(content: String|HTMLElement|Function|Tooltip, options?: Tooltip options): this
+	// Binds a tooltip to the layer with the passed `content` and sets up the
+	// necessary event listeners. If a `Function` is passed it will receive
+	// the layer as the first argument and should return a `String` or `HTMLElement`.
+	bindTooltip: function (content, options) {
+
+		if (content instanceof Tooltip) {
+			setOptions(content, options);
+			this._tooltip = content;
+			content._source = this;
+		} else {
+			if (!this._tooltip || options) {
+				this._tooltip = new Tooltip(options, this);
+			}
+			this._tooltip.setContent(content);
+
+		}
+
+		this._initTooltipInteractions();
+
+		if (this._tooltip.options.permanent && this._map && this._map.hasLayer(this)) {
+			this.openTooltip();
+		}
+
+		return this;
+	},
+
+	// @method unbindTooltip(): this
+	// Removes the tooltip previously bound with `bindTooltip`.
+	unbindTooltip: function () {
+		if (this._tooltip) {
+			this._initTooltipInteractions(true);
+			this.closeTooltip();
+			this._tooltip = null;
+		}
+		return this;
+	},
+
+	_initTooltipInteractions: function (remove$$1) {
+		if (!remove$$1 && this._tooltipHandlersAdded) { return; }
+		var onOff = remove$$1 ? 'off' : 'on',
+		    events = {
+			remove: this.closeTooltip,
+			move: this._moveTooltip
+		    };
+		if (!this._tooltip.options.permanent) {
+			events.mouseover = this._openTooltip;
+			events.mouseout = this.closeTooltip;
+			if (this._tooltip.options.sticky) {
+				events.mousemove = this._moveTooltip;
+			}
+			if (touch) {
+				events.click = this._openTooltip;
+			}
+		} else {
+			events.add = this._openTooltip;
+		}
+		this[onOff](events);
+		this._tooltipHandlersAdded = !remove$$1;
+	},
+
+	// @method openTooltip(latlng?: LatLng): this
+	// Opens the bound tooltip at the specificed `latlng` or at the default tooltip anchor if no `latlng` is passed.
+	openTooltip: function (layer, latlng) {
+		if (!(layer instanceof Layer)) {
+			latlng = layer;
+			layer = this;
+		}
+
+		if (layer instanceof FeatureGroup) {
+			for (var id in this._layers) {
+				layer = this._layers[id];
+				break;
+			}
+		}
+
+		if (!latlng) {
+			latlng = layer.getCenter ? layer.getCenter() : layer.getLatLng();
+		}
+
+		if (this._tooltip && this._map) {
+
+			// set tooltip source to this layer
+			this._tooltip._source = layer;
+
+			// update the tooltip (content, layout, ect...)
+			this._tooltip.update();
+
+			// open the tooltip on the map
+			this._map.openTooltip(this._tooltip, latlng);
+
+			// Tooltip container may not be defined if not permanent and never
+			// opened.
+			if (this._tooltip.options.interactive && this._tooltip._container) {
+				addClass(this._tooltip._container, 'leaflet-clickable');
+				this.addInteractiveTarget(this._tooltip._container);
+			}
+		}
+
+		return this;
+	},
+
+	// @method closeTooltip(): this
+	// Closes the tooltip bound to this layer if it is open.
+	closeTooltip: function () {
+		if (this._tooltip) {
+			this._tooltip._close();
+			if (this._tooltip.options.interactive && this._tooltip._container) {
+				removeClass(this._tooltip._container, 'leaflet-clickable');
+				this.removeInteractiveTarget(this._tooltip._container);
+			}
+		}
+		return this;
+	},
+
+	// @method toggleTooltip(): this
+	// Opens or closes the tooltip bound to this layer depending on its current state.
+	toggleTooltip: function (target) {
+		if (this._tooltip) {
+			if (this._tooltip._map) {
+				this.closeTooltip();
+			} else {
+				this.openTooltip(target);
+			}
+		}
+		return this;
+	},
+
+	// @method isTooltipOpen(): boolean
+	// Returns `true` if the tooltip bound to this layer is currently open.
+	isTooltipOpen: function () {
+		return this._tooltip.isOpen();
+	},
+
+	// @method setTooltipContent(content: String|HTMLElement|Tooltip): this
+	// Sets the content of the tooltip bound to this layer.
+	setTooltipContent: function (content) {
+		if (this._tooltip) {
+			this._tooltip.setContent(content);
+		}
+		return this;
+	},
+
+	// @method getTooltip(): Tooltip
+	// Returns the tooltip bound to this layer.
+	getTooltip: function () {
+		return this._tooltip;
+	},
+
+	_openTooltip: function (e) {
+		var layer = e.layer || e.target;
+
+		if (!this._tooltip || !this._map) {
+			return;
+		}
+		this.openTooltip(layer, this._tooltip.options.sticky ? e.latlng : undefined);
+	},
+
+	_moveTooltip: function (e) {
+		var latlng = e.latlng, containerPoint, layerPoint;
+		if (this._tooltip.options.sticky && e.originalEvent) {
+			containerPoint = this._map.mouseEventToContainerPoint(e.originalEvent);
+			layerPoint = this._map.containerPointToLayerPoint(containerPoint);
+			latlng = this._map.layerPointToLatLng(layerPoint);
+		}
+		this._tooltip.setLatLng(latlng);
+	}
+});
+
+var Popup = DivOverlay.extend({
+
+	// @section
+	// @aka Popup options
+	options: {
+		// @option maxWidth: Number = 300
+		// Max width of the popup, in pixels.
+		maxWidth: 300,
+
+		// @option minWidth: Number = 50
+		// Min width of the popup, in pixels.
+		minWidth: 50,
+
+		// @option maxHeight: Number = null
+		// If set, creates a scrollable container of the given height
+		// inside a popup if its content exceeds it.
+		maxHeight: null,
+
+		// @option autoPan: Boolean = true
+		// Set it to `false` if you don't want the map to do panning animation
+		// to fit the opened popup.
+		autoPan: true,
+
+		// @option autoPanPaddingTopLeft: Point = null
+		// The margin between the popup and the top left corner of the map
+		// view after autopanning was performed.
+		autoPanPaddingTopLeft: null,
+
+		// @option autoPanPaddingBottomRight: Point = null
+		// The margin between the popup and the bottom right corner of the map
+		// view after autopanning was performed.
+		autoPanPaddingBottomRight: null,
+
+		// @option autoPanPadding: Point = Point(5, 5)
+		// Equivalent of setting both top left and bottom right autopan padding to the same value.
+		autoPanPadding: [5, 5],
+
+		// @option keepInView: Boolean = false
+		// Set it to `true` if you want to prevent users from panning the popup
+		// off of the screen while it is open.
+		keepInView: false,
+
+		// @option closeButton: Boolean = true
+		// Controls the presence of a close button in the popup.
+		closeButton: true,
+
+		// @option autoClose: Boolean = true
+		// Set it to `false` if you want to override the default behavior of
+		// the popup closing when another popup is opened.
+		autoClose: true,
+
+		// @option closeOnClick: Boolean = *
+		// Set it if you want to override the default behavior of the popup closing when user clicks
+		// on the map. Defaults to the map's [`closePopupOnClick`](#map-closepopuponclick) option.
+
+		// @option className: String = ''
+		// A custom CSS class name to assign to the popup.
+		className: ''
+	},
+
+	// @namespace Popup
+	// @method openOn(map: Map): this
+	// Adds the popup to the map and closes the previous one. The same as `map.openPopup(popup)`.
+	openOn: function (map) {
+		map.openPopup(this);
+		return this;
+	},
+
+	onAdd: function (map) {
+		DivOverlay.prototype.onAdd.call(this, map);
+
+		// @namespace Map
+		// @section Popup events
+		// @event popupopen: PopupEvent
+		// Fired when a popup is opened in the map
+		map.fire('popupopen', {popup: this});
+
+		if (this._source) {
+			// @namespace Layer
+			// @section Popup events
+			// @event popupopen: PopupEvent
+			// Fired when a popup bound to this layer is opened
+			this._source.fire('popupopen', {popup: this}, true);
+			// For non-path layers, we toggle the popup when clicking
+			// again the layer, so prevent the map to reopen it.
+			if (!(this._source instanceof Path)) {
+				this._source.on('preclick', stopPropagation);
+			}
+		}
+	},
+
+	onRemove: function (map) {
+		DivOverlay.prototype.onRemove.call(this, map);
+
+		// @namespace Map
+		// @section Popup events
+		// @event popupclose: PopupEvent
+		// Fired when a popup in the map is closed
+		map.fire('popupclose', {popup: this});
+
+		if (this._source) {
+			// @namespace Layer
+			// @section Popup events
+			// @event popupclose: PopupEvent
+			// Fired when a popup bound to this layer is closed
+			this._source.fire('popupclose', {popup: this}, true);
+			if (!(this._source instanceof Path)) {
+				this._source.off('preclick', stopPropagation);
+			}
+		}
+	},
+
+	getEvents: function () {
+		var events = DivOverlay.prototype.getEvents.call(this);
+
+		if (this.options.closeOnClick !== undefined ? this.options.closeOnClick : this._map.options.closePopupOnClick) {
+			events.preclick = this._close;
+		}
+
+		if (this.options.keepInView) {
+			events.moveend = this._adjustPan;
+		}
+
+		return events;
+	},
+
+	_close: function () {
+		if (this._map) {
+			this._map.closePopup(this);
+		}
+	},
+
+	_initLayout: function () {
+		var prefix = 'leaflet-popup',
+		    container = this._container = create$1('div',
+			prefix + ' ' + (this.options.className || '') +
+			' leaflet-zoom-animated');
+
+		var wrapper = this._wrapper = create$1('div', prefix + '-content-wrapper', container);
+		this._contentNode = create$1('div', prefix + '-content', wrapper);
+
+		disableClickPropagation(wrapper);
+		disableScrollPropagation(this._contentNode);
+		on(wrapper, 'contextmenu', stopPropagation);
+
+		this._tipContainer = create$1('div', prefix + '-tip-container', container);
+		this._tip = create$1('div', prefix + '-tip', this._tipContainer);
+
+		if (this.options.closeButton) {
+			var closeButton = this._closeButton = create$1('a', prefix + '-close-button', container);
+			closeButton.href = '#close';
+			closeButton.innerHTML = '&#215;';
+
+			on(closeButton, 'click', this._onCloseButtonClick, this);
+		}
+	},
+
+	_updateLayout: function () {
+		var container = this._contentNode,
+		    style = container.style;
+
+		style.width = '';
+		style.whiteSpace = 'nowrap';
+
+		var width = container.offsetWidth;
+		width = Math.min(width, this.options.maxWidth);
+		width = Math.max(width, this.options.minWidth);
+
+		style.width = (width + 1) + 'px';
+		style.whiteSpace = '';
+
+		style.height = '';
+
+		var height = container.offsetHeight,
+		    maxHeight = this.options.maxHeight,
+		    scrolledClass = 'leaflet-popup-scrolled';
+
+		if (maxHeight && height > maxHeight) {
+			style.height = maxHeight + 'px';
+			addClass(container, scrolledClass);
+		} else {
+			removeClass(container, scrolledClass);
+		}
+
+		this._containerWidth = this._container.offsetWidth;
+	},
+
+	_animateZoom: function (e) {
+		var pos = this._map._latLngToNewLayerPoint(this._latlng, e.zoom, e.center),
+		    anchor = this._getAnchor();
+		setPosition(this._container, pos.add(anchor));
+	},
+
+	_adjustPan: function () {
+		if (!this.options.autoPan || (this._map._panAnim && this._map._panAnim._inProgress)) { return; }
+
+		var map = this._map,
+		    marginBottom = parseInt(getStyle(this._container, 'marginBottom'), 10) || 0,
+		    containerHeight = this._container.offsetHeight + marginBottom,
+		    containerWidth = this._containerWidth,
+		    layerPos = new Point(this._containerLeft, -containerHeight - this._containerBottom);
+
+		layerPos._add(getPosition(this._container));
+
+		var containerPos = map.layerPointToContainerPoint(layerPos),
+		    padding = toPoint(this.options.autoPanPadding),
+		    paddingTL = toPoint(this.options.autoPanPaddingTopLeft || padding),
+		    paddingBR = toPoint(this.options.autoPanPaddingBottomRight || padding),
+		    size = map.getSize(),
+		    dx = 0,
+		    dy = 0;
+
+		if (containerPos.x + containerWidth + paddingBR.x > size.x) { // right
+			dx = containerPos.x + containerWidth - size.x + paddingBR.x;
+		}
+		if (containerPos.x - dx - paddingTL.x < 0) { // left
+			dx = containerPos.x - paddingTL.x;
+		}
+		if (containerPos.y + containerHeight + paddingBR.y > size.y) { // bottom
+			dy = containerPos.y + containerHeight - size.y + paddingBR.y;
+		}
+		if (containerPos.y - dy - paddingTL.y < 0) { // top
+			dy = containerPos.y - paddingTL.y;
+		}
+
+		// @namespace Map
+		// @section Popup events
+		// @event autopanstart: Event
+		// Fired when the map starts autopanning when opening a popup.
+		if (dx || dy) {
+			map
+			    .fire('autopanstart')
+			    .panBy([dx, dy]);
+		}
+	},
+
+	_onCloseButtonClick: function (e) {
+		this._close();
+		stop(e);
+	},
+
+	_getAnchor: function () {
+		// Where should we anchor the popup on the source layer?
+		return toPoint(this._source && this._source._getPopupAnchor ? this._source._getPopupAnchor() : [0, 0]);
+	}
+
+});
+
+// @namespace Popup
+// @factory L.popup(options?: Popup options, source?: Layer)
+// Instantiates a `Popup` object given an optional `options` object that describes its appearance and location and an optional `source` object that is used to tag the popup with a reference to the Layer to which it refers.
+var popup = function (options, source) {
+	return new Popup(options, source);
+};
+
+
+/* @namespace Map
+ * @section Interaction Options
+ * @option closePopupOnClick: Boolean = true
+ * Set it to `false` if you don't want popups to close when user clicks the map.
+ */
+Map$1.mergeOptions({
+	closePopupOnClick: true
+});
+
+
+// @namespace Map
+// @section Methods for Layers and Controls
+Map$1.include({
+	// @method openPopup(popup: Popup): this
+	// Opens the specified popup while closing the previously opened (to make sure only one is opened at one time for usability).
+	// @alternative
+	// @method openPopup(content: String|HTMLElement, latlng: LatLng, options?: Popup options): this
+	// Creates a popup with the specified content and options and opens it in the given point on a map.
+	openPopup: function (popup, latlng, options) {
+		if (!(popup instanceof Popup)) {
+			popup = new Popup(options).setContent(popup);
+		}
+
+		if (latlng) {
+			popup.setLatLng(latlng);
+		}
+
+		if (this.hasLayer(popup)) {
+			return this;
+		}
+
+		if (this._popup && this._popup.options.autoClose) {
+			this.closePopup();
+		}
+
+		this._popup = popup;
+		return this.addLayer(popup);
+	},
+
+	// @method closePopup(popup?: Popup): this
+	// Closes the popup previously opened with [openPopup](#map-openpopup) (or the given one).
+	closePopup: function (popup) {
+		if (!popup || popup === this._popup) {
+			popup = this._popup;
+			this._popup = null;
+		}
+		if (popup) {
+			this.removeLayer(popup);
+		}
+		return this;
+	}
+});
+
+/*
+ * @namespace Layer
+ * @section Popup methods example
+ *
+ * All layers share a set of methods convenient for binding popups to it.
+ *
+ * ```js
+ * var layer = L.Polygon(latlngs).bindPopup('Hi There!').addTo(map);
+ * layer.openPopup();
+ * layer.closePopup();
+ * ```
+ *
+ * Popups will also be automatically opened when the layer is clicked on and closed when the layer is removed from the map or another popup is opened.
+ */
+
+// @section Popup methods
+Layer.include({
+
+	// @method bindPopup(content: String|HTMLElement|Function|Popup, options?: Popup options): this
+	// Binds a popup to the layer with the passed `content` and sets up the
+	// necessary event listeners. If a `Function` is passed it will receive
+	// the layer as the first argument and should return a `String` or `HTMLElement`.
+	bindPopup: function (content, options) {
+
+		if (content instanceof Popup) {
+			setOptions(content, options);
+			this._popup = content;
+			content._source = this;
+		} else {
+			if (!this._popup || options) {
+				this._popup = new Popup(options, this);
+			}
+			this._popup.setContent(content);
+		}
+
+		if (!this._popupHandlersAdded) {
+			this.on({
+				click: this._openPopup,
+				keypress: this._onKeyPress,
+				remove: this.closePopup,
+				move: this._movePopup
+			});
+			this._popupHandlersAdded = true;
+		}
+
+		return this;
+	},
+
+	// @method unbindPopup(): this
+	// Removes the popup previously bound with `bindPopup`.
+	unbindPopup: function () {
+		if (this._popup) {
+			this.off({
+				click: this._openPopup,
+				keypress: this._onKeyPress,
+				remove: this.closePopup,
+				move: this._movePopup
+			});
+			this._popupHandlersAdded = false;
+			this._popup = null;
+		}
+		return this;
+	},
+
+	// @method openPopup(latlng?: LatLng): this
+	// Opens the bound popup at the specificed `latlng` or at the default popup anchor if no `latlng` is passed.
+	openPopup: function (layer, latlng) {
+		if (!(layer instanceof Layer)) {
+			latlng = layer;
+			layer = this;
+		}
+
+		if (layer instanceof FeatureGroup) {
+			for (var id in this._layers) {
+				layer = this._layers[id];
+				break;
+			}
+		}
+
+		if (!latlng) {
+			latlng = layer.getCenter ? layer.getCenter() : layer.getLatLng();
+		}
+
+		if (this._popup && this._map) {
+			// set popup source to this layer
+			this._popup._source = layer;
+
+			// update the popup (content, layout, ect...)
+			this._popup.update();
+
+			// open the popup on the map
+			this._map.openPopup(this._popup, latlng);
+		}
+
+		return this;
+	},
+
+	// @method closePopup(): this
+	// Closes the popup bound to this layer if it is open.
+	closePopup: function () {
+		if (this._popup) {
+			this._popup._close();
+		}
+		return this;
+	},
+
+	// @method togglePopup(): this
+	// Opens or closes the popup bound to this layer depending on its current state.
+	togglePopup: function (target) {
+		if (this._popup) {
+			if (this._popup._map) {
+				this.closePopup();
+			} else {
+				this.openPopup(target);
+			}
+		}
+		return this;
+	},
+
+	// @method isPopupOpen(): boolean
+	// Returns `true` if the popup bound to this layer is currently open.
+	isPopupOpen: function () {
+		return (this._popup ? this._popup.isOpen() : false);
+	},
+
+	// @method setPopupContent(content: String|HTMLElement|Popup): this
+	// Sets the content of the popup bound to this layer.
+	setPopupContent: function (content) {
+		if (this._popup) {
+			this._popup.setContent(content);
+		}
+		return this;
+	},
+
+	// @method getPopup(): Popup
+	// Returns the popup bound to this layer.
+	getPopup: function () {
+		return this._popup;
+	},
+
+	_openPopup: function (e) {
+		var layer = e.layer || e.target;
+
+		if (!this._popup) {
+			return;
+		}
+
+		if (!this._map) {
+			return;
+		}
+
+		// prevent map click
+		stop(e);
+
+		// if this inherits from Path its a vector and we can just
+		// open the popup at the new location
+		if (layer instanceof Path) {
+			this.openPopup(e.layer || e.target, e.latlng);
+			return;
+		}
+
+		// otherwise treat it like a marker and figure out
+		// if we should toggle it open/closed
+		if (this._map.hasLayer(this._popup) && this._popup._source === layer) {
+			this.closePopup();
+		} else {
+			this.openPopup(layer, e.latlng);
+		}
+	},
+
+	_movePopup: function (e) {
+		this._popup.setLatLng(e.latlng);
+	},
+
+	_onKeyPress: function (e) {
+		if (e.originalEvent.keyCode === 13) {
+			this._openPopup(e);
+		}
+	}
+});
+
+// hack to rollup.js load all layer functions
+console.log(typeof(tooltip), typeof(popup));
 
 var BaseMapDistance = function(store, map){
 
     var line = null;
-    var tooltip = null; 
+    var tooltip$$1 = null; 
     store.on('map.drawMode', function(e)
     {
         if(e.new_val == DRAW_DISTANCE)
         {
-            L.setOptions(map.editTools, {skipMiddleMarkers: true});
-            line = map.editTools.startPolyline(undefined, {weight:2, color: 'red', dashArray:'5,10'});   
+            var ce = map.getCenter();
+            var b = map.getBounds();
+            var w = (b.getEast() - b.getWest()) / 4;
+            var ll = [toLatLng(ce.lat, ce.lng + w),  toLatLng(ce.lat, ce.lng - w)];
+            line = polyline(ll, {weight:2, color: 'red', dashArray:'5,10'});   
+            line.addTo(map);
+            setOptions(map.editTools, {skipMiddleMarkers: true});
+            line.enableEdit(map); 
             line.on('editable:editing', on_edit);
+            on_edit({layer: line});
         }
         else if(e.old_val == DRAW_DISTANCE) {
-            L.setOptions(map.editTools, {skipMiddleMarkers: false});            
+            setOptions(map.editTools, {skipMiddleMarkers: false}); 
+            store(BASE_DISTANCE_SET);
         }
     });
 
@@ -12741,10 +16503,10 @@ var BaseMapDistance = function(store, map){
                 return map.project(it,1);
             });
             var length_px = points[0].distanceTo(points[1]);
-            var length_m = Math.round(L.CRS.Simple.distance(latLngs[0], latLngs[1]));
+            var length_m = Math.round(Simple.distance(latLngs[0], latLngs[1]));
             updateTooltip(length_m);
             store(BASE_DISTANCE_SET, {length_px: length_px, length_m:length_m, points: points});
-            store(DRAWING_MODE_SET, null);
+            // store(DRAWING_MODE_SET, null);
         }
     }
 
@@ -12759,154 +16521,39 @@ var BaseMapDistance = function(store, map){
 
 };
 
-var cur_locale = 'ru';
-
-function t(s, o, loc){
-    loc = loc || cur_locale;
-    var rep = translations[s] &&  translations[s][loc];
-    if(!rep) 
-        return 'Missing ' + loc + ' translation: ' + s;
-    if(o) for(var k in o)  rep = rep.replace('{' + k + '}', o[k]);
-    return rep
-}
-
-var translations = 
+var BaseGridEdit = function(store, map, bmv)
 {
-    "invalid_svg_type": {
-        "ru": "Не верный тип файла: {type}"
-    },
-    "invalid_svg_content": {
-        "ru": "SVG-документ с ошибками"
-    },
-    "no_svg_size":{
-        "ru": 'SVG-документ должен содержать атрибуты "width" и "height"'
-    },
-    "no_svg_dimensions": {
-        "ru": 'В SVG-документе отсутствуют и атрибуты "width", "height" и атрибут "viewBox"'
+    function onGeometryChange()
+    {
+        var grid = bmv.grid.getPoints();
+        store(BASE_GRID_GEOMETRY, grid);
     }
+
+    store.on('map.drawMode', function(e)
+    {
+        if(e.new_val == EDIT_GRID){
+            setOptions(map.editTools, {skipMiddleMarkers: true, draggable: true});
+            bmv.grid.enableEdit(map); 
+            bmv.grid.on('editable:dragend', onGeometryChange);
+            bmv.grid.on('editable:vertex:dragend', onGeometryChange);
+        }
+        else if(e.old_val == EDIT_GRID) {
+            bmv.grid.off('editable:dragend', onGeometryChange);
+            bmv.grid.off('editable:vertex:dragend', onGeometryChange);
+            bmv.grid.disableEdit();
+        }
+    });
 };
 
-var hidenElement = null;
-
-function getHidenEl(){
-    if(hidenElement)
-        return hidenElement;
-    hidenElement = document.createElement("div");    
-    hidenElement.style = 'visibility: hidden; position: absolute; top:0; left:0;';
-    hidenElement = document.body.appendChild(hidenElement);
-    return hidenElement;
-}
-
-function svgToBase64(svg_text)
-{
-    if(!svg_text || svg_text.length < 7) 
-        return Either.left(t('invalid_svg_content'))
-      
-    var parser = new DOMParser();    
-    var svg_document = parser.parseFromString(svg_text, "image/svg+xml").documentElement;
-    if( !svg_document ||
-        !svg_document.getAttribute ||
-        !startswith(svg_document.getAttribute('xmlns'), 'http://www.w3.org/2000/svg'))
-        return Either.left(t('invalid_svg_content'))
-    if(!svg_document.height || !svg_document.width)
-        return Either.left(t('no_svg_size'))
-
-    var viewBox = null;
-    if(svg_document.viewBox.baseVal && svg_document.viewBox.baseVal.width != 0) {
-        var vb = svg_document.viewBox.baseVal;
-        viewBox = [vb.x, vb.y, vb.width, vb.height];
-    }
-    var raw_svg =   new XMLSerializer().serializeToString(svg_document); 
-    var data_uri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(raw_svg)));
-    
-    if(!viewBox && (svg_document.width.baseVal.value == 0 || svg_document.height.baseVal.value == 0 )){
-        var node = document.importNode(svg_document, true);
-        node = getHidenEl().appendChild(node);
-        var box = node.getBBox();
-        viewBox = [0,0,box.x + box.width, box.y + box.height];
-        getHidenEl().removeChild(node);
-        // return Either.left(t('no_svg_dimensions'))
-    }
-    var width = 0, height = 0;
-    if(viewBox){
-        width = viewBox[2];
-        height = viewBox[3];
-    }
-    if(svg_document.width.baseVal.value != 0)
-        width = svg_document.width.baseVal.value;
-    if(svg_document.height.baseVal.value != 0)
-        height = svg_document.height.baseVal.value;
-    return Either.right({
-        svg_document: svg_document,
-        raw_svg: raw_svg,
-        width: width,
-        height: height,
-        data_uri: data_uri
-    })    
-}
-
-function FileHandler(store, error_fn)
-{
-    return function(e){
-        error_fn('');
-        var file = e.target.files[0];
-        if(!file) return; 
-        if(file.type !== 'image/svg+xml') {
-            error_fn(t('invalid_svg_type', {type: file.type}));
-        }
-        else  
-        {
-            var reader = new FileReader();
-            reader.onloadend = function(e){
-                svgToBase64(reader.result).fold(
-                    error_fn ,
-                    function(e) {
-                        store(BASE_LAYER_SET, {
-                            raw_svg: e.raw_svg,
-                            url: e.data_uri,
-                            size_m: {x: Math.round(e.width), y: Math.round(e.height)},
-                            size_px: {x: e.width, y: e.height}
-                        });
-                    }
-                );
-            };
-            reader.readAsText(file);
-        }
-        
-    }
-}
-
-var store = Store(reducers);
+var store = Store(reduceReducers([mapReducer, baseReducer]));
 store.state = initState;
 window.store = store;
 
 var map = Map('map', store);
-BaseMapView(store,map);
+BaseView(store);
+var bmv = BaseMapView(store,map);
 BaseMapDistance(store,map);
+BaseGridEdit(store, map, bmv);
 store("INIT");
-
-
-var $ = function(id) { return document.getElementById(id) };
-var show = function(id) { $(id).style['display'] = ''; };
-var html = function(id, t) {  $(id).innerHTML = t; };
-var text = function(id, t) {  $(id).innerText = t; };
-
-
-$('file').onchange = FileHandler(store, function(error){ 
-    html('error', error);
-});
-
-$('draw_line').onclick = function(){
-    store(DRAWING_MODE_SET, DRAW_DISTANCE);
-};
-
-store.on('selectedBase.size_m', function(e){
-    if(e.new_val) {
-        var size = e.new_val;
-        show('toolbar');
-        show('size');
-        text('size', size.x + ' - ' + size.y);
-    }
-});
 
 }());
