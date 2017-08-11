@@ -11729,7 +11729,10 @@ Handler.PathDrag = Handler.extend( /** @lends  Path.Drag.prototype */ {
   _onDragStart: function(evt) {
     var eventType = evt.originalEvent._simulated ? 'touchstart' : evt.originalEvent.type;
 
-    var cp = this._path._map.snapContainerPoint(evt.containerPoint);
+    var cp = evt.containerPoint;
+    var map = this._path._map;
+    if(!map.options.nosnap && map.grid)
+      cp = map.grid.snapContainerPoint(cp);
     this._mapDraggingWasEnabled = false;
     this._startPoint = cp.clone();
     this._dragStartPoint = cp.clone();
@@ -11737,8 +11740,8 @@ Handler.PathDrag = Handler.extend( /** @lends  Path.Drag.prototype */ {
     stop(evt.originalEvent);
 
     addClass(this._path._renderer._container, 'leaflet-interactive');
-    on(document, MOVE$1[eventType], this._onDrag,    this)
-      .on(document, END$1[eventType],  this._onDragEnd, this);
+    on(document, MOVE$1[eventType], this._onDrag,    this);
+    on(document, END$1[eventType],  this._onDragEnd, this);
 
     if (this._path._map.dragging.enabled()) {
       // I guess it's required because mousdown gets simulated with a delay
@@ -11766,7 +11769,11 @@ Handler.PathDrag = Handler.extend( /** @lends  Path.Drag.prototype */ {
     var first = (evt.touches && evt.touches.length >= 1 ? evt.touches[0] : evt);
     var containerPoint = this._path._map.mouseEventToContainerPoint(first);
 
-    var cp = this._path._map.snapContainerPoint(containerPoint);
+    var cp = containerPoint;
+    var map = this._path._map;
+    if(!map.options.nosnap && map.grid)
+      cp = map.grid.snapContainerPoint(cp);
+    
     var x = cp.x;
     var y = cp.y;
 
@@ -11810,8 +11817,8 @@ Handler.PathDrag = Handler.extend( /** @lends  Path.Drag.prototype */ {
     }
 
 
-    off(document, 'mousemove touchmove', this._onDrag, this)
-      .off(document, 'mouseup touchend',    this._onDragEnd, this);
+    off(document, 'mousemove touchmove', this._onDrag, this);
+    off(document, 'mouseup touchend',    this._onDragEnd, this);
 
     this._restoreCoordGetters();
 
@@ -12437,12 +12444,12 @@ function BaseView(store) {
         html('error', error);
     });
 
-    el('draw_line').onclick = function(){
-        store(DRAWING_MODE_SET, DRAW_DISTANCE);
+    el('draw_line').onchange = function(){
+        store(DRAWING_MODE_SET, el('draw_line').checked ? DRAW_DISTANCE : null);
     };
 
-    el('grid_edit').onclick = function(){
-        store(DRAWING_MODE_SET, EDIT_GRID);
+    el('grid_edit').onchange = function(){
+        store(DRAWING_MODE_SET, el('grid_edit').checked ? EDIT_GRID : null);
     };
 
     el('distance_input').oninput = _.debounce( function(e){
@@ -12468,6 +12475,11 @@ function BaseView(store) {
         else {
             hide('distance');
         }
+    });
+
+    store.on('map.drawMode', function(e){
+        el('draw_line').checked = e.new_val == DRAW_DISTANCE;
+        el('grid_edit').checked = e.new_val == EDIT_GRID;
     });
 }
 
@@ -15675,9 +15687,26 @@ var Grid = Rectangle.extend({
     options: {
         color: 'grey',
         weight: 1,
-        fill: true,
+        fill: false,
         className: 'grid-axis'
     },
+
+    snap: function(ll){
+        var b = this.getBounds();
+        if(b.contains(ll)) {
+            var dlat = ll.lat - b.getNorth();
+            var dlng = ll.lng - b.getWest();
+            ll.lat = b.getNorth() + Math.round(dlat / this.step_m) * this.step_m;
+            ll.lng = b.getWest() + Math.round(dlng / this.step_m) * this.step_m;
+        }
+        return ll;
+    },
+
+    snapContainerPoint: function(cp){
+        if(!this._map) return cp;
+        var ll = this._map.containerPointToLatLng(cp);
+        return this._map.latLngToContainerPoint(this.snap(ll));        
+    }, 
 
     onAdd: function (map) {
         var g = map.getRenderer(this)._rootGroup;
@@ -15687,6 +15716,7 @@ var Grid = Rectangle.extend({
         this._addAxis(map);
         Rectangle.prototype.onAdd.call(this, map);
         map.on('move', this._updateAxis, this);
+        map.grid = this;
     },
 
     onRemove: function (map) {
@@ -15694,6 +15724,7 @@ var Grid = Rectangle.extend({
         this.$graphPanel.remove();
         map.off('move', this._updateAxis, this);
         Rectangle.prototype.onRemove.call(this, map);
+        delete map.grid;
     },
 
     getPoints: function(){
@@ -15746,7 +15777,7 @@ var Grid = Rectangle.extend({
     _updatePath: function(){
         var map = this._map;
         Rectangle.prototype._updatePath.call(this);
-        var step = this.step;
+        var step = this.step_px;
         var bb = toBounds(this._parts[0]);
         var topLeft = bb.getTopLeft();
         var bottomRight = bb.getBottomRight();
@@ -15788,27 +15819,40 @@ var Grid = Rectangle.extend({
  
     _project: function(){
         if(this._map){
-            // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
-            var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
-            var p2 = this._map.latLngToContainerPoint(toLatLng(0,0.5));
-            var d = p1.distanceTo(p2);
-            if(d < 5){
+
+            var diff = [0.5, 1, 5, 10, 20, 100, 500];
+            this.step_px = 1;
+            this.step_m = 1;
+            for(var i=0; i<diff.length; i++){
+                this.step_m = diff[i];
                 var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
-                var p2 = this._map.latLngToContainerPoint(toLatLng(0,1));
-                var d = p1.distanceTo(p2);
-                if(d < 5){
-                    var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
-                    var p2 = this._map.latLngToContainerPoint(toLatLng(0,5));
-                    var d = p1.distanceTo(p2);
-                }
-                if(d < 5){
-                    var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
-                    var p2 = this._map.latLngToContainerPoint(toLatLng(0,10));
-                    var d = p1.distanceTo(p2);
-                }
-            // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
+                var p2 = this._map.latLngToContainerPoint(toLatLng(0,this.step_m));
+                this.step_px = p1.distanceTo(p2);
+                if(this.step_px > 5)
+                    break;
+                            
             }
-            this.step = d > 5 ? d : 5;
+            // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
+            // var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+            // var p2 = this._map.latLngToContainerPoint(toLatLng(0,0.5));
+            // var d = p1.distanceTo(p2);
+            // if(d < 5){
+            //     var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+            //     var p2 = this._map.latLngToContainerPoint(toLatLng(0,1));
+            //     var d = p1.distanceTo(p2);
+            //     if(d < 5){
+            //         var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+            //         var p2 = this._map.latLngToContainerPoint(toLatLng(0,5));
+            //         var d = p1.distanceTo(p2);
+            //     }
+            //     if(d < 5){
+            //         var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+            //         var p2 = this._map.latLngToContainerPoint(toLatLng(0,10));
+            //         var d = p1.distanceTo(p2);
+            //     }
+            // // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
+            // }
+            // this.step = d > 5 ? d : 5;
         }
         Rectangle.prototype._project.call(this);
     }
@@ -17085,12 +17129,14 @@ var BaseGridEdit = function(store, map, bmv)
     store.on('map.drawMode', function(e)
     {
         if(e.new_val == EDIT_GRID){
-            setOptions(map.editTools, {skipMiddleMarkers: true, draggable: true});
+            setOptions(map.editTools, {skipMiddleMarkers: true, draggable: true, nosnap: true});
+            bmv.grid.setStyle({fill: true, fillColor: '#ebf0fa'});
             bmv.grid.enableEdit(map); 
             bmv.grid.on('editable:dragend', onGeometryChange);
             bmv.grid.on('editable:vertex:dragend', onGeometryChange);
         }
         else if(e.old_val == EDIT_GRID) {
+            bmv.grid.setStyle({fill: false});
             bmv.grid.off('editable:dragend', onGeometryChange);
             bmv.grid.off('editable:vertex:dragend', onGeometryChange);
             bmv.grid.disableEdit();

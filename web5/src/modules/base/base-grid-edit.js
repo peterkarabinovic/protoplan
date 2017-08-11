@@ -14,12 +14,14 @@ export default function(store, map, bmv)
     store.on('map.drawMode', function(e)
     {
         if(e.new_val == EDIT_GRID){
-            Util.setOptions(map.editTools, {skipMiddleMarkers: true, draggable: true});
+            Util.setOptions(map.editTools, {skipMiddleMarkers: true, draggable: true, nosnap: true});
+            bmv.grid.setStyle({fill: true, fillColor: '#ebf0fa'})
             bmv.grid.enableEdit(map); 
             bmv.grid.on('editable:dragend', onGeometryChange)
-            bmv.grid.on('editable:vertex:dragend', onGeometryChange)
+            bmv.grid.on('editable:vertex:dragend', onGeometryChange);
         }
         else if(e.old_val == EDIT_GRID) {
+            bmv.grid.setStyle({fill: false})
             bmv.grid.off('editable:dragend', onGeometryChange)
             bmv.grid.off('editable:vertex:dragend', onGeometryChange)
             bmv.grid.disableEdit();

@@ -15,20 +15,25 @@ export var Grid = Rectangle.extend({
     options: {
         color: 'grey',
         weight: 1,
-        fill: true,
+        fill: false,
         className: 'grid-axis'
     },
 
-    snap: function(latlng){
-        latlng.lat = Math.round(latlng.lat / this.step) * this.step; 
-        latlng.lng = Math.round(latlng.lng / this.step) * this.step; 
-        return latlng;
+    snap: function(ll){
+        var b = this.getBounds();
+        if(b.contains(ll)) {
+            var dlat = ll.lat - b.getNorth();
+            var dlng = ll.lng - b.getWest();
+            ll.lat = b.getNorth() + Math.round(dlat / this.step_m) * this.step_m;
+            ll.lng = b.getWest() + Math.round(dlng / this.step_m) * this.step_m;
+        }
+        return ll;
     },
 
     snapContainerPoint: function(cp){
         if(!this._map) return cp;
-        var ll = map.containerPointToLatLng(cp)
-        return map.latLngToContainerPoint(map.snap(ll));        
+        var ll = this._map.containerPointToLatLng(cp)
+        return this._map.latLngToContainerPoint(this.snap(ll));        
     }, 
 
     onAdd: function (map) {
@@ -39,6 +44,7 @@ export var Grid = Rectangle.extend({
         this._addAxis(map);
         Rectangle.prototype.onAdd.call(this, map);
         map.on('move', this._updateAxis, this);
+        map.grid = this;
     },
 
     onRemove: function (map) {
@@ -46,6 +52,7 @@ export var Grid = Rectangle.extend({
         this.$graphPanel.remove();
         map.off('move', this._updateAxis, this);
         Rectangle.prototype.onRemove.call(this, map);
+        delete map.grid;
     },
 
     getPoints: function(){
@@ -98,7 +105,7 @@ export var Grid = Rectangle.extend({
     _updatePath: function(){
         var map = this._map;
         Rectangle.prototype._updatePath.call(this);
-        var step = this.step;
+        var step = this.step_px;
         var bb = toBounds(this._parts[0]);
         var topLeft = bb.getTopLeft();
         var bottomRight = bb.getBottomRight();
@@ -142,38 +149,38 @@ export var Grid = Rectangle.extend({
         if(this._map){
 
             var diff = [0.5, 1, 5, 10, 20, 100, 500];
-            var dm = 0;
-            var dpx = 0;
+            this.step_px = 1;
+            this.step_m = 1;
             for(var i=0; i<diff.length; i++){
-                dm = diff[i];
+                this.step_m = diff[i];
                 var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
-                var p2 = this._map.latLngToContainerPoint(toLatLng(0,dm));
-                dpx = p1.distanceTo(p2);
-                if(dpx > 5)
+                var p2 = this._map.latLngToContainerPoint(toLatLng(0,this.step_m));
+                this.step_px = p1.distanceTo(p2);
+                if(this.step_px > 5)
                     break;
                             
             }
             // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
-            var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
-            var p2 = this._map.latLngToContainerPoint(toLatLng(0,0.5));
-            var d = p1.distanceTo(p2);
-            if(d < 5){
-                var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
-                var p2 = this._map.latLngToContainerPoint(toLatLng(0,1));
-                var d = p1.distanceTo(p2);
-                if(d < 5){
-                    var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
-                    var p2 = this._map.latLngToContainerPoint(toLatLng(0,5));
-                    var d = p1.distanceTo(p2);
-                }
-                if(d < 5){
-                    var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
-                    var p2 = this._map.latLngToContainerPoint(toLatLng(0,10));
-                    var d = p1.distanceTo(p2);
-                }
-            // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
-            }
-            this.step = d > 5 ? d : 5;
+            // var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+            // var p2 = this._map.latLngToContainerPoint(toLatLng(0,0.5));
+            // var d = p1.distanceTo(p2);
+            // if(d < 5){
+            //     var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+            //     var p2 = this._map.latLngToContainerPoint(toLatLng(0,1));
+            //     var d = p1.distanceTo(p2);
+            //     if(d < 5){
+            //         var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+            //         var p2 = this._map.latLngToContainerPoint(toLatLng(0,5));
+            //         var d = p1.distanceTo(p2);
+            //     }
+            //     if(d < 5){
+            //         var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+            //         var p2 = this._map.latLngToContainerPoint(toLatLng(0,10));
+            //         var d = p1.distanceTo(p2);
+            //     }
+            // // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
+            // }
+            // this.step = d > 5 ? d : 5;
         }
         Rectangle.prototype._project.call(this);
     }

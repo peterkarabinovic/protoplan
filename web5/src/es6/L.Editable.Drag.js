@@ -162,7 +162,10 @@ Handler.PathDrag = Handler.extend( /** @lends  Path.Drag.prototype */ {
   _onDragStart: function(evt) {
     var eventType = evt.originalEvent._simulated ? 'touchstart' : evt.originalEvent.type;
 
-    var cp = this._path._map.snapContainerPoint(evt.containerPoint);
+    var cp = evt.containerPoint;
+    var map = this._path._map;
+    if(!map.options.nosnap && map.grid)
+      cp = map.grid.snapContainerPoint(cp);
     this._mapDraggingWasEnabled = false;
     this._startPoint = cp.clone();
     this._dragStartPoint = cp.clone();
@@ -170,9 +173,8 @@ Handler.PathDrag = Handler.extend( /** @lends  Path.Drag.prototype */ {
     DomEvent.stop(evt.originalEvent);
 
     DomUtil.addClass(this._path._renderer._container, 'leaflet-interactive');
-    DomEvent
-      .on(document, MOVE[eventType], this._onDrag,    this)
-      .on(document, END[eventType],  this._onDragEnd, this);
+    DomEvent.on(document, MOVE[eventType], this._onDrag,    this)
+    DomEvent.on(document, END[eventType],  this._onDragEnd, this);
 
     if (this._path._map.dragging.enabled()) {
       // I guess it's required because mousdown gets simulated with a delay
@@ -200,7 +202,11 @@ Handler.PathDrag = Handler.extend( /** @lends  Path.Drag.prototype */ {
     var first = (evt.touches && evt.touches.length >= 1 ? evt.touches[0] : evt);
     var containerPoint = this._path._map.mouseEventToContainerPoint(first);
 
-    var cp = this._path._map.snapContainerPoint(containerPoint);
+    var cp = containerPoint;
+    var map = this._path._map;
+    if(!map.options.nosnap && map.grid)
+      cp = map.grid.snapContainerPoint(cp);
+    
     var x = cp.x;
     var y = cp.y;
 
@@ -244,9 +250,8 @@ Handler.PathDrag = Handler.extend( /** @lends  Path.Drag.prototype */ {
     }
 
 
-    DomEvent
-      .off(document, 'mousemove touchmove', this._onDrag, this)
-      .off(document, 'mouseup touchend',    this._onDragEnd, this);
+    DomEvent.off(document, 'mousemove touchmove', this._onDrag, this)
+    DomEvent.off(document, 'mouseup touchend',    this._onDragEnd, this);
 
     this._restoreCoordGetters();
 

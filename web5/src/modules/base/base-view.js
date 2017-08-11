@@ -22,12 +22,12 @@ export default function BaseView(store) {
         html('error', error);
     });
 
-    el('draw_line').onclick = function(){
-        store(DRAWING_MODE_SET, DRAW_DISTANCE);
+    el('draw_line').onchange = function(){
+        store(DRAWING_MODE_SET, el('draw_line').checked ? DRAW_DISTANCE : null);
     }
 
-    el('grid_edit').onclick = function(){
-        store(DRAWING_MODE_SET, EDIT_GRID);
+    el('grid_edit').onchange = function(){
+        store(DRAWING_MODE_SET, el('grid_edit').checked ? EDIT_GRID : null);
     }
 
     el('distance_input').oninput = _.debounce( function(e){
@@ -53,6 +53,11 @@ export default function BaseView(store) {
         else {
             hide('distance');
         }
+    });
+
+    store.on('map.drawMode', function(e){
+        el('draw_line').checked = e.new_val == DRAW_DISTANCE;
+        el('grid_edit').checked = e.new_val == EDIT_GRID;
     });
 } 
 
