@@ -1,5 +1,4 @@
 import _  from './es6/underscore.js'
-
 import {Store} from './utils/redux.js'
 import {reduceReducers} from './utils/redux.js'
 import initState from './state.js'

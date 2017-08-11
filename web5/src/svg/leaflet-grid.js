@@ -15,9 +15,21 @@ export var Grid = Rectangle.extend({
     options: {
         color: 'grey',
         weight: 1,
-        fill: false,
+        fill: true,
         className: 'grid-axis'
     },
+
+    snap: function(latlng){
+        latlng.lat = Math.round(latlng.lat / this.step) * this.step; 
+        latlng.lng = Math.round(latlng.lng / this.step) * this.step; 
+        return latlng;
+    },
+
+    snapContainerPoint: function(cp){
+        if(!this._map) return cp;
+        var ll = map.containerPointToLatLng(cp)
+        return map.latLngToContainerPoint(map.snap(ll));        
+    }, 
 
     onAdd: function (map) {
         var g = map.getRenderer(this)._rootGroup;
@@ -128,6 +140,19 @@ export var Grid = Rectangle.extend({
  
     _project: function(){
         if(this._map){
+
+            var diff = [0.5, 1, 5, 10, 20, 100, 500];
+            var dm = 0;
+            var dpx = 0;
+            for(var i=0; i<diff.length; i++){
+                dm = diff[i];
+                var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
+                var p2 = this._map.latLngToContainerPoint(toLatLng(0,dm));
+                dpx = p1.distanceTo(p2);
+                if(dpx > 5)
+                    break;
+                            
+            }
             // REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR REFACTOR
             var p1 = this._map.latLngToContainerPoint(toLatLng(0,0));
             var p2 = this._map.latLngToContainerPoint(toLatLng(0,0.5));

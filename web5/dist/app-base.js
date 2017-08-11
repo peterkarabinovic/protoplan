@@ -3099,9 +3099,8 @@ var pointer = !!(window.PointerEvent || msPointer);
 // This does not necessarily mean that the browser is running in a computer with
 // a touchscreen, it only means that the browser is capable of understanding
 // touch events.
-// export var touch = !window.L_NO_TOUCH && (pointer || 'ontouchstart' in window ||
-// 		(window.DocumentTouch && document instanceof window.DocumentTouch));
-var touch = false;
+var touch = !window.L_NO_TOUCH && (pointer || 'ontouchstart' in window ||
+		(window.DocumentTouch && document instanceof window.DocumentTouch));
 
 // @property mobileOpera: Boolean; `true` for the Opera browser in a mobile device.
 var mobileOpera = mobile && opera;
@@ -9347,10 +9346,10 @@ var Editable = Evented.extend({
 
     },
 
-    initialize: function (map, options) {
+    initialize: function (map$$1, options) {
         setOptions(this, options);
         this._lastZIndex = this.options.zIndex;
-        this.map = map;
+        this.map = map$$1;
         this.editLayer = this.createEditLayer();
         this.featuresLayer = this.createFeaturesLayer();
         this.forwardLineGuide = this.createLineGuide();
@@ -9698,8 +9697,8 @@ Editable.VertexMarker = Marker.extend({
         this.setZIndexOffset(editor.tools._lastZIndex + 1);
     },
 
-    onAdd: function (map) {
-        Marker.prototype.onAdd.call(this, map);
+    onAdd: function (map$$1) {
+        Marker.prototype.onAdd.call(this, map$$1);
         this.on('drag', this.onDrag);
         this.on('dragstart', this.onDragStart);
         this.on('dragend', this.onDragEnd);
@@ -9710,7 +9709,7 @@ Editable.VertexMarker = Marker.extend({
         this.addMiddleMarkers();
     },
 
-    onRemove: function (map) {
+    onRemove: function (map$$1) {
         if (this.middleMarker) this.middleMarker.delete();
         delete this.latlng.__vertex;
         this.off('drag', this.onDrag);
@@ -9720,7 +9719,7 @@ Editable.VertexMarker = Marker.extend({
         this.off('click', this.onClick);
         this.off('contextmenu', this.onContextMenu);
         this.off('mousedown touchstart', this.onMouseDown);
-        Marker.prototype.onRemove.call(this, map);
+        Marker.prototype.onRemove.call(this, map$$1);
     },
 
     onDrag: function (e) {
@@ -9907,17 +9906,17 @@ Editable.MiddleMarker = Marker.extend({
         return this.editor.map.containerPointToLatLng([x, y]);
     },
 
-    onAdd: function (map) {
-        Marker.prototype.onAdd.call(this, map);
+    onAdd: function (map$$1) {
+        Marker.prototype.onAdd.call(this, map$$1);
         on(this._icon, 'mousedown touchstart', this.onMouseDown, this);
-        map.on('zoomend', this.setVisibility, this);
+        map$$1.on('zoomend', this.setVisibility, this);
     },
 
-    onRemove: function (map) {
+    onRemove: function (map$$1) {
         delete this.right.middleMarker;
         off(this._icon, 'mousedown touchstart', this.onMouseDown, this);
-        map.off('zoomend', this.setVisibility, this);
-        Marker.prototype.onRemove.call(this, map);
+        map$$1.off('zoomend', this.setVisibility, this);
+        Marker.prototype.onRemove.call(this, map$$1);
     },
 
     onMouseDown: function (e) {
@@ -9975,13 +9974,13 @@ Editable.mergeOptions({
 // editor basically knows how to handle the edition.
 Editable.BaseEditor = Handler.extend({
 
-    initialize: function (map, feature, options) {
+    initialize: function (map$$1, feature, options) {
         setOptions(this, options);
-        this.map = map;
+        this.map = map$$1;
         this.feature = feature;
         this.feature.editor = this;
         this.editLayer = new LayerGroup();
-        this.tools = this.options.editTools || map.editTools;
+        this.tools = this.options.editTools || map$$1.editTools;
     },
 
     // 🍂method enable(): this
@@ -10238,7 +10237,7 @@ Editable.PathEditor = Editable.BaseEditor.extend({
     initVertexMarkers: function (latlngs) {
         if (!this.enabled()) return;
         latlngs = latlngs || this.getLatLngs();
-        if (isFlat(latlngs)) this.addVertexMarkers(latlngs);
+        if (isFlat$$1(latlngs)) this.addVertexMarkers(latlngs);
         else for (var i = 0; i < latlngs.length; i++) this.initVertexMarkers(latlngs[i]);
     },
 
@@ -10660,7 +10659,7 @@ Editable.PolylineEditor = Editable.PathEditor.extend({
     },
 
     ensureMulti: function () {
-        if (this.feature._latlngs.length && isFlat(this.feature._latlngs)) {
+        if (this.feature._latlngs.length && isFlat$$1(this.feature._latlngs)) {
             this.feature._latlngs = [this.feature._latlngs];
         }
     },
@@ -10676,7 +10675,7 @@ Editable.PolylineEditor = Editable.PathEditor.extend({
     },
 
     formatShape: function (shape) {
-        if (isFlat(shape)) return shape;
+        if (isFlat$$1(shape)) return shape;
         else if (shape[0]) return this.formatShape(shape[0]);
     },
 
@@ -10741,13 +10740,13 @@ Editable.PolygonEditor = Editable.PathEditor.extend({
     },
 
     ensureMulti: function () {
-        if (this.feature._latlngs.length && isFlat(this.feature._latlngs[0])) {
+        if (this.feature._latlngs.length && isFlat$$1(this.feature._latlngs[0])) {
             this.feature._latlngs = [this.feature._latlngs];
         }
     },
 
     ensureNotFlat: function () {
-        if (!this.feature._latlngs.length || isFlat(this.feature._latlngs)) this.feature._latlngs = [this.feature._latlngs];
+        if (!this.feature._latlngs.length || isFlat$$1(this.feature._latlngs)) this.feature._latlngs = [this.feature._latlngs];
     },
 
     vertexCanBeDeleted: function (vertex) {
@@ -10766,7 +10765,7 @@ Editable.PolygonEditor = Editable.PathEditor.extend({
         // [[1, 2], [3, 4]] => must be nested
         // [] => must be nested
         // [[]] => is already nested
-        if (isFlat(shape) && (!shape[0] || shape[0].length !== 0)) return [shape];
+        if (isFlat$$1(shape) && (!shape[0] || shape[0].length !== 0)) return [shape];
         else return shape;
     }
 
@@ -10867,8 +10866,8 @@ Editable.CircleEditor = Editable.PathEditor.extend({
         skipMiddleMarkers: true
     },
 
-    initialize: function (map, feature, options) {
-        Editable.PathEditor.prototype.initialize.call(this, map, feature, options);
+    initialize: function (map$$1, feature, options) {
+        Editable.PathEditor.prototype.initialize.call(this, map$$1, feature, options);
         this._resizeLatLng = this.computeResizeLatLng();
     },
 
@@ -10940,18 +10939,18 @@ Editable.CircleEditor = Editable.PathEditor.extend({
 // `editor` property.*
 var EditableMixin = {
 
-    createEditor: function (map) {
-        map = map || this._map;
-        var tools = (this.options.editOptions || {}).editTools || map.editTools;
+    createEditor: function (map$$1) {
+        map$$1 = map$$1 || this._map;
+        var tools = (this.options.editOptions || {}).editTools || map$$1.editTools;
         if (!tools) throw Error('Unable to detect Editable instance.')
         var Klass = this.options.editorClass || this.getEditorClass(tools);
-        return new Klass(map, this, this.options.editOptions);
+        return new Klass(map$$1, this, this.options.editOptions);
     },
 
     // 🍂method enableEdit(map?: L.Map): this.editor
     // Enable editing, by creating an editor if not existing, and then calling `enable` on it.
-    enableEdit: function (map) {
-        if (!this.editor) this.createEditor(map);
+    enableEdit: function (map$$1) {
+        if (!this.editor) this.createEditor(map$$1);
         this.editor.enable();
         return this.editor;
     },
@@ -10997,7 +10996,7 @@ var PolylineMixin = {
         var shape = null;
         latlngs = latlngs || this._latlngs;
         if (!latlngs.length) return shape;
-        else if (isFlat(latlngs) && this.isInLatLngs(latlng, latlngs)) shape = latlngs;
+        else if (isFlat$$1(latlngs) && this.isInLatLngs(latlng, latlngs)) shape = latlngs;
         else for (var i = 0; i < latlngs.length; i++) if (this.isInLatLngs(latlng, latlngs[i])) return latlngs[i];
         return shape;
     },
@@ -11036,8 +11035,8 @@ var PolygonMixin = {
         var shape = null;
         latlngs = latlngs || this._latlngs;
         if (!latlngs.length) return shape;
-        else if (isFlat(latlngs) && this.isInLatLngs(latlng, latlngs)) shape = latlngs;
-        else if (isFlat(latlngs[0]) && this.isInLatLngs(latlng, latlngs[0])) shape = latlngs;
+        else if (isFlat$$1(latlngs) && this.isInLatLngs(latlng, latlngs)) shape = latlngs;
+        else if (isFlat$$1(latlngs[0]) && this.isInLatLngs(latlng, latlngs[0])) shape = latlngs;
         else for (var i = 0; i < latlngs.length; i++) if (this.isInLatLngs(latlng, latlngs[i][0])) return latlngs[i];
         return shape;
     },
@@ -11101,7 +11100,7 @@ var keepEditable = function () {
     this.on('add', this._onEditableAdd);
 };
 
-var isFlat = isFlat$1 || _flat || Polyline._flat;  // <=> 1.1 compat.
+var isFlat$$1 = isFlat$1 || _flat || Polyline._flat;  // <=> 1.1 compat.
 
 
 if (Polyline) {
@@ -11132,6 +11131,1015 @@ LatLng.prototype.update = function (latlng) {
     this.lat = latlng.lat;
     this.lng = latlng.lng;
 };
+
+var Renderer = Layer.extend({
+
+	// @section
+	// @aka Renderer options
+	options: {
+		// @option padding: Number = 0.1
+		// How much to extend the clip area around the map view (relative to its size)
+		// e.g. 0.1 would be 10% of map view in each direction
+		padding: 0.1
+	},
+
+	initialize: function (options) {
+		setOptions(this, options);
+		stamp(this);
+		this._layers = this._layers || {};
+	},
+
+	onAdd: function () {
+		if (!this._container) {
+			this._initContainer(); // defined by renderer implementations
+
+			if (this._zoomAnimated) {
+				addClass(this._container, 'leaflet-zoom-animated');
+			}
+		}
+
+		this.getPane().appendChild(this._container);
+		this._update();
+		this.on('update', this._updatePaths, this);
+	},
+
+	onRemove: function () {
+		this.off('update', this._updatePaths, this);
+		this._destroyContainer();
+	},
+
+	getEvents: function () {
+		var events = {
+			viewreset: this._reset,
+			zoom: this._onZoom,
+			moveend: this._update,
+			zoomend: this._onZoomEnd
+		};
+		if (this._zoomAnimated) {
+			events.zoomanim = this._onAnimZoom;
+		}
+		return events;
+	},
+
+	_onAnimZoom: function (ev) {
+		this._updateTransform(ev.center, ev.zoom);
+	},
+
+	_onZoom: function () {
+		this._updateTransform(this._map.getCenter(), this._map.getZoom());
+	},
+
+	_updateTransform: function (center, zoom) {
+		var scale = this._map.getZoomScale(zoom, this._zoom),
+		    position = getPosition(this._container),
+		    viewHalf = this._map.getSize().multiplyBy(0.5 + this.options.padding),
+		    currentCenterPoint = this._map.project(this._center, zoom),
+		    destCenterPoint = this._map.project(center, zoom),
+		    centerOffset = destCenterPoint.subtract(currentCenterPoint),
+
+		    topLeftOffset = viewHalf.multiplyBy(-scale).add(position).add(viewHalf).subtract(centerOffset);
+
+		if (any3d) {
+			setTransform(this._container, topLeftOffset, scale);
+		} else {
+			setPosition(this._container, topLeftOffset);
+		}
+	},
+
+	_reset: function () {
+		this._update();
+		this._updateTransform(this._center, this._zoom);
+
+		for (var id in this._layers) {
+			this._layers[id]._reset();
+		}
+	},
+
+	_onZoomEnd: function () {
+		for (var id in this._layers) {
+			this._layers[id]._project();
+		}
+	},
+
+	_updatePaths: function () {
+		for (var id in this._layers) {
+			this._layers[id]._update();
+		}
+	},
+
+	_update: function () {
+		// Update pixel bounds of renderer container (for positioning/sizing/clipping later)
+		// Subclasses are responsible of firing the 'update' event.
+		var p = this.options.padding,
+		    size = this._map.getSize(),
+		    min = this._map.containerPointToLayerPoint(size.multiplyBy(-p)).round();
+
+		this._bounds = new Bounds(min, min.add(size.multiplyBy(1 + p * 2)).round());
+
+		this._center = this._map.getCenter();
+		this._zoom = this._map.getZoom();
+	}
+});
+
+var vmlCreate = (function () {
+	try {
+		document.namespaces.add('lvml', 'urn:schemas-microsoft-com:vml');
+		return function (name) {
+			return document.createElement('<lvml:' + name + ' class="lvml">');
+		};
+	} catch (e) {
+		return function (name) {
+			return document.createElement('<' + name + ' xmlns="urn:schemas-microsoft.com:vml" class="lvml">');
+		};
+	}
+})();
+
+
+/*
+ * @class SVG
+ *
+ * Although SVG is not available on IE7 and IE8, these browsers support [VML](https://en.wikipedia.org/wiki/Vector_Markup_Language), and the SVG renderer will fall back to VML in this case.
+ *
+ * VML was deprecated in 2012, which means VML functionality exists only for backwards compatibility
+ * with old versions of Internet Explorer.
+ */
+
+// mixin to redefine some SVG methods to handle VML syntax which is similar but with some differences
+var vmlMixin = {
+
+	_initContainer: function () {
+		this._container = create$1('div', 'leaflet-vml-container');
+	},
+
+	_update: function () {
+		if (this._map._animatingZoom) { return; }
+		Renderer.prototype._update.call(this);
+		this.fire('update');
+	},
+
+	_initPath: function (layer) {
+		var container = layer._container = vmlCreate('shape');
+
+		addClass(container, 'leaflet-vml-shape ' + (this.options.className || ''));
+
+		container.coordsize = '1 1';
+
+		layer._path = vmlCreate('path');
+		container.appendChild(layer._path);
+
+		this._updateStyle(layer);
+		this._layers[stamp(layer)] = layer;
+	},
+
+	_addPath: function (layer) {
+		var container = layer._container;
+		this._container.appendChild(container);
+
+		if (layer.options.interactive) {
+			layer.addInteractiveTarget(container);
+		}
+	},
+
+	_removePath: function (layer) {
+		var container = layer._container;
+		remove(container);
+		layer.removeInteractiveTarget(container);
+		delete this._layers[stamp(layer)];
+	},
+
+	_updateStyle: function (layer) {
+		var stroke = layer._stroke,
+		    fill = layer._fill,
+		    options = layer.options,
+		    container = layer._container;
+
+		container.stroked = !!options.stroke;
+		container.filled = !!options.fill;
+
+		if (options.stroke) {
+			if (!stroke) {
+				stroke = layer._stroke = vmlCreate('stroke');
+			}
+			container.appendChild(stroke);
+			stroke.weight = options.weight + 'px';
+			stroke.color = options.color;
+			stroke.opacity = options.opacity;
+
+			if (options.dashArray) {
+				stroke.dashStyle = isArray(options.dashArray) ?
+				    options.dashArray.join(' ') :
+				    options.dashArray.replace(/( *, *)/g, ' ');
+			} else {
+				stroke.dashStyle = '';
+			}
+			stroke.endcap = options.lineCap.replace('butt', 'flat');
+			stroke.joinstyle = options.lineJoin;
+
+		} else if (stroke) {
+			container.removeChild(stroke);
+			layer._stroke = null;
+		}
+
+		if (options.fill) {
+			if (!fill) {
+				fill = layer._fill = vmlCreate('fill');
+			}
+			container.appendChild(fill);
+			fill.color = options.fillColor || options.color;
+			fill.opacity = options.fillOpacity;
+
+		} else if (fill) {
+			container.removeChild(fill);
+			layer._fill = null;
+		}
+	},
+
+	_updateCircle: function (layer) {
+		var p = layer._point.round(),
+		    r = Math.round(layer._radius),
+		    r2 = Math.round(layer._radiusY || r);
+
+		this._setPath(layer, layer._empty() ? 'M0 0' :
+				'AL ' + p.x + ',' + p.y + ' ' + r + ',' + r2 + ' 0,' + (65535 * 360));
+	},
+
+	_setPath: function (layer, path) {
+		layer._path.v = path;
+	},
+
+	_bringToFront: function (layer) {
+		toFront(layer._container);
+	},
+
+	_bringToBack: function (layer) {
+		toBack(layer._container);
+	}
+};
+
+var create$2 = vml ? vmlCreate : svgCreate;
+
+/*
+ * @class SVG
+ * @inherits Renderer
+ * @aka L.SVG
+ *
+ * Allows vector layers to be displayed with [SVG](https://developer.mozilla.org/docs/Web/SVG).
+ * Inherits `Renderer`.
+ *
+ * Due to [technical limitations](http://caniuse.com/#search=svg), SVG is not
+ * available in all web browsers, notably Android 2.x and 3.x.
+ *
+ * Although SVG is not available on IE7 and IE8, these browsers support
+ * [VML](https://en.wikipedia.org/wiki/Vector_Markup_Language)
+ * (a now deprecated technology), and the SVG renderer will fall back to VML in
+ * this case.
+ *
+ * @example
+ *
+ * Use SVG by default for all paths in the map:
+ *
+ * ```js
+ * var map = L.map('map', {
+ * 	renderer: L.svg()
+ * });
+ * ```
+ *
+ * Use a SVG renderer with extra padding for specific vector geometries:
+ *
+ * ```js
+ * var map = L.map('map');
+ * var myRenderer = L.svg({ padding: 0.5 });
+ * var line = L.polyline( coordinates, { renderer: myRenderer } );
+ * var circle = L.circle( center, { renderer: myRenderer } );
+ * ```
+ */
+
+var SVG = Renderer.extend({
+
+	getEvents: function () {
+		var events = Renderer.prototype.getEvents.call(this);
+		events.zoomstart = this._onZoomStart;
+		return events;
+	},
+
+	_initContainer: function () {
+		this._container = create$2('svg');
+
+		// makes it possible to click through svg root; we'll reset it back in individual paths
+		this._container.setAttribute('pointer-events', 'none');
+
+		this._rootGroup = create$2('g');
+		this._container.appendChild(this._rootGroup);
+	},
+
+	_destroyContainer: function () {
+		remove(this._container);
+		off(this._container);
+		delete this._container;
+		delete this._rootGroup;
+	},
+
+	_onZoomStart: function () {
+		// Drag-then-pinch interactions might mess up the center and zoom.
+		// In this case, the easiest way to prevent this is re-do the renderer
+		//   bounds and padding when the zooming starts.
+		this._update();
+	},
+
+	_update: function () {
+		if (this._map._animatingZoom && this._bounds) { return; }
+
+		Renderer.prototype._update.call(this);
+
+		var b = this._bounds,
+		    size = b.getSize(),
+		    container = this._container;
+
+		// set size of svg-container if changed
+		if (!this._svgSize || !this._svgSize.equals(size)) {
+			this._svgSize = size;
+			container.setAttribute('width', size.x);
+			container.setAttribute('height', size.y);
+		}
+
+		// movement: update container viewBox so that we don't have to change coordinates of individual layers
+		setPosition(container, b.min);
+		container.setAttribute('viewBox', [b.min.x, b.min.y, size.x, size.y].join(' '));
+
+		this.fire('update');
+	},
+
+	// methods below are called by vector layers implementations
+
+	_initPath: function (layer) {
+		var path = layer._path = create$2('path');
+
+		// @namespace Path
+		// @option className: String = null
+		// Custom class name set on an element. Only for SVG renderer.
+		if (layer.options.className) {
+			addClass(path, layer.options.className);
+		}
+
+		if (layer.options.interactive) {
+			addClass(path, 'leaflet-interactive');
+		}
+
+		this._updateStyle(layer);
+		this._layers[stamp(layer)] = layer;
+	},
+
+	_addPath: function (layer) {
+		if (!this._rootGroup) { this._initContainer(); }
+		this._rootGroup.appendChild(layer._path);
+		layer.addInteractiveTarget(layer._path);
+	},
+
+	_removePath: function (layer) {
+		remove(layer._path);
+		layer.removeInteractiveTarget(layer._path);
+		delete this._layers[stamp(layer)];
+	},
+
+	_updatePath: function (layer) {
+		layer._project();
+		layer._update();
+	},
+
+	_updateStyle: function (layer) {
+		var path = layer._path,
+		    options = layer.options;
+
+		if (!path) { return; }
+
+		if (options.stroke) {
+			path.setAttribute('stroke', options.color);
+			path.setAttribute('stroke-opacity', options.opacity);
+			path.setAttribute('stroke-width', options.weight);
+			path.setAttribute('stroke-linecap', options.lineCap);
+			path.setAttribute('stroke-linejoin', options.lineJoin);
+
+			if (options.dashArray) {
+				path.setAttribute('stroke-dasharray', options.dashArray);
+			} else {
+				path.removeAttribute('stroke-dasharray');
+			}
+
+			if (options.dashOffset) {
+				path.setAttribute('stroke-dashoffset', options.dashOffset);
+			} else {
+				path.removeAttribute('stroke-dashoffset');
+			}
+		} else {
+			path.setAttribute('stroke', 'none');
+		}
+
+		if (options.fill) {
+			path.setAttribute('fill', options.fillColor || options.color);
+			path.setAttribute('fill-opacity', options.fillOpacity);
+			path.setAttribute('fill-rule', options.fillRule || 'evenodd');
+		} else {
+			path.setAttribute('fill', 'none');
+		}
+	},
+
+	_updatePoly: function (layer, closed) {
+		this._setPath(layer, pointsToPath(layer._parts, closed));
+	},
+
+	_updateCircle: function (layer) {
+		var p = layer._point,
+		    r = layer._radius,
+		    r2 = layer._radiusY || r,
+		    arc = 'a' + r + ',' + r2 + ' 0 1,0 ';
+
+		// drawing a circle with two half-arcs
+		var d = layer._empty() ? 'M0 0' :
+				'M' + (p.x - r) + ',' + p.y +
+				arc + (r * 2) + ',0 ' +
+				arc + (-r * 2) + ',0 ';
+
+		this._setPath(layer, d);
+	},
+
+	_setPath: function (layer, path) {
+		layer._path.setAttribute('d', path);
+	},
+
+	// SVG does not have the concept of zIndex so we resort to changing the DOM order of elements
+	_bringToFront: function (layer) {
+		toFront(layer._path);
+	},
+
+	_bringToBack: function (layer) {
+		toBack(layer._path);
+	}
+});
+
+if (vml) {
+	SVG.include(vmlMixin);
+}
+
+// @factory L.svg(options?: Renderer options)
+// Creates a SVG renderer with the given options.
+function svg$1(options) {
+	return svg || vml ? new SVG(options) : null;
+}
+
+Path.include({
+
+	/**
+	 * Applies matrix transformation to SVG
+	 * @param {Array.<Number>?} matrix
+	 */
+	_transform: function(matrix) {
+		if (this._renderer) {
+			if (matrix) {
+				this._renderer.transformPath(this, matrix);
+			} else {
+				// reset transform matrix
+				this._renderer._resetTransformPath(this);
+				this._update();
+			}
+		}
+		return this;
+	},
+
+	/**
+	 * Check if the feature was dragged, that'll supress the click event
+	 * on mouseup. That fixes popups for example
+	 *
+	 * @param  {MouseEvent} e
+	 */
+	_onMouseClick: function(e) {
+		if ((this.dragging && this.dragging.moved()) ||
+			(this._map.dragging && this._map.dragging.moved())) {
+			return;
+		}
+
+		this._fireMouseEvent(e);
+	}
+
+});
+
+var END$1 = {
+	mousedown: 'mouseup',
+	touchstart: 'touchend',
+	pointerdown: 'touchend',
+	MSPointerDown: 'touchend'
+};
+var MOVE$1 = {
+	mousedown: 'mousemove',
+	touchstart: 'touchmove',
+	pointerdown: 'touchmove',
+	MSPointerDown: 'touchmove'
+};
+
+function _sqDist$1(p1, p2) {
+	var dx = p2.x - p1.x,
+	    dy = p2.y - p1.y;
+	return dx * dx + dy * dy;
+}
+
+
+/**
+ * Drag handler
+ * @class Path.Drag
+ * @extends {Handler}
+ */
+Handler.PathDrag = Handler.extend( /** @lends  Path.Drag.prototype */ {
+
+  statics: {
+    DRAGGING_CLS: 'leaflet-path-draggable',
+  },
+
+
+  /**
+   * @param  {Path} path
+   * @constructor
+   */
+  initialize: function(path) {
+
+    /**
+     * @type {Path}
+     */
+    this._path = path;
+
+    /**
+     * @type {Array.<Number>}
+     */
+    this._matrix = null;
+
+    /**
+     * @type {L.Point}
+     */
+    this._startPoint = null;
+
+    /**
+     * @type {L.Point}
+     */
+    this._dragStartPoint = null;
+
+    /**
+     * @type {Boolean}
+     */
+    this._mapDraggingWasEnabled = false;
+
+  },
+
+  /**
+   * Enable dragging
+   */
+  addHooks: function() {
+    this._path.on('mousedown', this._onDragStart, this);
+
+    this._path.options.className = this._path.options.className ?
+        (this._path.options.className + ' ' + Handler.PathDrag.DRAGGING_CLS) :
+         Handler.PathDrag.DRAGGING_CLS;
+
+    if (this._path._path) {
+      addClass(this._path._path, Handler.PathDrag.DRAGGING_CLS);
+    }
+  },
+
+  /**
+   * Disable dragging
+   */
+  removeHooks: function() {
+    this._path.off('mousedown', this._onDragStart, this);
+
+    this._path.options.className = this._path.options.className
+      .replace(new RegExp('\\s+' + Handler.PathDrag.DRAGGING_CLS), '');
+    if (this._path._path) {
+      removeClass(this._path._path, Handler.PathDrag.DRAGGING_CLS);
+    }
+  },
+
+  /**
+   * @return {Boolean}
+   */
+  moved: function() {
+    return this._path._dragMoved;
+  },
+
+  /**
+   * Start drag
+   * @param  {L.MouseEvent} evt
+   */
+  _onDragStart: function(evt) {
+    var eventType = evt.originalEvent._simulated ? 'touchstart' : evt.originalEvent.type;
+
+    var cp = this._path._map.snapContainerPoint(evt.containerPoint);
+    this._mapDraggingWasEnabled = false;
+    this._startPoint = cp.clone();
+    this._dragStartPoint = cp.clone();
+    this._matrix = [1, 0, 0, 1, 0, 0];
+    stop(evt.originalEvent);
+
+    addClass(this._path._renderer._container, 'leaflet-interactive');
+    on(document, MOVE$1[eventType], this._onDrag,    this)
+      .on(document, END$1[eventType],  this._onDragEnd, this);
+
+    if (this._path._map.dragging.enabled()) {
+      // I guess it's required because mousdown gets simulated with a delay
+      //this._path._map.dragging._draggable._onUp(evt);
+
+      this._path._map.dragging.disable();
+      this._mapDraggingWasEnabled = true;
+    }
+    this._path._dragMoved = false;
+
+    if (this._path._popup) { // that might be a case on touch devices as well
+      this._path._popup._close();
+    }
+
+    this._replaceCoordGetters(evt);
+  },
+
+  /**
+   * Dragging
+   * @param  {L.MouseEvent} evt
+   */
+  _onDrag: function(evt) {
+    stop(evt);
+
+    var first = (evt.touches && evt.touches.length >= 1 ? evt.touches[0] : evt);
+    var containerPoint = this._path._map.mouseEventToContainerPoint(first);
+
+    var cp = this._path._map.snapContainerPoint(containerPoint);
+    var x = cp.x;
+    var y = cp.y;
+
+    var dx = x - this._startPoint.x;
+    var dy = y - this._startPoint.y;
+
+    if (!this._path._dragMoved && (dx || dy)) {
+      this._path._dragMoved = true;
+      this._path.fire('dragstart', evt);
+      // we don't want that to happen on click
+      this._path.bringToFront();
+    }
+
+    this._matrix[4] += dx;
+    this._matrix[5] += dy;
+
+    this._startPoint.x = x;
+    this._startPoint.y = y;
+
+    this._path.fire('predrag', evt);
+    this._path._transform(this._matrix);
+    this._path.fire('drag', evt);
+  },
+
+  /**
+   * Dragging stopped, apply
+   * @param  {L.MouseEvent} evt
+   */
+  _onDragEnd: function(evt) {
+    var containerPoint = this._path._map.mouseEventToContainerPoint(evt);
+    var moved = this.moved();
+
+    // apply matrix
+    if (moved) {
+      this._transformPoints(this._matrix);
+      this._path._updatePath();
+      this._path._project();
+      this._path._transform(null);
+
+      stop(evt);
+    }
+
+
+    off(document, 'mousemove touchmove', this._onDrag, this)
+      .off(document, 'mouseup touchend',    this._onDragEnd, this);
+
+    this._restoreCoordGetters();
+
+    // consistency
+    if (moved) {
+      this._path.fire('dragend', {
+        distance: Math.sqrt(
+          _sqDist$1(this._dragStartPoint, containerPoint)
+        )
+      });
+
+      // hack for skipping the click in canvas-rendered layers
+      var contains = this._path._containsPoint;
+      this._path._containsPoint = falseFn;
+      requestAnimFrame(function() {
+        skipped({ type: 'click' });
+        this._path._containsPoint = contains;
+      }, this);
+    }
+
+    this._matrix          = null;
+    this._startPoint      = null;
+    this._dragStartPoint  = null;
+    this._path._dragMoved = false;
+
+    if (this._mapDraggingWasEnabled) {
+      fakeStop({ type: 'click' });
+      this._path._map.dragging.enable();
+    }
+  },
+
+
+  /**
+   * Applies transformation, does it in one sweep for performance,
+   * so don't be surprised about the code repetition.
+   *
+   * [ x ]   [ a  b  tx ] [ x ]   [ a * x + b * y + tx ]
+   * [ y ] = [ c  d  ty ] [ y ] = [ c * x + d * y + ty ]
+   *
+   * @param {Array.<Number>} matrix
+   */
+  _transformPoints: function(matrix, dest) {
+    var path = this._path;
+    var i, len, latlng;
+
+    var px = toPoint(matrix[4], matrix[5]);
+
+    var crs = path._map.options.crs;
+    var transformation = crs.transformation;
+    var scale = crs.scale(path._map.getZoom());
+    var projection = crs.projection;
+
+    var diff = transformation.untransform(px, scale)
+      .subtract(transformation.untransform(toPoint(0, 0), scale));
+    var applyTransform = !dest;
+
+    path._bounds = new LatLngBounds();
+
+    // console.time('transform');
+    // all shifts are in-place
+    if (path._point) { // L.Circle
+      dest = projection.unproject(
+        projection.project(path._latlng)._add(diff));
+      if (applyTransform) {
+        path._latlng = dest;
+        path._point._add(px);
+      }
+    } else if (path._rings || path._parts) { // everything else
+      var rings   = path._rings || path._parts;
+      var latlngs = path._latlngs;
+      dest = dest || latlngs;
+      if (!isArray(latlngs[0])) { // polyline
+        latlngs = [latlngs];
+        dest    = [dest];
+      }
+      for (i = 0, len = rings.length; i < len; i++) {
+        dest[i] = dest[i] || [];
+        for (var j = 0, jj = rings[i].length; j < jj; j++) {
+          latlng     = latlngs[i][j];
+          dest[i][j] = projection
+            .unproject(projection.project(latlng)._add(diff));
+          if (applyTransform) {
+            path._bounds.extend(latlngs[i][j]);
+            rings[i][j]._add(px);
+          }
+        }
+      }
+    }
+    return dest;
+    // console.timeEnd('transform');
+  },
+
+
+
+  /**
+   * If you want to read the latlngs during the drag - your right,
+   * but they have to be transformed
+   */
+  _replaceCoordGetters: function() {
+    if (this._path.getLatLng) { // Circle, CircleMarker
+      this._path.getLatLng_ = this._path.getLatLng;
+      this._path.getLatLng = bind(function() {
+        return this.dragging._transformPoints(this.dragging._matrix, {});
+      }, this._path);
+    } else if (this._path.getLatLngs) {
+      this._path.getLatLngs_ = this._path.getLatLngs;
+      this._path.getLatLngs = bind(function() {
+        return this.dragging._transformPoints(this.dragging._matrix, []);
+      }, this._path);
+    }
+  },
+
+
+  /**
+   * Put back the getters
+   */
+  _restoreCoordGetters: function() {
+    if (this._path.getLatLng_) {
+      this._path.getLatLng = this._path.getLatLng_;
+      delete this._path.getLatLng_;
+    } else if (this._path.getLatLngs_) {
+      this._path.getLatLngs = this._path.getLatLngs_;
+      delete this._path.getLatLngs_;
+    }
+  }
+
+});
+
+
+/**
+ * @param  {Path} layer
+ * @return {Path}
+ */
+Handler.PathDrag.makeDraggable = function(layer) {
+  layer.dragging = new Handler.PathDrag(layer);
+  return layer;
+};
+
+
+/**
+ * Also expose as a method
+ * @return {Path}
+ */
+Path.prototype.makeDraggable = function() {
+  return Handler.PathDrag.makeDraggable(this);
+};
+
+
+Path.addInitHook(function() {
+  if (this.options.draggable) {
+    // ensure interactive
+    this.options.interactive = true;
+
+    if (this.dragging) {
+      this.dragging.enable();
+    } else {
+      Handler.PathDrag.makeDraggable(this);
+      this.dragging.enable();
+    }
+  } else if (this.dragging) {
+    this.dragging.disable();
+  }
+});
+
+SVG.include({
+
+	/**
+	 * Reset transform matrix
+	 */
+	_resetTransformPath: function(layer) {
+		layer._path.setAttributeNS(null, 'transform', '');
+	},
+
+	/**
+	 * Applies matrix transformation to SVG
+	 * @param {Path}         layer
+	 * @param {Array.<Number>} matrix
+	 */
+	transformPath: function(layer, matrix) {
+		layer._path.setAttributeNS(null, 'transform',
+			'matrix(' + matrix.join(' ') + ')');
+	}
+
+});
+
+SVG.include( !vml ? {} : {
+
+	/**
+	 * Reset transform matrix
+	 */
+	_resetTransformPath: function(layer) {
+		if (layer._skew) {
+			// super important! workaround for a 'jumping' glitch:
+			// disable transform before removing it
+			layer._skew.on = false;
+			layer._path.removeChild(layer._skew);
+			layer._skew = null;
+		}
+	},
+
+	/**
+	 * Applies matrix transformation to VML
+	 * @param {Path}         layer
+	 * @param {Array.<Number>} matrix
+	 */
+	transformPath: function(layer, matrix) {
+		var skew = layer._skew;
+
+		if (!skew) {
+			skew = SVG.create('skew');
+			layer._path.appendChild(skew);
+			skew.style.behavior = 'url(#default#VML)';
+			layer._skew = skew;
+		}
+
+		// handle skew/translate separately, cause it's broken
+		var mt = matrix[0].toFixed(8) + ' ' + matrix[1].toFixed(8) + ' ' +
+			matrix[2].toFixed(8) + ' ' + matrix[3].toFixed(8) + ' 0 0';
+		var offset = Math.floor(matrix[4]).toFixed() + ', ' +
+			Math.floor(matrix[5]).toFixed() + '';
+
+		var s = this._path.style;
+		var l = parseFloat(s.left);
+		var t = parseFloat(s.top);
+		var w = parseFloat(s.width);
+		var h = parseFloat(s.height);
+
+		if (isNaN(l)) { l = 0; }
+		if (isNaN(t)) { t = 0; }
+		if (isNaN(w) || !w) { w = 1; }
+		if (isNaN(h) || !h) { h = 1; }
+
+		var origin = (-l / w - 0.5).toFixed(8) + ' ' + (-t / h - 0.5).toFixed(8);
+
+		skew.on = 'f';
+		skew.matrix = mt;
+		skew.origin = origin;
+		skew.offset = offset;
+		skew.on = true;
+	}
+
+});
+
+// Util.trueFn = function() {
+//   return true;
+// };
+
+/**
+ * Leaflet.Editable extension for dragging
+ * @author Alexander Milevski <info@w8r.name>
+ * @preserve
+ */
+Editable.PathEditor.include({
+
+  /**
+   * Hooks dragging in
+   * @override
+   * @return {Editable.PathEditor}
+   */
+  enable: function() {
+    this._enable();
+    if (!this.feature.dragging) {
+      Handler.PathDrag.makeDraggable(this.feature);
+    }
+    this.feature.dragging.enable();
+    this.feature
+      .on('dragstart', this._onFeatureDragStart, this)
+      .on('drag',      this._onFeatureDrag,      this)
+      .on('dragend',   this._onFeatureDragEnd,   this);
+
+    return this;
+  },
+  _enable: Editable.PathEditor.prototype.enable,
+
+
+  /**
+   * @override
+   * @return {Editable.PathEditor}
+   */
+  disable: function() {
+    this.feature.dragging.disable();
+    this._disable();
+    this.feature
+      .off('dragstart', this._onFeatureDragStart, this)
+      .off('drag',      this._onFeatureDrag,      this)
+      .off('dragend',   this._onFeatureDragEnd,   this);
+    return this;
+  },
+  _disable: Editable.PathEditor.prototype.disable,
+
+
+  /**
+   * Basically, remove the vertices
+   * @param  {Event} evt
+   */
+  _onFeatureDragStart: function(evt) {
+    this.fireAndForward('editable:shape:dragstart', evt);
+    this.editLayer.clearLayers();
+    if (this.drawing()) {
+      this.endDrawing();
+    }
+  },
+
+
+  /**
+   * Just propagate the event
+   * @param  {Event} evt
+   */
+  _onFeatureDrag: function(evt) {
+    this.fireAndForward('editable:shape:drag', evt);
+  },
+
+
+  /**
+   * Just propagate the event
+   * @param  {Event} evt
+   */
+  _onFeatureDragEnd: function(evt) {
+    this.fireAndForward('editable:shape:dragend', evt);
+    // this.initVertexMarkers();
+
+    // for the circle
+    if (typeof this.updateResizeLatLng === 'function') {
+      this.updateResizeLatLng();
+    }
+  }
+
+});
 
 function transformation(map_size, img_size){
    
@@ -11245,7 +12253,7 @@ var Simple = extend({}, CRS, {
 	infinite: true
 });
 
-var Map = function(el, store)
+var Map$$1 = function(el, store)
 {
     map$1 = new Map$1(el, 
     {
@@ -11696,115 +12704,6 @@ var imageOverlay = function (url, bounds, options) {
 	return new ImageOverlay(url, bounds, options);
 };
 
-var Renderer = Layer.extend({
-
-	// @section
-	// @aka Renderer options
-	options: {
-		// @option padding: Number = 0.1
-		// How much to extend the clip area around the map view (relative to its size)
-		// e.g. 0.1 would be 10% of map view in each direction
-		padding: 0.1
-	},
-
-	initialize: function (options) {
-		setOptions(this, options);
-		stamp(this);
-		this._layers = this._layers || {};
-	},
-
-	onAdd: function () {
-		if (!this._container) {
-			this._initContainer(); // defined by renderer implementations
-
-			if (this._zoomAnimated) {
-				addClass(this._container, 'leaflet-zoom-animated');
-			}
-		}
-
-		this.getPane().appendChild(this._container);
-		this._update();
-		this.on('update', this._updatePaths, this);
-	},
-
-	onRemove: function () {
-		this.off('update', this._updatePaths, this);
-		this._destroyContainer();
-	},
-
-	getEvents: function () {
-		var events = {
-			viewreset: this._reset,
-			zoom: this._onZoom,
-			moveend: this._update,
-			zoomend: this._onZoomEnd
-		};
-		if (this._zoomAnimated) {
-			events.zoomanim = this._onAnimZoom;
-		}
-		return events;
-	},
-
-	_onAnimZoom: function (ev) {
-		this._updateTransform(ev.center, ev.zoom);
-	},
-
-	_onZoom: function () {
-		this._updateTransform(this._map.getCenter(), this._map.getZoom());
-	},
-
-	_updateTransform: function (center, zoom) {
-		var scale = this._map.getZoomScale(zoom, this._zoom),
-		    position = getPosition(this._container),
-		    viewHalf = this._map.getSize().multiplyBy(0.5 + this.options.padding),
-		    currentCenterPoint = this._map.project(this._center, zoom),
-		    destCenterPoint = this._map.project(center, zoom),
-		    centerOffset = destCenterPoint.subtract(currentCenterPoint),
-
-		    topLeftOffset = viewHalf.multiplyBy(-scale).add(position).add(viewHalf).subtract(centerOffset);
-
-		if (any3d) {
-			setTransform(this._container, topLeftOffset, scale);
-		} else {
-			setPosition(this._container, topLeftOffset);
-		}
-	},
-
-	_reset: function () {
-		this._update();
-		this._updateTransform(this._center, this._zoom);
-
-		for (var id in this._layers) {
-			this._layers[id]._reset();
-		}
-	},
-
-	_onZoomEnd: function () {
-		for (var id in this._layers) {
-			this._layers[id]._project();
-		}
-	},
-
-	_updatePaths: function () {
-		for (var id in this._layers) {
-			this._layers[id]._update();
-		}
-	},
-
-	_update: function () {
-		// Update pixel bounds of renderer container (for positioning/sizing/clipping later)
-		// Subclasses are responsible of firing the 'update' event.
-		var p = this.options.padding,
-		    size = this._map.getSize(),
-		    min = this._map.containerPointToLayerPoint(size.multiplyBy(-p)).round();
-
-		this._bounds = new Bounds(min, min.add(size.multiplyBy(1 + p * 2)).round());
-
-		this._center = this._map.getCenter();
-		this._zoom = this._map.getZoom();
-	}
-});
-
 var Canvas = Renderer.extend({
 	getEvents: function () {
 		var events = Renderer.prototype.getEvents.call(this);
@@ -12232,351 +13131,6 @@ function canvas$1(options) {
 	return canvas ? new Canvas(options) : null;
 }
 
-var vmlCreate = (function () {
-	try {
-		document.namespaces.add('lvml', 'urn:schemas-microsoft-com:vml');
-		return function (name) {
-			return document.createElement('<lvml:' + name + ' class="lvml">');
-		};
-	} catch (e) {
-		return function (name) {
-			return document.createElement('<' + name + ' xmlns="urn:schemas-microsoft.com:vml" class="lvml">');
-		};
-	}
-})();
-
-
-/*
- * @class SVG
- *
- * Although SVG is not available on IE7 and IE8, these browsers support [VML](https://en.wikipedia.org/wiki/Vector_Markup_Language), and the SVG renderer will fall back to VML in this case.
- *
- * VML was deprecated in 2012, which means VML functionality exists only for backwards compatibility
- * with old versions of Internet Explorer.
- */
-
-// mixin to redefine some SVG methods to handle VML syntax which is similar but with some differences
-var vmlMixin = {
-
-	_initContainer: function () {
-		this._container = create$1('div', 'leaflet-vml-container');
-	},
-
-	_update: function () {
-		if (this._map._animatingZoom) { return; }
-		Renderer.prototype._update.call(this);
-		this.fire('update');
-	},
-
-	_initPath: function (layer) {
-		var container = layer._container = vmlCreate('shape');
-
-		addClass(container, 'leaflet-vml-shape ' + (this.options.className || ''));
-
-		container.coordsize = '1 1';
-
-		layer._path = vmlCreate('path');
-		container.appendChild(layer._path);
-
-		this._updateStyle(layer);
-		this._layers[stamp(layer)] = layer;
-	},
-
-	_addPath: function (layer) {
-		var container = layer._container;
-		this._container.appendChild(container);
-
-		if (layer.options.interactive) {
-			layer.addInteractiveTarget(container);
-		}
-	},
-
-	_removePath: function (layer) {
-		var container = layer._container;
-		remove(container);
-		layer.removeInteractiveTarget(container);
-		delete this._layers[stamp(layer)];
-	},
-
-	_updateStyle: function (layer) {
-		var stroke = layer._stroke,
-		    fill = layer._fill,
-		    options = layer.options,
-		    container = layer._container;
-
-		container.stroked = !!options.stroke;
-		container.filled = !!options.fill;
-
-		if (options.stroke) {
-			if (!stroke) {
-				stroke = layer._stroke = vmlCreate('stroke');
-			}
-			container.appendChild(stroke);
-			stroke.weight = options.weight + 'px';
-			stroke.color = options.color;
-			stroke.opacity = options.opacity;
-
-			if (options.dashArray) {
-				stroke.dashStyle = isArray(options.dashArray) ?
-				    options.dashArray.join(' ') :
-				    options.dashArray.replace(/( *, *)/g, ' ');
-			} else {
-				stroke.dashStyle = '';
-			}
-			stroke.endcap = options.lineCap.replace('butt', 'flat');
-			stroke.joinstyle = options.lineJoin;
-
-		} else if (stroke) {
-			container.removeChild(stroke);
-			layer._stroke = null;
-		}
-
-		if (options.fill) {
-			if (!fill) {
-				fill = layer._fill = vmlCreate('fill');
-			}
-			container.appendChild(fill);
-			fill.color = options.fillColor || options.color;
-			fill.opacity = options.fillOpacity;
-
-		} else if (fill) {
-			container.removeChild(fill);
-			layer._fill = null;
-		}
-	},
-
-	_updateCircle: function (layer) {
-		var p = layer._point.round(),
-		    r = Math.round(layer._radius),
-		    r2 = Math.round(layer._radiusY || r);
-
-		this._setPath(layer, layer._empty() ? 'M0 0' :
-				'AL ' + p.x + ',' + p.y + ' ' + r + ',' + r2 + ' 0,' + (65535 * 360));
-	},
-
-	_setPath: function (layer, path) {
-		layer._path.v = path;
-	},
-
-	_bringToFront: function (layer) {
-		toFront(layer._container);
-	},
-
-	_bringToBack: function (layer) {
-		toBack(layer._container);
-	}
-};
-
-var create$2 = vml ? vmlCreate : svgCreate;
-
-/*
- * @class SVG
- * @inherits Renderer
- * @aka L.SVG
- *
- * Allows vector layers to be displayed with [SVG](https://developer.mozilla.org/docs/Web/SVG).
- * Inherits `Renderer`.
- *
- * Due to [technical limitations](http://caniuse.com/#search=svg), SVG is not
- * available in all web browsers, notably Android 2.x and 3.x.
- *
- * Although SVG is not available on IE7 and IE8, these browsers support
- * [VML](https://en.wikipedia.org/wiki/Vector_Markup_Language)
- * (a now deprecated technology), and the SVG renderer will fall back to VML in
- * this case.
- *
- * @example
- *
- * Use SVG by default for all paths in the map:
- *
- * ```js
- * var map = L.map('map', {
- * 	renderer: L.svg()
- * });
- * ```
- *
- * Use a SVG renderer with extra padding for specific vector geometries:
- *
- * ```js
- * var map = L.map('map');
- * var myRenderer = L.svg({ padding: 0.5 });
- * var line = L.polyline( coordinates, { renderer: myRenderer } );
- * var circle = L.circle( center, { renderer: myRenderer } );
- * ```
- */
-
-var SVG = Renderer.extend({
-
-	getEvents: function () {
-		var events = Renderer.prototype.getEvents.call(this);
-		events.zoomstart = this._onZoomStart;
-		return events;
-	},
-
-	_initContainer: function () {
-		this._container = create$2('svg');
-
-		// makes it possible to click through svg root; we'll reset it back in individual paths
-		this._container.setAttribute('pointer-events', 'none');
-
-		this._rootGroup = create$2('g');
-		this._container.appendChild(this._rootGroup);
-	},
-
-	_destroyContainer: function () {
-		remove(this._container);
-		off(this._container);
-		delete this._container;
-		delete this._rootGroup;
-	},
-
-	_onZoomStart: function () {
-		// Drag-then-pinch interactions might mess up the center and zoom.
-		// In this case, the easiest way to prevent this is re-do the renderer
-		//   bounds and padding when the zooming starts.
-		this._update();
-	},
-
-	_update: function () {
-		if (this._map._animatingZoom && this._bounds) { return; }
-
-		Renderer.prototype._update.call(this);
-
-		var b = this._bounds,
-		    size = b.getSize(),
-		    container = this._container;
-
-		// set size of svg-container if changed
-		if (!this._svgSize || !this._svgSize.equals(size)) {
-			this._svgSize = size;
-			container.setAttribute('width', size.x);
-			container.setAttribute('height', size.y);
-		}
-
-		// movement: update container viewBox so that we don't have to change coordinates of individual layers
-		setPosition(container, b.min);
-		container.setAttribute('viewBox', [b.min.x, b.min.y, size.x, size.y].join(' '));
-
-		this.fire('update');
-	},
-
-	// methods below are called by vector layers implementations
-
-	_initPath: function (layer) {
-		var path = layer._path = create$2('path');
-
-		// @namespace Path
-		// @option className: String = null
-		// Custom class name set on an element. Only for SVG renderer.
-		if (layer.options.className) {
-			addClass(path, layer.options.className);
-		}
-
-		if (layer.options.interactive) {
-			addClass(path, 'leaflet-interactive');
-		}
-
-		this._updateStyle(layer);
-		this._layers[stamp(layer)] = layer;
-	},
-
-	_addPath: function (layer) {
-		if (!this._rootGroup) { this._initContainer(); }
-		this._rootGroup.appendChild(layer._path);
-		layer.addInteractiveTarget(layer._path);
-	},
-
-	_removePath: function (layer) {
-		remove(layer._path);
-		layer.removeInteractiveTarget(layer._path);
-		delete this._layers[stamp(layer)];
-	},
-
-	_updatePath: function (layer) {
-		layer._project();
-		layer._update();
-	},
-
-	_updateStyle: function (layer) {
-		var path = layer._path,
-		    options = layer.options;
-
-		if (!path) { return; }
-
-		if (options.stroke) {
-			path.setAttribute('stroke', options.color);
-			path.setAttribute('stroke-opacity', options.opacity);
-			path.setAttribute('stroke-width', options.weight);
-			path.setAttribute('stroke-linecap', options.lineCap);
-			path.setAttribute('stroke-linejoin', options.lineJoin);
-
-			if (options.dashArray) {
-				path.setAttribute('stroke-dasharray', options.dashArray);
-			} else {
-				path.removeAttribute('stroke-dasharray');
-			}
-
-			if (options.dashOffset) {
-				path.setAttribute('stroke-dashoffset', options.dashOffset);
-			} else {
-				path.removeAttribute('stroke-dashoffset');
-			}
-		} else {
-			path.setAttribute('stroke', 'none');
-		}
-
-		if (options.fill) {
-			path.setAttribute('fill', options.fillColor || options.color);
-			path.setAttribute('fill-opacity', options.fillOpacity);
-			path.setAttribute('fill-rule', options.fillRule || 'evenodd');
-		} else {
-			path.setAttribute('fill', 'none');
-		}
-	},
-
-	_updatePoly: function (layer, closed) {
-		this._setPath(layer, pointsToPath(layer._parts, closed));
-	},
-
-	_updateCircle: function (layer) {
-		var p = layer._point,
-		    r = layer._radius,
-		    r2 = layer._radiusY || r,
-		    arc = 'a' + r + ',' + r2 + ' 0 1,0 ';
-
-		// drawing a circle with two half-arcs
-		var d = layer._empty() ? 'M0 0' :
-				'M' + (p.x - r) + ',' + p.y +
-				arc + (r * 2) + ',0 ' +
-				arc + (-r * 2) + ',0 ';
-
-		this._setPath(layer, d);
-	},
-
-	_setPath: function (layer, path) {
-		layer._path.setAttribute('d', path);
-	},
-
-	// SVG does not have the concept of zIndex so we resort to changing the DOM order of elements
-	_bringToFront: function (layer) {
-		toFront(layer._path);
-	},
-
-	_bringToBack: function (layer) {
-		toBack(layer._path);
-	}
-});
-
-if (vml) {
-	SVG.include(vmlMixin);
-}
-
-// @factory L.svg(options?: Renderer options)
-// Creates a SVG renderer with the given options.
-function svg$1(options) {
-	return svg || vml ? new SVG(options) : null;
-}
-
 Map$1.include({
 	// @namespace Map; @method getRenderer(layer: Path): Renderer
 	// Returns the instance of `Renderer` that should be used to render the given
@@ -12852,9 +13406,9 @@ var selection_exit = function() {
   return new Selection(this._exit || this._groups.map(sparse), this._parents);
 };
 
-var selection_merge = function(selection$$1) {
+var selection_merge = function(selection) {
 
-  for (var groups0 = this._groups, groups1 = selection$$1._groups, m0 = groups0.length, m1 = groups1.length, m = Math.min(m0, m1), merges = new Array(m0), j = 0; j < m; ++j) {
+  for (var groups0 = this._groups, groups1 = selection._groups, m0 = groups0.length, m1 = groups1.length, m = Math.min(m0, m1), merges = new Array(m0), j = 0; j < m; ++j) {
     for (var group0 = groups0[j], group1 = groups1[j], n = group0.length, merge = merges[j] = new Array(n), node, i = 0; i < n; ++i) {
       if (node = group0[i] || group1[i]) {
         merge[i] = node;
@@ -14232,7 +14786,7 @@ function nogamma(a, b) {
   return d ? linear$1(a, d) : constant$2(isNaN(a) ? b : a);
 }
 
-var rgb$1 = (function rgbGamma(y) {
+var rgb$1 = ((function rgbGamma(y) {
   var color$$1 = gamma(y);
 
   function rgb$$1(start, end) {
@@ -14252,7 +14806,7 @@ var rgb$1 = (function rgbGamma(y) {
   rgb$$1.gamma = rgbGamma;
 
   return rgb$$1;
-})(1);
+}))(1);
 
 var array$1 = function(a, b) {
   var nb = b ? b.length : 0,
@@ -14493,7 +15047,7 @@ function copy(source, target) {
 function continuous(deinterpolate, reinterpolate) {
   var domain = unit,
       range$$1 = unit,
-      interpolate = interpolateValue,
+      interpolate$$1 = interpolateValue,
       clamp = false,
       piecewise,
       output,
@@ -14506,7 +15060,7 @@ function continuous(deinterpolate, reinterpolate) {
   }
 
   function scale(x) {
-    return (output || (output = piecewise(domain, range$$1, clamp ? deinterpolateClamp(deinterpolate) : deinterpolate, interpolate)))(+x);
+    return (output || (output = piecewise(domain, range$$1, clamp ? deinterpolateClamp(deinterpolate) : deinterpolate, interpolate$$1)))(+x);
   }
 
   scale.invert = function(y) {
@@ -14522,7 +15076,7 @@ function continuous(deinterpolate, reinterpolate) {
   };
 
   scale.rangeRound = function(_) {
-    return range$$1 = slice$1.call(_), interpolate = interpolateRound, rescale();
+    return range$$1 = slice$1.call(_), interpolate$$1 = interpolateRound, rescale();
   };
 
   scale.clamp = function(_) {
@@ -14530,7 +15084,7 @@ function continuous(deinterpolate, reinterpolate) {
   };
 
   scale.interpolate = function(_) {
-    return arguments.length ? (interpolate = _, rescale()) : interpolate;
+    return arguments.length ? (interpolate$$1 = _, rescale()) : interpolate$$1;
   };
 
   return rescale();
@@ -15121,7 +15675,7 @@ var Grid = Rectangle.extend({
     options: {
         color: 'grey',
         weight: 1,
-        fill: false,
+        fill: true,
         className: 'grid-axis'
     },
 
@@ -16442,7 +16996,6 @@ Layer.include({
 	}
 });
 
-// hack to rollup.js load all layer functions
 console.log(typeof(tooltip), typeof(popup));
 
 var BaseMapDistance = function(store, map){
@@ -16549,7 +17102,7 @@ var store = Store(reduceReducers([mapReducer, baseReducer]));
 store.state = initState;
 window.store = store;
 
-var map = Map('map', store);
+var map = Map$$1('map', store);
 BaseView(store);
 var bmv = BaseMapView(store,map);
 BaseMapDistance(store,map);
