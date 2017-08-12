@@ -90,8 +90,7 @@ export var baseReducer = function(state, action)
 {
     switch(action.type)
     {
-        case a.BASE_LOADED:
-            var base = action.payload;
+        case a.BASES_LOADED:
             return Immutable.set(state, 'entities.bases', action.payload);
 
         case a.BASE_LAYER_SET: 
