@@ -19,6 +19,10 @@ export function FileHandler(store, error_fn)
                     error_fn ,
                     function(e) {
                         store(BASE_LAYER_SET, {
+                            grid: {
+                                topLeft: {x:0, y:0},
+                                bottomRight: {x: Math.round(e.width), y: Math.round(e.height)}
+                            },
                             raw_svg: e.raw_svg,
                             url: e.data_uri,
                             size_m: {x: Math.round(e.width), y: Math.round(e.height)},

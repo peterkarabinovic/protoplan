@@ -95,12 +95,6 @@ export var baseReducer = function(state, action)
 
         case a.BASE_LAYER_SET: 
             var base = action.payload;
-            
-            base = Immutable.extend(base, "grid", {
-                topLeft: toPoint(0,0),
-                bottomRight: toPoint(base.size_m.x, base.size_m.y)
-            });
-
             state = Immutable.extend(state, 'selectedBase', base);
             return Immutable.set(state, 'map.size_m', base.size_m);
         
