@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "rollup -c -w -i src/app.js -f iife -o dist/app.js",
     "build-base": "rollup -c -i src/app-base.js -f iife -o dist/app-base.js && uglifyjs -c \"evaluate=false\"  -m -o dist/app-base.min.js dist/app-base.js",
-    "dev-base": "rollup -c -w -i src/app-base.js -f iife -o dist/app-base.js"
+    "dev-base": "rollup -c -w -i src/app-base.js -f iife -o dist/app-base.js",
+    "dev-stands": "rollup -c -w -i src/app-stands.js -f iife -o dist/app-stands.js"
   },
   "keywords": [],
   "author": "",

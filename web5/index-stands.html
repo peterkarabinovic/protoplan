@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title></title>
+    <link href="dist/css/leaflet.css" rel="stylesheet">
+    <link href="dist/css/w3.css" rel="stylesheet">
+    <style>
+        .grid-axis{
+            shape-rendering: crispEdges;
+            stroke-opacity: 0.3;
+        }
+        .axis text{
+            pointer-events: none;
+        }
+        .axis path,
+        .axis line { 
+            fill: none;
+            stroke: grey;
+            stroke-width: 1;
+            shape-rendering: crispEdges;
+        }   
+    </style>
+</head>
+<body style="margin: 30px;">
+    <div id="map" class="w3-margin" style="width: 800px; height: 600px;">
+    </div>
+
+    <script src="dist/app-stands.js"></script>
+</body>
+</html>

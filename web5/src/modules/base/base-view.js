@@ -5,6 +5,7 @@ import {DRAW_DISTANCE, EDIT_GRID} from '../../map/modes.js'
 import {FileHandler} from './base-file-change.js'
 import {baseLayer} from '../../state.js'
 import {DRAWING_MODE_SET, 
+        BASE_LAYER_SAVE,
         BASE_DISTANCE_LENGTH_SET} from '../../actions.js'
 
 
@@ -39,8 +40,8 @@ export default function BaseView(store) {
     store.on('selectedBase.size_m', function(e){
         if(e.new_val) {
             var size = e.new_val
-            show('toolbar')
-            show('size')
+            show('toolbar');
+            show('size');
             text('size_input', Math.round(size.x) + 'x' + Math.round(size.y))
         }
     }); 
@@ -59,5 +60,11 @@ export default function BaseView(store) {
         el('draw_line').checked = e.new_val == DRAW_DISTANCE;
         el('grid_edit').checked = e.new_val == EDIT_GRID;
     });
+
+    store.on('selectedBase', function(e){
+        if(e.new_val){
+            store(BASE_LAYER_SAVE, { base: e.new_val} )
+        }
+    })
 } 
 

@@ -17,7 +17,7 @@ export default function (store, map)
         if(m.baseLayer) {
             map.removeLayer(m.baseLayer);
             m.baseLayer = null;
-            map.removeLayer(m.grid)
+            map.removeLayer(m.grid);
             m.grid = null;
         }
         if(url) {

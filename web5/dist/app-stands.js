@@ -1543,6 +1543,12 @@ var root = (function() {
 
 var _ = root._;
 
+/**
+ * 
+ * @param {function} reducers - reduce state function 
+ * @param {Array} middleware - optional array of middleware
+ * @param {Object} initState - optional init state
+ */
 function Store(reducers, middleware)
 {
     middleware = middleware || [];
@@ -1671,6 +1677,11 @@ function events_finder(new_obj, old_obj)
     }
 }
 
+/**
+ * find the properties that is not equals
+ * @param {Object} obj1  
+ * @param {Object} obj2 
+ */
 function diffs(new_obj, old_obj, keys)
 {
     return keys.reduce(function(diffs, key){
@@ -1716,6 +1727,9 @@ function reduceReducers(reducers){
     }
 }
 
+/**
+ * Init state
+ */
 var initState = {
     pavilions: {
 
@@ -1802,22 +1816,6 @@ function selectedStandsId(store) {
 /***
  *  Either monad
  */
-function Either(left, right){
-    return {
-        fold: function(left_fn, right_fn) {
-            left === void 0 ? right_fn(right) : left_fn(left);
-        },
-        right: right
-    }
-}
-
-Either.right = function(value){
-    return Either(undefined, value)
-};
-
-Either.left = function(value){
-    return Either(value)
-};
 
 
 /***
@@ -2028,6 +2026,11 @@ function setOptions(obj, options) {
 // be uppercased (e.g. `'?A=foo&B=bar'`)
 
 
+// @function template(str: String, data: Object): String
+// Simple templating facility, accepts a template string of the form `'Hello {a}, {b}'`
+// and a data object like `{a: 'foo', b: 'bar'}`, returns evaluated string
+// `('Hello foo, bar')`. You can also specify functions instead of strings for
+// data values — they will be evaluated passing `data` as an argument.
 
 
 // @function isArray(obj): Boolean
@@ -2093,6 +2096,26 @@ function cancelAnimFrame(id) {
 		cancelFn.call(window, id);
 	}
 }
+
+/*
+ * @class Point
+ * @aka L.Point
+ *
+ * Represents a point with `x` and `y` coordinates in pixels.
+ *
+ * @example
+ *
+ * ```js
+ * var point = L.point(200, 300);
+ * ```
+ *
+ * All Leaflet methods and options that accept `Point` objects also accept them in a simple Array form (unless noted otherwise), so these lines are equivalent:
+ *
+ * ```js
+ * map.panBy([200, 300]);
+ * map.panBy(L.point(200, 300));
+ * ```
+ */
 
 function Point(x, y, round) {
 	// @property x: Number; The `x` coordinate of the point
@@ -2275,6 +2298,27 @@ function toPoint(x, y, round) {
 	return new Point(x, y, round);
 }
 
+/*
+ * @class Bounds
+ * @aka L.Bounds
+ *
+ * Represents a rectangular area in pixel coordinates.
+ *
+ * @example
+ *
+ * ```js
+ * var p1 = L.point(10, 10),
+ * p2 = L.point(40, 60),
+ * bounds = L.bounds(p1, p2);
+ * ```
+ *
+ * All Leaflet methods that accept `Bounds` objects also accept them in a simple Array form (unless noted otherwise), so the bounds example above can be passed like this:
+ *
+ * ```js
+ * otherBounds.intersects([[10, 10], [40, 60]]);
+ * ```
+ */
+
 function Bounds(a, b) {
 	if (!a) { return; }
 
@@ -2421,6 +2465,32 @@ function toBounds(a, b) {
 	}
 	return new Bounds(a, b);
 }
+
+/*
+ * @class LatLngBounds
+ * @aka L.LatLngBounds
+ *
+ * Represents a rectangular geographical area on a map.
+ *
+ * @example
+ *
+ * ```js
+ * var corner1 = L.latLng(40.712, -74.227),
+ * corner2 = L.latLng(40.774, -74.125),
+ * bounds = L.latLngBounds(corner1, corner2);
+ * ```
+ *
+ * All Leaflet methods that accept LatLngBounds objects also accept them in a simple Array form (unless noted otherwise), so the bounds example above can be passed like this:
+ *
+ * ```js
+ * map.fitBounds([
+ * 	[40.712, -74.227],
+ * 	[40.774, -74.125]
+ * ]);
+ * ```
+ *
+ * Caution: if the area crosses the antimeridian (often confused with the International Date Line), you must specify corners _outside_ the [-180, 180] degrees longitude range.
+ */
 
 function LatLngBounds(corner1, corner2) { // (LatLng, LatLng) or (LatLng[])
 	if (!corner1) { return; }
@@ -2640,6 +2710,19 @@ function toLatLngBounds(a, b) {
 	return new LatLngBounds(a, b);
 }
 
+/*
+ * @namespace CRS
+ * @crs L.CRS.Base
+ * Object that defines coordinate reference systems for projecting
+ * geographical points into pixel (screen) coordinates and back (and to
+ * coordinates in other units for [WMS](https://en.wikipedia.org/wiki/Web_Map_Service) services). See
+ * [spatial reference system](http://en.wikipedia.org/wiki/Coordinate_reference_system).
+ *
+ * Leaflet defines the most usual CRSs by default. If you want to use a
+ * CRS not defined by default, take a look at the
+ * [Proj4Leaflet](https://github.com/kartena/Proj4Leaflet) plugin.
+ */
+
 var CRS = {
 	// @method latLngToPoint(latlng: LatLng, zoom: Number): Point
 	// Projects geographical coordinates into pixel coordinates for a given zoom.
@@ -2757,6 +2840,16 @@ var CRS = {
 	}
 };
 
+/*
+ * @namespace CRS
+ * @crs L.CRS.Earth
+ *
+ * Serves as the base for CRS that are global such that they cover the earth.
+ * Can only be used as the base for other CRS and cannot be used directly,
+ * since it does not have a `code`, `projection` or `transformation`. `distance()` returns
+ * meters.
+ */
+
 var Earth = extend({}, CRS, {
 	wrapLng: [-180, 180],
 
@@ -2776,6 +2869,27 @@ var Earth = extend({}, CRS, {
 		return this.R * Math.acos(Math.min(a, 1));
 	}
 });
+
+/* @class LatLng
+ * @aka L.LatLng
+ *
+ * Represents a geographical point with a certain latitude and longitude.
+ *
+ * @example
+ *
+ * ```
+ * var latlng = L.latLng(50.5, 30.5);
+ * ```
+ *
+ * All Leaflet methods that accept LatLng objects also accept them in a simple Array form and simple object form (unless noted otherwise), so these lines are equivalent:
+ *
+ * ```
+ * map.panTo([50, 30]);
+ * map.panTo({lon: 30, lat: 50});
+ * map.panTo({lat: 50, lng: 30});
+ * map.panTo(L.latLng(50, 30));
+ * ```
+ */
 
 function LatLng(lat, lng, alt) {
 	if (isNaN(lat) || isNaN(lng)) {
@@ -2884,10 +2998,6 @@ function toLatLng(a, b, c) {
 		return null;
 	}
 	return new LatLng(a, b, c);
-}
-
-function startswith(str, substr) { 
-    return str && str.indexOf(str) === 0;
 }
 
 function toLatLngs(points) {
@@ -3024,12 +3134,6 @@ var baseReducer = function(state, action)
     }
     return state;
 };
-
-
-
-
-
-// export default reduceReducers([errorReducer, mapReducer, pavilionReducer, baseReducer, overlayReducer, standsReducer])
 
 var prefix = "$";
 
@@ -3553,6 +3657,13 @@ function RequestsMiddleware(store){
     }
 }
 
+// @namespace SVG; @section
+// There are several static functions which can be called without instantiating L.SVG:
+
+// @function create(name: String): SVGElement
+// Returns a instance of [SVGElement](https://developer.mozilla.org/docs/Web/API/SVGElement),
+// corresponding to the class name passed. For example, using 'line' will return
+// an instance of [SVGLineElement](https://developer.mozilla.org/docs/Web/API/SVGLineElement).
 function svgCreate(name) {
 	return document.createElementNS('http://www.w3.org/2000/svg', name);
 }
@@ -3579,6 +3690,21 @@ function pointsToPath(rings, closed) {
 	// SVG complains about empty path strings
 	return str || 'M0 0';
 }
+
+/*
+ * @namespace Browser
+ * @aka L.Browser
+ *
+ * A namespace with static properties for browser/feature detection used by Leaflet internally.
+ *
+ * @example
+ *
+ * ```js
+ * if (L.Browser.ielt9) {
+ *   alert('Upgrade your browser, dude!');
+ * }
+ * ```
+ */
 
 var style = document.documentElement.style;
 
@@ -3706,6 +3832,14 @@ function userAgentContains(str) {
 	return navigator.userAgent.toLowerCase().indexOf(str) >= 0;
 }
 
+// @class Class
+// @aka L.Class
+
+// @section
+// @uninheritable
+
+// Thanks to John Resig and Dean Edwards for inspiration!
+
 function Class() {}
 
 Class.extend = function (props) {
@@ -3822,6 +3956,31 @@ function checkDeprecatedMixinEvents(includes) {
 		}
 	}
 }
+
+/*
+ * @class Evented
+ * @aka L.Evented
+ * @inherits Class
+ *
+ * A set of methods shared between event-powered classes (like `Map` and `Marker`). Generally, events allow you to execute some function when something happens with an object (e.g. the user clicks on the map, causing the map to fire `'click'` event).
+ *
+ * @example
+ *
+ * ```js
+ * map.on('click', function(e) {
+ * 	alert(e.latlng);
+ * } );
+ * ```
+ *
+ * Leaflet deals with event listeners by reference, so if you want to add a listener and then remove it, define it as a function:
+ *
+ * ```js
+ * function onClick(e) { ... }
+ *
+ * map.on('click', onClick);
+ * map.off('click', onClick);
+ * ```
+ */
 
 var Events = {
 	/* @method on(type: String, fn: Function, context?: Object): this
@@ -4084,6 +4243,15 @@ Events.hasEventListeners = Events.listens;
 
 var Evented = Class.extend(Events);
 
+/*
+	L.Handler is a base class for handler classes that are used internally to inject
+	interaction features like dragging to classes like Map and Marker.
+*/
+
+// @class Handler
+// @aka L.Handler
+// Abstract class for map interaction handlers
+
 var Handler = Class.extend({
 	initialize: function (map) {
 		this._map = map;
@@ -4123,6 +4291,23 @@ var Handler = Class.extend({
 	// Called when the handler is disabled, should remove the event hooks added previously.
 });
 
+/*
+ * @namespace LineUtil
+ *
+ * Various utility functions for polyine points processing, used by Leaflet internally to make polylines lightning-fast.
+ */
+
+// Simplify polyline with vertex reduction and Douglas-Peucker simplification.
+// Improves rendering performance dramatically by lessening the number of points to draw.
+
+// @function simplify(points: Point[], tolerance: Number): Point[]
+// Dramatically reduces the number of points in a polyline while retaining
+// its shape and returns a new array of simplified points, using the
+// [Douglas-Peucker algorithm](http://en.wikipedia.org/wiki/Douglas-Peucker_algorithm).
+// Used for a huge performance boost when processing/displaying Leaflet polylines for
+// each zoom level and also reducing visual noise. tolerance affects the amount of
+// simplification (lesser value means higher quality but slower and with more points).
+// Also released as a separated micro-library [Simplify.js](http://mourner.github.com/simplify-js/).
 function simplify(points, tolerance) {
 	if (!tolerance || !points.length) {
 		return points.slice();
@@ -4343,6 +4528,11 @@ function _flat(latlngs) {
 	return isFlat$1(latlngs);
 }
 
+/*
+ * Extends L.DomEvent to provide touch support for Internet Explorer and Windows-based devices.
+ */
+
+
 var POINTER_DOWN =   msPointer ? 'MSPointerDown'   : 'pointerdown';
 var POINTER_MOVE =   msPointer ? 'MSPointerMove'   : 'pointermove';
 var POINTER_UP =     msPointer ? 'MSPointerUp'     : 'pointerup';
@@ -4467,6 +4657,10 @@ function _addPointerEnd(obj, handler, id) {
 	obj.addEventListener(POINTER_CANCEL, onUp, false);
 }
 
+/*
+ * Extends the event handling code with double tap support for mobile browsers.
+ */
+
 var _touchstart = msPointer ? 'MSPointerDown' : pointer ? 'pointerdown' : 'touchstart';
 var _touchend = msPointer ? 'MSPointerUp' : pointer ? 'pointerup' : 'touchend';
 var _pre = '_leaflet_';
@@ -4547,6 +4741,22 @@ function removeDoubleTapListener(obj, id) {
 	return this;
 }
 
+/*
+ * @namespace DomEvent
+ * Utility functions to work with the [DOM events](https://developer.mozilla.org/docs/Web/API/Event), used by Leaflet internally.
+ */
+
+// Inspired by John Resig, Dean Edwards and YUI addEvent implementations.
+
+// @function on(el: HTMLElement, types: String, fn: Function, context?: Object): this
+// Adds a listener function (`fn`) to a particular DOM event type of the
+// element `el`. You can optionally specify the context of the listener
+// (object the `this` keyword will point to). You can also pass several
+// space-separated types (e.g. `'click dblclick'`).
+
+// @alternative
+// @function on(el: HTMLElement, eventMap: Object, context?: Object): this
+// Adds a set of type/listener pairs, e.g. `{click: onClick, mousemove: onMouseMove}`
 function on(obj, types, fn, context) {
 
 	if (typeof types === 'object') {
@@ -4707,19 +4917,12 @@ function stopPropagation(e) {
 
 // @function disableScrollPropagation(el: HTMLElement): this
 // Adds `stopPropagation` to the element's `'mousewheel'` events (plus browser variants).
-function disableScrollPropagation(el) {
-	addOne(el, 'mousewheel', stopPropagation);
-	return this;
-}
+
 
 // @function disableClickPropagation(el: HTMLElement): this
 // Adds `stopPropagation` to the element's `'click'`, `'doubleclick'`,
 // `'mousedown'` and `'touchstart'` events (plus browser variants).
-function disableClickPropagation(el) {
-	on(el, 'mousedown touchstart dblclick', stopPropagation);
-	addOne(el, 'click', fakeStop);
-	return this;
-}
+
 
 // @function preventDefault(ev: DOMEvent): this
 // Prevents the default action of the DOM Event `ev` from happening (such as
@@ -4833,8 +5036,14 @@ function filterClick(e, handler) {
 	handler(e);
 }
 
-// @function addListener(…): this
-// Alias to [`L.DomEvent.on`](#domevent-on)
+/*
+ * @namespace Projection
+ * @projection L.Projection.SphericalMercator
+ *
+ * Spherical Mercator projection — the most common projection for online maps,
+ * used by almost all free and commercial tile providers. Assumes that Earth is
+ * a sphere. Used by the `EPSG:3857` CRS.
+ */
 
 var SphericalMercator = {
 
@@ -4866,6 +5075,27 @@ var SphericalMercator = {
 	})()
 };
 
+/*
+ * @class Transformation
+ * @aka L.Transformation
+ *
+ * Represents an affine transformation: a set of coefficients `a`, `b`, `c`, `d`
+ * for transforming a point of a form `(x, y)` into `(a*x + b, c*y + d)` and doing
+ * the reverse. Used by Leaflet in its projections code.
+ *
+ * @example
+ *
+ * ```js
+ * var transformation = L.transformation(2, 5, -1, 10),
+ * 	p = L.point(1, 2),
+ * 	p2 = transformation.transform(p), //  L.point(7, 8)
+ * 	p3 = transformation.untransform(p2); //  L.point(1, 2)
+ * ```
+ */
+
+
+// factory new L.Transformation(a: Number, b: Number, c: Number, d: Number)
+// Creates a `Transformation` object with the given coefficients.
 function Transformation(a, b, c, d) {
 	if (isArray(a)) {
 		// use array properties
@@ -4922,6 +5152,15 @@ function toTransformation(a, b, c, d) {
 	return new Transformation(a, b, c, d);
 }
 
+/*
+ * @namespace CRS
+ * @crs L.CRS.EPSG3857
+ *
+ * The most common CRS for online maps, used by almost all free and commercial
+ * tile providers. Uses Spherical Mercator projection. Set in by default in
+ * Map's `crs` option.
+ */
+
 var EPSG3857 = extend({}, Earth, {
 	code: 'EPSG:3857',
 	projection: SphericalMercator,
@@ -4936,6 +5175,20 @@ var EPSG900913 = extend({}, EPSG3857, {
 	code: 'EPSG:900913'
 });
 
+/*
+ * @namespace DomUtil
+ *
+ * Utility functions to work with the [DOM](https://developer.mozilla.org/docs/Web/API/Document_Object_Model)
+ * tree, used by Leaflet internally.
+ *
+ * Most functions expecting or returning a `HTMLElement` also work for
+ * SVG elements. The only difference is that classes refer to CSS classes
+ * in HTML and SVG classes in SVG.
+ */
+
+
+// @property TRANSFORM: String
+// Vendor-prefixed transform style name (e.g. `'webkitTransform'` for WebKit).
 var TRANSFORM = testProp(
 	['transform', 'WebkitTransform', 'OTransform', 'MozTransform', 'msTransform']);
 
@@ -5236,6 +5489,23 @@ function restoreOutline() {
 	off(window, 'keydown', restoreOutline);
 }
 
+/*
+ * @class PosAnimation
+ * @aka L.PosAnimation
+ * @inherits Evented
+ * Used internally for panning animations, utilizing CSS3 Transitions for modern browsers and a timer fallback for IE6-9.
+ *
+ * @example
+ * ```js
+ * var fx = new L.PosAnimation();
+ * fx.run(el, [300, 500], 0.5);
+ * ```
+ *
+ * @constructor L.PosAnimation()
+ * Creates a `PosAnimation` object.
+ *
+ */
+
 var PosAnimation = Evented.extend({
 
 	// @method run(el: HTMLElement, newPos: Point, duration?: Number, easeLinearity?: Number)
@@ -5314,6 +5584,25 @@ var PosAnimation = Evented.extend({
 		return 1 - Math.pow(1 - t, this._easeOutPower);
 	}
 });
+
+/*
+ * @class Map
+ * @aka L.Map
+ * @inherits Evented
+ *
+ * The central class of the API — it is used to create a map on a page and manipulate it.
+ *
+ * @example
+ *
+ * ```js
+ * // initialize the map on the "map" div with a given center and zoom
+ * var map = L.map('map', {
+ * 	center: [51.505, -0.09],
+ * 	zoom: 13
+ * });
+ * ```
+ *
+ */
 
 var Map$2 = Evented.extend({
 
@@ -6927,6 +7216,13 @@ var Map$2 = Evented.extend({
 // Instantiates a map object given an instance of a `<div>` HTML element
 // and optionally an object literal with `Map options`.
 
+/*
+ * L.Handler.BoxZoom is used to add shift-drag zoom interaction to the map
+ * (zoom to a selected bounding box), enabled by default.
+ */
+
+// @namespace Map
+// @section Interaction Options
 Map$2.mergeOptions({
 	// @option boxZoom: Boolean = true
 	// Whether the map can be zoomed to a rectangular area specified by
@@ -7063,6 +7359,13 @@ var BoxZoom = Handler.extend({
 // Box (shift-drag with mouse) zoom handler.
 Map$2.addInitHook('addHandler', 'boxZoom', BoxZoom);
 
+/*
+ * L.Handler.DoubleClickZoom is used to handle double-click zoom on the map, enabled by default.
+ */
+
+// @namespace Map
+// @section Interaction Options
+
 Map$2.mergeOptions({
 	// @option doubleClickZoom: Boolean|String = true
 	// Whether the map can be zoomed in by double clicking on it and
@@ -7108,6 +7411,22 @@ var DoubleClickZoom = Handler.extend({
 // @property doubleClickZoom: Handler
 // Double click zoom handler.
 Map$2.addInitHook('addHandler', 'doubleClickZoom', DoubleClickZoom);
+
+/*
+ * @class Draggable
+ * @aka L.Draggable
+ * @inherits Evented
+ *
+ * A class for making DOM elements draggable (including touch support).
+ * Used internally for map and marker dragging. Only works for elements
+ * that were positioned with [`L.DomUtil.setPosition`](#domutil-setposition).
+ *
+ * @example
+ * ```js
+ * var draggable = new L.Draggable(elementToDrag);
+ * draggable.enable();
+ * ```
+ */
 
 var START = touch ? 'touchstart mousedown' : 'mousedown';
 var END = {
@@ -7314,6 +7633,12 @@ var Draggable = Evented.extend({
 
 });
 
+/*
+ * L.Handler.MapDrag is used to make the map draggable (with panning inertia), enabled by default.
+ */
+
+// @namespace Map
+// @section Interaction Options
 Map$2.mergeOptions({
 	// @option dragging: Boolean = true
 	// Whether the map be draggable with mouse/touch or not.
@@ -7531,6 +7856,12 @@ var Drag = Handler.extend({
 // Map dragging handler (by both mouse and touch).
 Map$2.addInitHook('addHandler', 'dragging', Drag);
 
+/*
+ * L.Map.Keyboard is handling keyboard interaction with the map, enabled by default.
+ */
+
+// @namespace Map
+// @section Keyboard Navigation Options
 Map$2.mergeOptions({
 	// @option keyboard: Boolean = true
 	// Makes the map focusable and allows users to navigate the map with keyboard
@@ -7700,6 +8031,12 @@ var Keyboard = Handler.extend({
 // Keyboard navigation handler.
 Map$2.addInitHook('addHandler', 'keyboard', Keyboard);
 
+/*
+ * L.Handler.ScrollWheelZoom is used by L.Map to enable mouse scroll wheel zoom on the map.
+ */
+
+// @namespace Map
+// @section Interaction Options
 Map$2.mergeOptions({
 	// @section Mousewheel options
 	// @option scrollWheelZoom: Boolean|String = true
@@ -7781,6 +8118,12 @@ var ScrollWheelZoom = Handler.extend({
 // Scroll wheel zoom handler.
 Map$2.addInitHook('addHandler', 'scrollWheelZoom', ScrollWheelZoom);
 
+/*
+ * L.Map.Tap is used to enable mobile hacks like quick taps and long hold.
+ */
+
+// @namespace Map
+// @section Interaction Options
 Map$2.mergeOptions({
 	// @section Touch interaction options
 	// @option tap: Boolean = true
@@ -7903,6 +8246,12 @@ if (touch && !pointer) {
 	Map$2.addInitHook('addHandler', 'tap', Tap);
 }
 
+/*
+ * L.Handler.TouchZoom is used by L.Map to add pinch zoom on supported mobile browsers.
+ */
+
+// @namespace Map
+// @section Interaction Options
 Map$2.mergeOptions({
 	// @section Touch interaction options
 	// @option touchZoom: Boolean|String = *
@@ -8029,6 +8378,34 @@ Map$2.ScrollWheelZoom = ScrollWheelZoom;
 Map$2.Tap = Tap;
 Map$2.TouchZoom = TouchZoom;
 
+/*
+ * @class Icon
+ * @aka L.Icon
+ *
+ * Represents an icon to provide when creating a marker.
+ *
+ * @example
+ *
+ * ```js
+ * var myIcon = L.icon({
+ *     iconUrl: 'my-icon.png',
+ *     iconRetinaUrl: 'my-icon@2x.png',
+ *     iconSize: [38, 95],
+ *     iconAnchor: [22, 94],
+ *     popupAnchor: [-3, -76],
+ *     shadowUrl: 'my-icon-shadow.png',
+ *     shadowRetinaUrl: 'my-icon-shadow@2x.png',
+ *     shadowSize: [68, 95],
+ *     shadowAnchor: [22, 94]
+ * });
+ *
+ * L.marker([50.505, 30.57], {icon: myIcon}).addTo(map);
+ * ```
+ *
+ * `L.Icon.Default` extends `L.Icon` and is the blue icon Leaflet uses for markers by default.
+ *
+ */
+
 var Icon = Class.extend({
 
 	/* @section
@@ -8141,6 +8518,22 @@ var Icon = Class.extend({
 // @factory L.icon(options: Icon options)
 // Creates an icon instance with the given options.
 
+/*
+ * @miniclass Icon.Default (Icon)
+ * @aka L.Icon.Default
+ * @section
+ *
+ * A trivial subclass of `Icon`, represents the icon to use in `Marker`s when
+ * no icon is specified. Points to the blue marker image distributed with Leaflet
+ * releases.
+ *
+ * In order to customize the default icon, just change the properties of `L.Icon.Default.prototype.options`
+ * (which is a set of `Icon options`).
+ *
+ * If you want to _completely_ replace the default icon, override the
+ * `L.Marker.prototype.options.icon` with your own icon instead.
+ */
+
 var IconDefault = Icon.extend({
 
 	options: {
@@ -8182,6 +8575,25 @@ var IconDefault = Icon.extend({
 		return path;
 	}
 });
+
+/*
+ * @class DivIcon
+ * @aka L.DivIcon
+ * @inherits Icon
+ *
+ * Represents a lightweight icon for markers that uses a simple `<div>`
+ * element instead of an image. Inherits from `Icon` but ignores the `iconUrl` and shadow options.
+ *
+ * @example
+ * ```js
+ * var myIcon = L.divIcon({className: 'my-div-icon'});
+ * // you can set .my-div-icon styles in CSS
+ *
+ * L.marker([50.505, 30.57], {icon: myIcon}).addTo(map);
+ * ```
+ *
+ * By default, it has a 'leaflet-div-icon' CSS class and is styled as a little white square with a shadow.
+ */
 
 var DivIcon = Icon.extend({
 	options: {
@@ -8225,6 +8637,31 @@ var DivIcon = Icon.extend({
 
 // @factory L.divIcon(options: DivIcon options)
 // Creates a `DivIcon` instance with the given options.
+
+/*
+ * @class Layer
+ * @inherits Evented
+ * @aka L.Layer
+ * @aka ILayer
+ *
+ * A set of methods from the Layer base class that all Leaflet layers use.
+ * Inherits all methods, options and events from `L.Evented`.
+ *
+ * @example
+ *
+ * ```js
+ * var layer = L.Marker(latlng).addTo(map);
+ * layer.addTo(map);
+ * layer.remove();
+ * ```
+ *
+ * @event add: Event
+ * Fired after the layer is added to a map
+ *
+ * @event remove: Event
+ * Fired after the layer is removed from a map
+ */
+
 
 var Layer = Evented.extend({
 
@@ -8477,6 +8914,24 @@ Map$2.include({
 	}
 });
 
+/*
+ * L.Handler.MarkerDrag is used internally by L.Marker to make the markers draggable.
+ */
+
+
+/* @namespace Marker
+ * @section Interaction handlers
+ *
+ * Interaction handlers are properties of a marker instance that allow you to control interaction behavior in runtime, enabling or disabling certain features such as dragging (see `Handler` methods). Example:
+ *
+ * ```js
+ * marker.dragging.disable();
+ * ```
+ *
+ * @property dragging: Handler
+ * Marker dragging handler (by both mouse and touch). Only valid when the marker is on the map (Otherwise set [`marker.options.draggable`](#marker-draggable)).
+ */
+
 var MarkerDrag = Handler.extend({
 	initialize: function (marker) {
 		this._marker = marker;
@@ -8563,6 +9018,19 @@ var MarkerDrag = Handler.extend({
 		    .fire('dragend', e);
 	}
 });
+
+/*
+ * @class Marker
+ * @inherits Interactive layer
+ * @aka L.Marker
+ * L.Marker is used to display clickable/draggable icons on the map. Extends `Layer`.
+ *
+ * @example
+ *
+ * ```js
+ * L.marker([50.5, 30.5]).addTo(map);
+ * ```
+ */
 
 var Marker = Layer.extend({
 
@@ -8898,6 +9366,24 @@ var Marker = Layer.extend({
 
 Icon.Default = IconDefault;
 
+/*
+ * @class LayerGroup
+ * @aka L.LayerGroup
+ * @inherits Layer
+ *
+ * Used to group several layers and handle them as one. If you add it to the map,
+ * any layers added or removed from the group will be added/removed on the map as
+ * well. Extends `Layer`.
+ *
+ * @example
+ *
+ * ```js
+ * L.layerGroup([marker1, marker2])
+ * 	.addLayer(polyline)
+ * 	.addTo(map);
+ * ```
+ */
+
 var LayerGroup = Layer.extend({
 
 	initialize: function (layers) {
@@ -9040,6 +9526,15 @@ var LayerGroup = Layer.extend({
 // @factory L.layerGroup(layers?: Layer[])
 // Create a layer group, optionally given an initial set of layers.
 
+/*
+ * @class Path
+ * @aka L.Path
+ * @inherits Interactive layer
+ *
+ * An abstract class that contains options and constants shared between vector
+ * overlays (Polygon, Polyline, Circle). Do not use it directly. Extends `Layer`.
+ */
+
 var Path = Layer.extend({
 
 	// @section
@@ -9173,6 +9668,14 @@ var Path = Layer.extend({
 	}
 });
 
+/*
+ * @class CircleMarker
+ * @aka L.CircleMarker
+ * @inherits Path
+ *
+ * A circle of a fixed size with radius specified in pixels. Extends `Path`.
+ */
+
 var CircleMarker = Path.extend({
 
 	// @section
@@ -9262,6 +9765,22 @@ var CircleMarker = Path.extend({
 // @factory L.circleMarker(latlng: LatLng, options?: CircleMarker options)
 // Instantiates a circle marker object given a geographical point, and an optional options object.
 
+/*
+ * @class Circle
+ * @aka L.Circle
+ * @inherits CircleMarker
+ *
+ * A class for drawing circle overlays on a map. Extends `CircleMarker`.
+ *
+ * It's an approximation and starts to diverge from a real circle closer to poles (due to projection distortion).
+ *
+ * @example
+ *
+ * ```js
+ * L.circle([50.5, 30.5], {radius: 200}).addTo(map);
+ * ```
+ */
+
 var Circle = CircleMarker.extend({
 
 	initialize: function (latlng, options, legacyOptions) {
@@ -9348,6 +9867,45 @@ var Circle = CircleMarker.extend({
 // @factory L.circle(latlng: LatLng, radius: Number, options?: Circle options)
 // Obsolete way of instantiating a circle, for compatibility with 0.7.x code.
 // Do not use in new applications or plugins.
+
+/*
+ * @class Polyline
+ * @aka L.Polyline
+ * @inherits Path
+ *
+ * A class for drawing polyline overlays on a map. Extends `Path`.
+ *
+ * @example
+ *
+ * ```js
+ * // create a red polyline from an array of LatLng points
+ * var latlngs = [
+ * 	[45.51, -122.68],
+ * 	[37.77, -122.43],
+ * 	[34.04, -118.2]
+ * ];
+ *
+ * var polyline = L.polyline(latlngs, {color: 'red'}).addTo(map);
+ *
+ * // zoom the map to the polyline
+ * map.fitBounds(polyline.getBounds());
+ * ```
+ *
+ * You can also pass a multi-dimensional array to represent a `MultiPolyline` shape:
+ *
+ * ```js
+ * // create a red polyline from an array of arrays of LatLng points
+ * var latlngs = [
+ * 	[[45.51, -122.68],
+ * 	 [37.77, -122.43],
+ * 	 [34.04, -118.2]],
+ * 	[[40.78, -73.91],
+ * 	 [41.83, -87.62],
+ * 	 [32.76, -96.72]]
+ * ];
+ * ```
+ */
+
 
 var Polyline = Path.extend({
 
@@ -9629,6 +10187,17 @@ function polyline(latlngs, options) {
 // Retrocompat. Allow plugins to support Leaflet versions before and after 1.1.
 Polyline._flat = _flat;
 
+/*
+ * @namespace PolyUtil
+ * Various utility functions for polygon geometries.
+ */
+
+/* @function clipPolygon(points: Point[], bounds: Bounds, round?: Boolean): Point[]
+ * Clips the polygon geometry defined by the given `points` by the given bounds (using the [Sutherland-Hodgeman algorithm](https://en.wikipedia.org/wiki/Sutherland%E2%80%93Hodgman_algorithm)).
+ * Used by Leaflet to only show polygon points that are on the screen or near, increasing
+ * performance. Note that polygon points needs different algorithm for clipping
+ * than polyline, so there's a seperate method for it.
+ */
 function clipPolygon(points, bounds, round) {
 	var clippedPoints,
 	    edges = [1, 4, 2, 8],
@@ -9671,6 +10240,52 @@ function clipPolygon(points, bounds, round) {
 
 	return points;
 }
+
+/*
+ * @class Polygon
+ * @aka L.Polygon
+ * @inherits Polyline
+ *
+ * A class for drawing polygon overlays on a map. Extends `Polyline`.
+ *
+ * Note that points you pass when creating a polygon shouldn't have an additional last point equal to the first one — it's better to filter out such points.
+ *
+ *
+ * @example
+ *
+ * ```js
+ * // create a red polygon from an array of LatLng points
+ * var latlngs = [[37, -109.05],[41, -109.03],[41, -102.05],[37, -102.04]];
+ *
+ * var polygon = L.polygon(latlngs, {color: 'red'}).addTo(map);
+ *
+ * // zoom the map to the polygon
+ * map.fitBounds(polygon.getBounds());
+ * ```
+ *
+ * You can also pass an array of arrays of latlngs, with the first array representing the outer shape and the other arrays representing holes in the outer shape:
+ *
+ * ```js
+ * var latlngs = [
+ *   [[37, -109.05],[41, -109.03],[41, -102.05],[37, -102.04]], // outer ring
+ *   [[37.29, -108.58],[40.71, -108.58],[40.71, -102.50],[37.29, -102.50]] // hole
+ * ];
+ * ```
+ *
+ * Additionally, you can pass a multi-dimensional array to represent a MultiPolygon shape.
+ *
+ * ```js
+ * var latlngs = [
+ *   [ // first polygon
+ *     [[37, -109.05],[41, -109.03],[41, -102.05],[37, -102.04]], // outer ring
+ *     [[37.29, -108.58],[40.71, -108.58],[40.71, -102.50],[37.29, -102.50]] // hole
+ *   ],
+ *   [ // second polygon
+ *     [[41, -111.03],[45, -111.04],[45, -104.05],[41, -104.05]]
+ *   ]
+ * ];
+ * ```
+ */
 
 var Polygon = Polyline.extend({
 
@@ -9801,6 +10416,33 @@ var Polygon = Polyline.extend({
 
 // @factory L.polygon(latlngs: LatLng[], options?: Polyline options)
 
+/*
+ * L.Rectangle extends Polygon and creates a rectangle when passed a LatLngBounds object.
+ */
+
+/*
+ * @class Rectangle
+ * @aka L.Retangle
+ * @inherits Polygon
+ *
+ * A class for drawing rectangle overlays on a map. Extends `Polygon`.
+ *
+ * @example
+ *
+ * ```js
+ * // define rectangle geographical bounds
+ * var bounds = [[54.559322, -5.767822], [56.1210604, -3.021240]];
+ *
+ * // create an orange rectangle
+ * L.rectangle(bounds, {color: "#ff7800", weight: 1}).addTo(map);
+ *
+ * // zoom the map to the rectangle bounds
+ * map.fitBounds(bounds);
+ * ```
+ *
+ */
+
+
 var Rectangle = Polygon.extend({
 	initialize: function (latLngBounds, options) {
 		Polygon.prototype.initialize.call(this, this._boundsToLatLngs(latLngBounds), options);
@@ -9826,6 +10468,36 @@ var Rectangle = Polygon.extend({
 
 // @factory L.rectangle(latLngBounds: LatLngBounds, options?: Polyline options)
 
+// import {MarkerDrag} from 'leaflet/src/layer/marker/Marker.Drag.js'
+// 🍂miniclass CancelableEvent (Event objects)
+// 🍂method cancel()
+// Cancel any subsequent action.
+
+// 🍂miniclass VertexEvent (Event objects)
+// 🍂property vertex: VertexMarker
+// The vertex that fires the event.
+
+// 🍂miniclass ShapeEvent (Event objects)
+// 🍂property shape: Array
+// The shape (LatLngs array) subject of the action.
+
+// 🍂miniclass CancelableVertexEvent (Event objects)
+// 🍂inherits VertexEvent
+// 🍂inherits CancelableEvent
+
+// 🍂miniclass CancelableShapeEvent (Event objects)
+// 🍂inherits ShapeEvent
+// 🍂inherits CancelableEvent
+
+// 🍂miniclass LayerEvent (Event objects)
+// 🍂property layer: object
+// The Layer (Marker, Polyline…) subject of the action.
+
+// 🍂namespace Editable; 🍂class Editable; 🍂aka Editable
+// Main edition handler. By default, it is attached to the map
+// as `map.editTools` property.
+// Leaflet.Editable is made to be fully extendable. You have three ways to customize
+// the behaviour: using options, listening to events, or extending.
 var Editable = Evented.extend({
 
     statics: {
@@ -11692,6 +12364,26 @@ LatLng.prototype.update = function (latlng) {
     this.lng = latlng.lng;
 };
 
+/*
+ * @class Renderer
+ * @inherits Layer
+ * @aka L.Renderer
+ *
+ * Base class for vector renderer implementations (`SVG`, `Canvas`). Handles the
+ * DOM container of the renderer, its bounds, and its zoom animation.
+ *
+ * A `Renderer` works as an implicit layer group for all `Path`s - the renderer
+ * itself can be added or removed to the map. All paths use a renderer, which can
+ * be implicit (the map will decide the type of renderer and use it automatically)
+ * or explicit (using the [`renderer`](#path-renderer) option of the path).
+ *
+ * Do not use this class directly, use `SVG` and `Canvas` instead.
+ *
+ * @event update: Event
+ * Fired when the renderer updates its bounds, center and zoom, for example when
+ * its map has moved
+ */
+
 var Renderer = Layer.extend({
 
 	// @section
@@ -11800,6 +12492,11 @@ var Renderer = Layer.extend({
 		this._zoom = this._map.getZoom();
 	}
 });
+
+/*
+ * Thanks to Dmitry Baranovsky and his Raphael library for inspiration!
+ */
+
 
 var vmlCreate = (function () {
 	try {
@@ -12146,6 +12843,16 @@ function svg$1(options) {
 	return svg || vml ? new SVG(options) : null;
 }
 
+/**
+ * Leaflet vector features drag functionality
+ * @author Alexander Milevski <info@w8r.name>
+ * @preserve
+ */
+
+/**
+ * Matrix transform path for SVG/VML
+ * Renderer-independent
+ */
 Path.include({
 
 	/**
@@ -12708,6 +13415,11 @@ Editable.PathEditor.include({
 
 });
 
+/**
+ * Calculate map transformation 
+ * @param {Size} map_size  - size of map's div
+ * @param {Size} img_size  - size of images in custom unit (meters)
+ */
 function transformation(map_size, img_size){
    
     var x_ratio = map_size.x / img_size.x;
@@ -12741,13 +13453,17 @@ function maxZoom(img_size, min_width){
 }
 
 /**
- * Constructor of Envelope
- * @param {*} min_x 
- * @param {*} min_y 
- * @param {*} max_x 
- * @param {*} max_y 
+ * As LatLngBounds with its SouthNorthWestEast stuff mislead with planar metric space
+ * Envelope seems more convenient 
+ * @param {LatLngBounds} bounds 
  */
 
+/**
+ * Add inqueue_on/inqueue_off methods on obj
+ * with these methods clients could add event handler into stack
+ * event handlers call from the tail, if handler return true? then processing stop
+ * @param {*} obj 
+ */
 function EventHandlerStack(obj)
 {
     var stack = {};
@@ -12786,6 +13502,19 @@ function EventHandlerStack(obj)
 
 }
 
+/*
+ * @namespace Projection
+ * @section
+ * Leaflet comes with a set of already defined Projections out of the box:
+ *
+ * @projection L.Projection.LonLat
+ *
+ * Equirectangular, or Plate Carree projection — the most simple projection,
+ * mostly used by GIS enthusiasts. Directly maps `x` as longitude, and `y` as
+ * latitude. Also suitable for flat worlds, e.g. game maps. Used by the
+ * `EPSG:4326` and `Simple` CRS.
+ */
+
 var LonLat = {
 	project: function (latlng) {
 		return new Point(latlng.lng, latlng.lat);
@@ -12797,6 +13526,16 @@ var LonLat = {
 
 	bounds: new Bounds([-180, -90], [180, 90])
 };
+
+/*
+ * @namespace CRS
+ * @crs L.CRS.Simple
+ *
+ * A simple CRS that maps longitude and latitude into `x` and `y` directly.
+ * May be used for maps of flat surfaces (e.g. game maps). Note that the `y`
+ * axis should still be inverted (going from bottom to top). `distance()` returns
+ * simple euclidean distance.
+ */
 
 var Simple = extend({}, CRS, {
 	projection: LonLat,
@@ -12820,6 +13559,7 @@ var Simple = extend({}, CRS, {
 	infinite: true
 });
 
+// import {GridPanel} from './grid-panel.js'
 var Map$1 = function(el, store)
 {
     map$3 = new Map$2(el, 
@@ -12870,188 +13610,21 @@ function updateMapSize(size_m)
     return bounds;
 }
 
-var cur_locale = 'ru';
-
-function t(s, o, loc){
-    loc = loc || cur_locale;
-    var rep = translations[s] &&  translations[s][loc];
-    if(!rep) 
-        return 'Missing ' + loc + ' translation: ' + s;
-    if(o) for(var k in o)  rep = rep.replace('{' + k + '}', o[k]);
-    return rep
-}
-
-var translations = 
-{
-    "invalid_svg_type": {
-        "ru": "Не верный тип файла: {type}"
-    },
-    "invalid_svg_content": {
-        "ru": "SVG-документ с ошибками"
-    },
-    "no_svg_size":{
-        "ru": 'SVG-документ должен содержать атрибуты "width" и "height"'
-    },
-    "no_svg_dimensions": {
-        "ru": 'В SVG-документе отсутствуют и атрибуты "width", "height" и атрибут "viewBox"'
-    }
-};
-
-var DRAW_DISTANCE = 'draw-distance';
-var EDIT_GRID = 'edit-grid';
-
-var hidenElement = null;
-
-function getHidenEl(){
-    if(hidenElement)
-        return hidenElement;
-    hidenElement = document.createElement("div");    
-    hidenElement.style = 'visibility: hidden; position: absolute; top:0; left:0;';
-    hidenElement = document.body.appendChild(hidenElement);
-    return hidenElement;
-}
-
-function svgToBase64(svg_text)
-{
-    if(!svg_text || svg_text.length < 7) 
-        return Either.left(t('invalid_svg_content'))
-      
-    var parser = new DOMParser();    
-    var svg_document = parser.parseFromString(svg_text, "image/svg+xml").documentElement;
-    if( !svg_document ||
-        !svg_document.getAttribute ||
-        !startswith(svg_document.getAttribute('xmlns'), 'http://www.w3.org/2000/svg'))
-        return Either.left(t('invalid_svg_content'))
-    if(!svg_document.height || !svg_document.width)
-        return Either.left(t('no_svg_size'))
-
-    var viewBox = null;
-    if(svg_document.viewBox.baseVal && svg_document.viewBox.baseVal.width != 0) {
-        var vb = svg_document.viewBox.baseVal;
-        viewBox = [vb.x, vb.y, vb.width, vb.height];
-    }
-    var raw_svg =   new XMLSerializer().serializeToString(svg_document); 
-    var data_uri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(raw_svg)));
-    
-    if(!viewBox && (svg_document.width.baseVal.value == 0 || svg_document.height.baseVal.value == 0 )){
-        var node = document.importNode(svg_document, true);
-        node = getHidenEl().appendChild(node);
-        var box = node.getBBox();
-        viewBox = [0,0,box.x + box.width, box.y + box.height];
-        getHidenEl().removeChild(node);
-        // return Either.left(t('no_svg_dimensions'))
-    }
-    var width = 0, height = 0;
-    if(viewBox){
-        width = viewBox[2];
-        height = viewBox[3];
-    }
-    if(svg_document.width.baseVal.value != 0)
-        width = svg_document.width.baseVal.value;
-    if(svg_document.height.baseVal.value != 0)
-        height = svg_document.height.baseVal.value;
-    return Either.right({
-        svg_document: svg_document,
-        raw_svg: raw_svg,
-        width: width,
-        height: height,
-        data_uri: data_uri
-    })    
-}
-
-function FileHandler(store, error_fn)
-{
-    return function(e){
-        error_fn('');
-        var file = e.target.files[0];
-        if(!file) return; 
-        if(file.type !== 'image/svg+xml') {
-            error_fn(t('invalid_svg_type', {type: file.type}));
-        }
-        else  
-        {
-            var reader = new FileReader();
-            reader.onloadend = function(e){
-                svgToBase64(reader.result).fold(
-                    error_fn ,
-                    function(e) {
-                        store(BASE_LAYER_SET, {
-                            grid: {
-                                topLeft: {x:0, y:0},
-                                bottomRight: {x: Math.round(e.width), y: Math.round(e.height)}
-                            },
-                            raw_svg: e.raw_svg,
-                            url: e.data_uri,
-                            size_m: {x: Math.round(e.width), y: Math.round(e.height)},
-                            size_px: {x: e.width, y: e.height}
-                        });
-                    }
-                );
-            };
-            reader.readAsText(file);
-        }
-        
-    }
-}
-
-function BaseView(store) {
-
-    var el = function(id) { return document.getElementById(id) };
-    var show = function(id) { el(id).style['display'] = ''; };
-    var hide = function(id) { el(id).style['display'] = 'none'; };
-    var html = function(id, t$$1) {  el(id).innerHTML = t$$1; };
-    var text = function(id, t$$1) {  el(id).innerText = t$$1; };
-    var value = function(id, t$$1) {  el(id).value = t$$1; };
-
-
-    el('file').onchange = FileHandler(store, function(error){ 
-        html('error', error);
-    });
-
-    el('draw_line').onchange = function(){
-        store(DRAWING_MODE_SET, el('draw_line').checked ? DRAW_DISTANCE : null);
-    };
-
-    el('grid_edit').onchange = function(){
-        store(DRAWING_MODE_SET, el('grid_edit').checked ? EDIT_GRID : null);
-    };
-
-    el('distance_input').oninput = _.debounce( function(e){
-        var v = parseInt(el('distance_input').value);
-        if(!Number.isNaN(v) && v > 0)
-            store(BASE_DISTANCE_LENGTH_SET, v);
-    }, 500);
-
-    store.on('selectedBase.size_m', function(e){
-        if(e.new_val) {
-            var size = e.new_val;
-            show('toolbar');
-            show('size');
-            text('size_input', Math.round(size.x) + 'x' + Math.round(size.y));
-        }
-    }); 
-
-    store.on('selectedBase.distance', function(e){
-        if(e.new_val){
-            show('distance');
-            value('distance_input', e.new_val.length_m);
-        }
-        else {
-            hide('distance');
-        }
-    });
-
-    store.on('map.drawMode', function(e){
-        el('draw_line').checked = e.new_val == DRAW_DISTANCE;
-        el('grid_edit').checked = e.new_val == EDIT_GRID;
-    });
-
-    store.on('selectedBase', function(e){
-        if(e.new_val){
-            store(BASE_LAYER_SAVE, { base: e.new_val} );
-        }
-    });
-}
+/*
+ * @class ImageOverlay
+ * @aka L.ImageOverlay
+ * @inherits Interactive layer
+ *
+ * Used to load and display a single image over specific bounds of the map. Extends `Layer`.
+ *
+ * @example
+ *
+ * ```js
+ * var imageUrl = 'http://www.lib.utexas.edu/maps/historical/newark_nj_1922.jpg',
+ * 	imageBounds = [[40.712216, -74.22655], [40.773941, -74.12544]];
+ * L.imageOverlay(imageUrl, imageBounds).addTo(map);
+ * ```
+ */
 
 var ImageOverlay = Layer.extend({
 
@@ -13285,6 +13858,38 @@ var ImageOverlay = Layer.extend({
 var imageOverlay = function (url, bounds, options) {
 	return new ImageOverlay(url, bounds, options);
 };
+
+/*
+ * @class Canvas
+ * @inherits Renderer
+ * @aka L.Canvas
+ *
+ * Allows vector layers to be displayed with [`<canvas>`](https://developer.mozilla.org/docs/Web/API/Canvas_API).
+ * Inherits `Renderer`.
+ *
+ * Due to [technical limitations](http://caniuse.com/#search=canvas), Canvas is not
+ * available in all web browsers, notably IE8, and overlapping geometries might
+ * not display properly in some edge cases.
+ *
+ * @example
+ *
+ * Use Canvas by default for all paths in the map:
+ *
+ * ```js
+ * var map = L.map('map', {
+ * 	renderer: L.canvas()
+ * });
+ * ```
+ *
+ * Use a Canvas renderer with extra padding for specific vector geometries:
+ *
+ * ```js
+ * var map = L.map('map');
+ * var myRenderer = L.canvas({ padding: 0.5 });
+ * var line = L.polyline( coordinates, { renderer: myRenderer } );
+ * var circle = L.circle( center, { renderer: myRenderer } );
+ * ```
+ */
 
 var Canvas = Renderer.extend({
 	getEvents: function () {
@@ -15522,6 +16127,9 @@ var interpolateRound = function(a, b) {
   };
 };
 
+// p0 = [ux0, uy0, w0]
+// p1 = [ux1, uy1, w1]
+
 function cubehelix$1(hue$$1) {
   return (function cubehelixGamma(y) {
     y = +y;
@@ -15775,6 +16383,7 @@ var formatTypes = {
   "x": function(x) { return Math.round(x).toString(16); }
 };
 
+// [[fill]align][sign][symbol][0][width][,][.precision][type]
 var re = /^(?:(.)?([<>=^]))?([+\-\( ])?([$#])?(0)?(\d+)?(,)?(\.\d+)?([a-z%])?$/i;
 
 function formatSpecifier(specifier) {
@@ -16476,1253 +17085,12 @@ var BaseMapView = function (store, map)
     return m;
 };
 
-var DivOverlay = Layer.extend({
-
-	// @section
-	// @aka DivOverlay options
-	options: {
-		// @option offset: Point = Point(0, 7)
-		// The offset of the popup position. Useful to control the anchor
-		// of the popup when opening it on some overlays.
-		offset: [0, 7],
-
-		// @option className: String = ''
-		// A custom CSS class name to assign to the popup.
-		className: '',
-
-		// @option pane: String = 'popupPane'
-		// `Map pane` where the popup will be added.
-		pane: 'popupPane'
-	},
-
-	initialize: function (options, source) {
-		setOptions(this, options);
-
-		this._source = source;
-	},
-
-	onAdd: function (map) {
-		this._zoomAnimated = map._zoomAnimated;
-
-		if (!this._container) {
-			this._initLayout();
-		}
-
-		if (map._fadeAnimated) {
-			setOpacity(this._container, 0);
-		}
-
-		clearTimeout(this._removeTimeout);
-		this.getPane().appendChild(this._container);
-		this.update();
-
-		if (map._fadeAnimated) {
-			setOpacity(this._container, 1);
-		}
-
-		this.bringToFront();
-	},
-
-	onRemove: function (map) {
-		if (map._fadeAnimated) {
-			setOpacity(this._container, 0);
-			this._removeTimeout = setTimeout(bind(remove, undefined, this._container), 200);
-		} else {
-			remove(this._container);
-		}
-	},
-
-	// @namespace Popup
-	// @method getLatLng: LatLng
-	// Returns the geographical point of popup.
-	getLatLng: function () {
-		return this._latlng;
-	},
-
-	// @method setLatLng(latlng: LatLng): this
-	// Sets the geographical point where the popup will open.
-	setLatLng: function (latlng) {
-		this._latlng = toLatLng(latlng);
-		if (this._map) {
-			this._updatePosition();
-			this._adjustPan();
-		}
-		return this;
-	},
-
-	// @method getContent: String|HTMLElement
-	// Returns the content of the popup.
-	getContent: function () {
-		return this._content;
-	},
-
-	// @method setContent(htmlContent: String|HTMLElement|Function): this
-	// Sets the HTML content of the popup. If a function is passed the source layer will be passed to the function. The function should return a `String` or `HTMLElement` to be used in the popup.
-	setContent: function (content) {
-		this._content = content;
-		this.update();
-		return this;
-	},
-
-	// @method getElement: String|HTMLElement
-	// Alias for [getContent()](#popup-getcontent)
-	getElement: function () {
-		return this._container;
-	},
-
-	// @method update: null
-	// Updates the popup content, layout and position. Useful for updating the popup after something inside changed, e.g. image loaded.
-	update: function () {
-		if (!this._map) { return; }
-
-		this._container.style.visibility = 'hidden';
-
-		this._updateContent();
-		this._updateLayout();
-		this._updatePosition();
-
-		this._container.style.visibility = '';
-
-		this._adjustPan();
-	},
-
-	getEvents: function () {
-		var events = {
-			zoom: this._updatePosition,
-			viewreset: this._updatePosition
-		};
-
-		if (this._zoomAnimated) {
-			events.zoomanim = this._animateZoom;
-		}
-		return events;
-	},
-
-	// @method isOpen: Boolean
-	// Returns `true` when the popup is visible on the map.
-	isOpen: function () {
-		return !!this._map && this._map.hasLayer(this);
-	},
-
-	// @method bringToFront: this
-	// Brings this popup in front of other popups (in the same map pane).
-	bringToFront: function () {
-		if (this._map) {
-			toFront(this._container);
-		}
-		return this;
-	},
-
-	// @method bringToBack: this
-	// Brings this popup to the back of other popups (in the same map pane).
-	bringToBack: function () {
-		if (this._map) {
-			toBack(this._container);
-		}
-		return this;
-	},
-
-	_updateContent: function () {
-		if (!this._content) { return; }
-
-		var node = this._contentNode;
-		var content = (typeof this._content === 'function') ? this._content(this._source || this) : this._content;
-
-		if (typeof content === 'string') {
-			node.innerHTML = content;
-		} else {
-			while (node.hasChildNodes()) {
-				node.removeChild(node.firstChild);
-			}
-			node.appendChild(content);
-		}
-		this.fire('contentupdate');
-	},
-
-	_updatePosition: function () {
-		if (!this._map) { return; }
-
-		var pos = this._map.latLngToLayerPoint(this._latlng),
-		    offset = toPoint(this.options.offset),
-		    anchor = this._getAnchor();
-
-		if (this._zoomAnimated) {
-			setPosition(this._container, pos.add(anchor));
-		} else {
-			offset = offset.add(pos).add(anchor);
-		}
-
-		var bottom = this._containerBottom = -offset.y,
-		    left = this._containerLeft = -Math.round(this._containerWidth / 2) + offset.x;
-
-		// bottom position the popup in case the height of the popup changes (images loading etc)
-		this._container.style.bottom = bottom + 'px';
-		this._container.style.left = left + 'px';
-	},
-
-	_getAnchor: function () {
-		return [0, 0];
-	}
-
-});
-
-var FeatureGroup = LayerGroup.extend({
-
-	addLayer: function (layer) {
-		if (this.hasLayer(layer)) {
-			return this;
-		}
-
-		layer.addEventParent(this);
-
-		LayerGroup.prototype.addLayer.call(this, layer);
-
-		// @event layeradd: LayerEvent
-		// Fired when a layer is added to this `FeatureGroup`
-		return this.fire('layeradd', {layer: layer});
-	},
-
-	removeLayer: function (layer) {
-		if (!this.hasLayer(layer)) {
-			return this;
-		}
-		if (layer in this._layers) {
-			layer = this._layers[layer];
-		}
-
-		layer.removeEventParent(this);
-
-		LayerGroup.prototype.removeLayer.call(this, layer);
-
-		// @event layerremove: LayerEvent
-		// Fired when a layer is removed from this `FeatureGroup`
-		return this.fire('layerremove', {layer: layer});
-	},
-
-	// @method setStyle(style: Path options): this
-	// Sets the given path options to each layer of the group that has a `setStyle` method.
-	setStyle: function (style) {
-		return this.invoke('setStyle', style);
-	},
-
-	// @method bringToFront(): this
-	// Brings the layer group to the top of all other layers
-	bringToFront: function () {
-		return this.invoke('bringToFront');
-	},
-
-	// @method bringToBack(): this
-	// Brings the layer group to the top of all other layers
-	bringToBack: function () {
-		return this.invoke('bringToBack');
-	},
-
-	// @method getBounds(): LatLngBounds
-	// Returns the LatLngBounds of the Feature Group (created from bounds and coordinates of its children).
-	getBounds: function () {
-		var bounds = new LatLngBounds();
-
-		for (var id in this._layers) {
-			var layer = this._layers[id];
-			bounds.extend(layer.getBounds ? layer.getBounds() : layer.getLatLng());
-		}
-		return bounds;
-	}
-});
-
-// @factory L.featureGroup(layers: Layer[])
-// Create a feature group, optionally given an initial set of layers.
-
-var Tooltip = DivOverlay.extend({
-
-	// @section
-	// @aka Tooltip options
-	options: {
-		// @option pane: String = 'tooltipPane'
-		// `Map pane` where the tooltip will be added.
-		pane: 'tooltipPane',
-
-		// @option offset: Point = Point(0, 0)
-		// Optional offset of the tooltip position.
-		offset: [0, 0],
-
-		// @option direction: String = 'auto'
-		// Direction where to open the tooltip. Possible values are: `right`, `left`,
-		// `top`, `bottom`, `center`, `auto`.
-		// `auto` will dynamicaly switch between `right` and `left` according to the tooltip
-		// position on the map.
-		direction: 'auto',
-
-		// @option permanent: Boolean = false
-		// Whether to open the tooltip permanently or only on mouseover.
-		permanent: false,
-
-		// @option sticky: Boolean = false
-		// If true, the tooltip will follow the mouse instead of being fixed at the feature center.
-		sticky: false,
-
-		// @option interactive: Boolean = false
-		// If true, the tooltip will listen to the feature events.
-		interactive: false,
-
-		// @option opacity: Number = 0.9
-		// Tooltip container opacity.
-		opacity: 0.9
-	},
-
-	onAdd: function (map) {
-		DivOverlay.prototype.onAdd.call(this, map);
-		this.setOpacity(this.options.opacity);
-
-		// @namespace Map
-		// @section Tooltip events
-		// @event tooltipopen: TooltipEvent
-		// Fired when a tooltip is opened in the map.
-		map.fire('tooltipopen', {tooltip: this});
-
-		if (this._source) {
-			// @namespace Layer
-			// @section Tooltip events
-			// @event tooltipopen: TooltipEvent
-			// Fired when a tooltip bound to this layer is opened.
-			this._source.fire('tooltipopen', {tooltip: this}, true);
-		}
-	},
-
-	onRemove: function (map) {
-		DivOverlay.prototype.onRemove.call(this, map);
-
-		// @namespace Map
-		// @section Tooltip events
-		// @event tooltipclose: TooltipEvent
-		// Fired when a tooltip in the map is closed.
-		map.fire('tooltipclose', {tooltip: this});
-
-		if (this._source) {
-			// @namespace Layer
-			// @section Tooltip events
-			// @event tooltipclose: TooltipEvent
-			// Fired when a tooltip bound to this layer is closed.
-			this._source.fire('tooltipclose', {tooltip: this}, true);
-		}
-	},
-
-	getEvents: function () {
-		var events = DivOverlay.prototype.getEvents.call(this);
-
-		if (touch && !this.options.permanent) {
-			events.preclick = this._close;
-		}
-
-		return events;
-	},
-
-	_close: function () {
-		if (this._map) {
-			this._map.closeTooltip(this);
-		}
-	},
-
-	_initLayout: function () {
-		var prefix = 'leaflet-tooltip',
-		    className = prefix + ' ' + (this.options.className || '') + ' leaflet-zoom-' + (this._zoomAnimated ? 'animated' : 'hide');
-
-		this._contentNode = this._container = create$1('div', className);
-	},
-
-	_updateLayout: function () {},
-
-	_adjustPan: function () {},
-
-	_setPosition: function (pos) {
-		var map = this._map,
-		    container = this._container,
-		    centerPoint = map.latLngToContainerPoint(map.getCenter()),
-		    tooltipPoint = map.layerPointToContainerPoint(pos),
-		    direction = this.options.direction,
-		    tooltipWidth = container.offsetWidth,
-		    tooltipHeight = container.offsetHeight,
-		    offset = toPoint(this.options.offset),
-		    anchor = this._getAnchor();
-
-		if (direction === 'top') {
-			pos = pos.add(toPoint(-tooltipWidth / 2 + offset.x, -tooltipHeight + offset.y + anchor.y, true));
-		} else if (direction === 'bottom') {
-			pos = pos.subtract(toPoint(tooltipWidth / 2 - offset.x, -offset.y, true));
-		} else if (direction === 'center') {
-			pos = pos.subtract(toPoint(tooltipWidth / 2 + offset.x, tooltipHeight / 2 - anchor.y + offset.y, true));
-		} else if (direction === 'right' || direction === 'auto' && tooltipPoint.x < centerPoint.x) {
-			direction = 'right';
-			pos = pos.add(toPoint(offset.x + anchor.x, anchor.y - tooltipHeight / 2 + offset.y, true));
-		} else {
-			direction = 'left';
-			pos = pos.subtract(toPoint(tooltipWidth + anchor.x - offset.x, tooltipHeight / 2 - anchor.y - offset.y, true));
-		}
-
-		removeClass(container, 'leaflet-tooltip-right');
-		removeClass(container, 'leaflet-tooltip-left');
-		removeClass(container, 'leaflet-tooltip-top');
-		removeClass(container, 'leaflet-tooltip-bottom');
-		addClass(container, 'leaflet-tooltip-' + direction);
-		setPosition(container, pos);
-	},
-
-	_updatePosition: function () {
-		var pos = this._map.latLngToLayerPoint(this._latlng);
-		this._setPosition(pos);
-	},
-
-	setOpacity: function (opacity) {
-		this.options.opacity = opacity;
-
-		if (this._container) {
-			setOpacity(this._container, opacity);
-		}
-	},
-
-	_animateZoom: function (e) {
-		var pos = this._map._latLngToNewLayerPoint(this._latlng, e.zoom, e.center);
-		this._setPosition(pos);
-	},
-
-	_getAnchor: function () {
-		// Where should we anchor the tooltip on the source layer?
-		return toPoint(this._source && this._source._getTooltipAnchor && !this.options.sticky ? this._source._getTooltipAnchor() : [0, 0]);
-	}
-
-});
-
-// @namespace Tooltip
-// @factory L.tooltip(options?: Tooltip options, source?: Layer)
-// Instantiates a Tooltip object given an optional `options` object that describes its appearance and location and an optional `source` object that is used to tag the tooltip with a reference to the Layer to which it refers.
-var tooltip = function (options, source) {
-	return new Tooltip(options, source);
-};
-
-// @namespace Map
-// @section Methods for Layers and Controls
-Map$2.include({
-
-	// @method openTooltip(tooltip: Tooltip): this
-	// Opens the specified tooltip.
-	// @alternative
-	// @method openTooltip(content: String|HTMLElement, latlng: LatLng, options?: Tooltip options): this
-	// Creates a tooltip with the specified content and options and open it.
-	openTooltip: function (tooltip, latlng, options) {
-		if (!(tooltip instanceof Tooltip)) {
-			tooltip = new Tooltip(options).setContent(tooltip);
-		}
-
-		if (latlng) {
-			tooltip.setLatLng(latlng);
-		}
-
-		if (this.hasLayer(tooltip)) {
-			return this;
-		}
-
-		return this.addLayer(tooltip);
-	},
-
-	// @method closeTooltip(tooltip?: Tooltip): this
-	// Closes the tooltip given as parameter.
-	closeTooltip: function (tooltip) {
-		if (tooltip) {
-			this.removeLayer(tooltip);
-		}
-		return this;
-	}
-
-});
-
-/*
- * @namespace Layer
- * @section Tooltip methods example
- *
- * All layers share a set of methods convenient for binding tooltips to it.
- *
- * ```js
- * var layer = L.Polygon(latlngs).bindTooltip('Hi There!').addTo(map);
- * layer.openTooltip();
- * layer.closeTooltip();
- * ```
- */
-
-// @section Tooltip methods
-Layer.include({
-
-	// @method bindTooltip(content: String|HTMLElement|Function|Tooltip, options?: Tooltip options): this
-	// Binds a tooltip to the layer with the passed `content` and sets up the
-	// necessary event listeners. If a `Function` is passed it will receive
-	// the layer as the first argument and should return a `String` or `HTMLElement`.
-	bindTooltip: function (content, options) {
-
-		if (content instanceof Tooltip) {
-			setOptions(content, options);
-			this._tooltip = content;
-			content._source = this;
-		} else {
-			if (!this._tooltip || options) {
-				this._tooltip = new Tooltip(options, this);
-			}
-			this._tooltip.setContent(content);
-
-		}
-
-		this._initTooltipInteractions();
-
-		if (this._tooltip.options.permanent && this._map && this._map.hasLayer(this)) {
-			this.openTooltip();
-		}
-
-		return this;
-	},
-
-	// @method unbindTooltip(): this
-	// Removes the tooltip previously bound with `bindTooltip`.
-	unbindTooltip: function () {
-		if (this._tooltip) {
-			this._initTooltipInteractions(true);
-			this.closeTooltip();
-			this._tooltip = null;
-		}
-		return this;
-	},
-
-	_initTooltipInteractions: function (remove$$1) {
-		if (!remove$$1 && this._tooltipHandlersAdded) { return; }
-		var onOff = remove$$1 ? 'off' : 'on',
-		    events = {
-			remove: this.closeTooltip,
-			move: this._moveTooltip
-		    };
-		if (!this._tooltip.options.permanent) {
-			events.mouseover = this._openTooltip;
-			events.mouseout = this.closeTooltip;
-			if (this._tooltip.options.sticky) {
-				events.mousemove = this._moveTooltip;
-			}
-			if (touch) {
-				events.click = this._openTooltip;
-			}
-		} else {
-			events.add = this._openTooltip;
-		}
-		this[onOff](events);
-		this._tooltipHandlersAdded = !remove$$1;
-	},
-
-	// @method openTooltip(latlng?: LatLng): this
-	// Opens the bound tooltip at the specificed `latlng` or at the default tooltip anchor if no `latlng` is passed.
-	openTooltip: function (layer, latlng) {
-		if (!(layer instanceof Layer)) {
-			latlng = layer;
-			layer = this;
-		}
-
-		if (layer instanceof FeatureGroup) {
-			for (var id in this._layers) {
-				layer = this._layers[id];
-				break;
-			}
-		}
-
-		if (!latlng) {
-			latlng = layer.getCenter ? layer.getCenter() : layer.getLatLng();
-		}
-
-		if (this._tooltip && this._map) {
-
-			// set tooltip source to this layer
-			this._tooltip._source = layer;
-
-			// update the tooltip (content, layout, ect...)
-			this._tooltip.update();
-
-			// open the tooltip on the map
-			this._map.openTooltip(this._tooltip, latlng);
-
-			// Tooltip container may not be defined if not permanent and never
-			// opened.
-			if (this._tooltip.options.interactive && this._tooltip._container) {
-				addClass(this._tooltip._container, 'leaflet-clickable');
-				this.addInteractiveTarget(this._tooltip._container);
-			}
-		}
-
-		return this;
-	},
-
-	// @method closeTooltip(): this
-	// Closes the tooltip bound to this layer if it is open.
-	closeTooltip: function () {
-		if (this._tooltip) {
-			this._tooltip._close();
-			if (this._tooltip.options.interactive && this._tooltip._container) {
-				removeClass(this._tooltip._container, 'leaflet-clickable');
-				this.removeInteractiveTarget(this._tooltip._container);
-			}
-		}
-		return this;
-	},
-
-	// @method toggleTooltip(): this
-	// Opens or closes the tooltip bound to this layer depending on its current state.
-	toggleTooltip: function (target) {
-		if (this._tooltip) {
-			if (this._tooltip._map) {
-				this.closeTooltip();
-			} else {
-				this.openTooltip(target);
-			}
-		}
-		return this;
-	},
-
-	// @method isTooltipOpen(): boolean
-	// Returns `true` if the tooltip bound to this layer is currently open.
-	isTooltipOpen: function () {
-		return this._tooltip.isOpen();
-	},
-
-	// @method setTooltipContent(content: String|HTMLElement|Tooltip): this
-	// Sets the content of the tooltip bound to this layer.
-	setTooltipContent: function (content) {
-		if (this._tooltip) {
-			this._tooltip.setContent(content);
-		}
-		return this;
-	},
-
-	// @method getTooltip(): Tooltip
-	// Returns the tooltip bound to this layer.
-	getTooltip: function () {
-		return this._tooltip;
-	},
-
-	_openTooltip: function (e) {
-		var layer = e.layer || e.target;
-
-		if (!this._tooltip || !this._map) {
-			return;
-		}
-		this.openTooltip(layer, this._tooltip.options.sticky ? e.latlng : undefined);
-	},
-
-	_moveTooltip: function (e) {
-		var latlng = e.latlng, containerPoint, layerPoint;
-		if (this._tooltip.options.sticky && e.originalEvent) {
-			containerPoint = this._map.mouseEventToContainerPoint(e.originalEvent);
-			layerPoint = this._map.containerPointToLayerPoint(containerPoint);
-			latlng = this._map.layerPointToLatLng(layerPoint);
-		}
-		this._tooltip.setLatLng(latlng);
-	}
-});
-
-var Popup = DivOverlay.extend({
-
-	// @section
-	// @aka Popup options
-	options: {
-		// @option maxWidth: Number = 300
-		// Max width of the popup, in pixels.
-		maxWidth: 300,
-
-		// @option minWidth: Number = 50
-		// Min width of the popup, in pixels.
-		minWidth: 50,
-
-		// @option maxHeight: Number = null
-		// If set, creates a scrollable container of the given height
-		// inside a popup if its content exceeds it.
-		maxHeight: null,
-
-		// @option autoPan: Boolean = true
-		// Set it to `false` if you don't want the map to do panning animation
-		// to fit the opened popup.
-		autoPan: true,
-
-		// @option autoPanPaddingTopLeft: Point = null
-		// The margin between the popup and the top left corner of the map
-		// view after autopanning was performed.
-		autoPanPaddingTopLeft: null,
-
-		// @option autoPanPaddingBottomRight: Point = null
-		// The margin between the popup and the bottom right corner of the map
-		// view after autopanning was performed.
-		autoPanPaddingBottomRight: null,
-
-		// @option autoPanPadding: Point = Point(5, 5)
-		// Equivalent of setting both top left and bottom right autopan padding to the same value.
-		autoPanPadding: [5, 5],
-
-		// @option keepInView: Boolean = false
-		// Set it to `true` if you want to prevent users from panning the popup
-		// off of the screen while it is open.
-		keepInView: false,
-
-		// @option closeButton: Boolean = true
-		// Controls the presence of a close button in the popup.
-		closeButton: true,
-
-		// @option autoClose: Boolean = true
-		// Set it to `false` if you want to override the default behavior of
-		// the popup closing when another popup is opened.
-		autoClose: true,
-
-		// @option closeOnClick: Boolean = *
-		// Set it if you want to override the default behavior of the popup closing when user clicks
-		// on the map. Defaults to the map's [`closePopupOnClick`](#map-closepopuponclick) option.
-
-		// @option className: String = ''
-		// A custom CSS class name to assign to the popup.
-		className: ''
-	},
-
-	// @namespace Popup
-	// @method openOn(map: Map): this
-	// Adds the popup to the map and closes the previous one. The same as `map.openPopup(popup)`.
-	openOn: function (map) {
-		map.openPopup(this);
-		return this;
-	},
-
-	onAdd: function (map) {
-		DivOverlay.prototype.onAdd.call(this, map);
-
-		// @namespace Map
-		// @section Popup events
-		// @event popupopen: PopupEvent
-		// Fired when a popup is opened in the map
-		map.fire('popupopen', {popup: this});
-
-		if (this._source) {
-			// @namespace Layer
-			// @section Popup events
-			// @event popupopen: PopupEvent
-			// Fired when a popup bound to this layer is opened
-			this._source.fire('popupopen', {popup: this}, true);
-			// For non-path layers, we toggle the popup when clicking
-			// again the layer, so prevent the map to reopen it.
-			if (!(this._source instanceof Path)) {
-				this._source.on('preclick', stopPropagation);
-			}
-		}
-	},
-
-	onRemove: function (map) {
-		DivOverlay.prototype.onRemove.call(this, map);
-
-		// @namespace Map
-		// @section Popup events
-		// @event popupclose: PopupEvent
-		// Fired when a popup in the map is closed
-		map.fire('popupclose', {popup: this});
-
-		if (this._source) {
-			// @namespace Layer
-			// @section Popup events
-			// @event popupclose: PopupEvent
-			// Fired when a popup bound to this layer is closed
-			this._source.fire('popupclose', {popup: this}, true);
-			if (!(this._source instanceof Path)) {
-				this._source.off('preclick', stopPropagation);
-			}
-		}
-	},
-
-	getEvents: function () {
-		var events = DivOverlay.prototype.getEvents.call(this);
-
-		if (this.options.closeOnClick !== undefined ? this.options.closeOnClick : this._map.options.closePopupOnClick) {
-			events.preclick = this._close;
-		}
-
-		if (this.options.keepInView) {
-			events.moveend = this._adjustPan;
-		}
-
-		return events;
-	},
-
-	_close: function () {
-		if (this._map) {
-			this._map.closePopup(this);
-		}
-	},
-
-	_initLayout: function () {
-		var prefix = 'leaflet-popup',
-		    container = this._container = create$1('div',
-			prefix + ' ' + (this.options.className || '') +
-			' leaflet-zoom-animated');
-
-		var wrapper = this._wrapper = create$1('div', prefix + '-content-wrapper', container);
-		this._contentNode = create$1('div', prefix + '-content', wrapper);
-
-		disableClickPropagation(wrapper);
-		disableScrollPropagation(this._contentNode);
-		on(wrapper, 'contextmenu', stopPropagation);
-
-		this._tipContainer = create$1('div', prefix + '-tip-container', container);
-		this._tip = create$1('div', prefix + '-tip', this._tipContainer);
-
-		if (this.options.closeButton) {
-			var closeButton = this._closeButton = create$1('a', prefix + '-close-button', container);
-			closeButton.href = '#close';
-			closeButton.innerHTML = '&#215;';
-
-			on(closeButton, 'click', this._onCloseButtonClick, this);
-		}
-	},
-
-	_updateLayout: function () {
-		var container = this._contentNode,
-		    style = container.style;
-
-		style.width = '';
-		style.whiteSpace = 'nowrap';
-
-		var width = container.offsetWidth;
-		width = Math.min(width, this.options.maxWidth);
-		width = Math.max(width, this.options.minWidth);
-
-		style.width = (width + 1) + 'px';
-		style.whiteSpace = '';
-
-		style.height = '';
-
-		var height = container.offsetHeight,
-		    maxHeight = this.options.maxHeight,
-		    scrolledClass = 'leaflet-popup-scrolled';
-
-		if (maxHeight && height > maxHeight) {
-			style.height = maxHeight + 'px';
-			addClass(container, scrolledClass);
-		} else {
-			removeClass(container, scrolledClass);
-		}
-
-		this._containerWidth = this._container.offsetWidth;
-	},
-
-	_animateZoom: function (e) {
-		var pos = this._map._latLngToNewLayerPoint(this._latlng, e.zoom, e.center),
-		    anchor = this._getAnchor();
-		setPosition(this._container, pos.add(anchor));
-	},
-
-	_adjustPan: function () {
-		if (!this.options.autoPan || (this._map._panAnim && this._map._panAnim._inProgress)) { return; }
-
-		var map = this._map,
-		    marginBottom = parseInt(getStyle(this._container, 'marginBottom'), 10) || 0,
-		    containerHeight = this._container.offsetHeight + marginBottom,
-		    containerWidth = this._containerWidth,
-		    layerPos = new Point(this._containerLeft, -containerHeight - this._containerBottom);
-
-		layerPos._add(getPosition(this._container));
-
-		var containerPos = map.layerPointToContainerPoint(layerPos),
-		    padding = toPoint(this.options.autoPanPadding),
-		    paddingTL = toPoint(this.options.autoPanPaddingTopLeft || padding),
-		    paddingBR = toPoint(this.options.autoPanPaddingBottomRight || padding),
-		    size = map.getSize(),
-		    dx = 0,
-		    dy = 0;
-
-		if (containerPos.x + containerWidth + paddingBR.x > size.x) { // right
-			dx = containerPos.x + containerWidth - size.x + paddingBR.x;
-		}
-		if (containerPos.x - dx - paddingTL.x < 0) { // left
-			dx = containerPos.x - paddingTL.x;
-		}
-		if (containerPos.y + containerHeight + paddingBR.y > size.y) { // bottom
-			dy = containerPos.y + containerHeight - size.y + paddingBR.y;
-		}
-		if (containerPos.y - dy - paddingTL.y < 0) { // top
-			dy = containerPos.y - paddingTL.y;
-		}
-
-		// @namespace Map
-		// @section Popup events
-		// @event autopanstart: Event
-		// Fired when the map starts autopanning when opening a popup.
-		if (dx || dy) {
-			map
-			    .fire('autopanstart')
-			    .panBy([dx, dy]);
-		}
-	},
-
-	_onCloseButtonClick: function (e) {
-		this._close();
-		stop(e);
-	},
-
-	_getAnchor: function () {
-		// Where should we anchor the popup on the source layer?
-		return toPoint(this._source && this._source._getPopupAnchor ? this._source._getPopupAnchor() : [0, 0]);
-	}
-
-});
-
-// @namespace Popup
-// @factory L.popup(options?: Popup options, source?: Layer)
-// Instantiates a `Popup` object given an optional `options` object that describes its appearance and location and an optional `source` object that is used to tag the popup with a reference to the Layer to which it refers.
-var popup = function (options, source) {
-	return new Popup(options, source);
-};
-
-
-/* @namespace Map
- * @section Interaction Options
- * @option closePopupOnClick: Boolean = true
- * Set it to `false` if you don't want popups to close when user clicks the map.
- */
-Map$2.mergeOptions({
-	closePopupOnClick: true
-});
-
-
-// @namespace Map
-// @section Methods for Layers and Controls
-Map$2.include({
-	// @method openPopup(popup: Popup): this
-	// Opens the specified popup while closing the previously opened (to make sure only one is opened at one time for usability).
-	// @alternative
-	// @method openPopup(content: String|HTMLElement, latlng: LatLng, options?: Popup options): this
-	// Creates a popup with the specified content and options and opens it in the given point on a map.
-	openPopup: function (popup, latlng, options) {
-		if (!(popup instanceof Popup)) {
-			popup = new Popup(options).setContent(popup);
-		}
-
-		if (latlng) {
-			popup.setLatLng(latlng);
-		}
-
-		if (this.hasLayer(popup)) {
-			return this;
-		}
-
-		if (this._popup && this._popup.options.autoClose) {
-			this.closePopup();
-		}
-
-		this._popup = popup;
-		return this.addLayer(popup);
-	},
-
-	// @method closePopup(popup?: Popup): this
-	// Closes the popup previously opened with [openPopup](#map-openpopup) (or the given one).
-	closePopup: function (popup) {
-		if (!popup || popup === this._popup) {
-			popup = this._popup;
-			this._popup = null;
-		}
-		if (popup) {
-			this.removeLayer(popup);
-		}
-		return this;
-	}
-});
-
-/*
- * @namespace Layer
- * @section Popup methods example
- *
- * All layers share a set of methods convenient for binding popups to it.
- *
- * ```js
- * var layer = L.Polygon(latlngs).bindPopup('Hi There!').addTo(map);
- * layer.openPopup();
- * layer.closePopup();
- * ```
- *
- * Popups will also be automatically opened when the layer is clicked on and closed when the layer is removed from the map or another popup is opened.
- */
-
-// @section Popup methods
-Layer.include({
-
-	// @method bindPopup(content: String|HTMLElement|Function|Popup, options?: Popup options): this
-	// Binds a popup to the layer with the passed `content` and sets up the
-	// necessary event listeners. If a `Function` is passed it will receive
-	// the layer as the first argument and should return a `String` or `HTMLElement`.
-	bindPopup: function (content, options) {
-
-		if (content instanceof Popup) {
-			setOptions(content, options);
-			this._popup = content;
-			content._source = this;
-		} else {
-			if (!this._popup || options) {
-				this._popup = new Popup(options, this);
-			}
-			this._popup.setContent(content);
-		}
-
-		if (!this._popupHandlersAdded) {
-			this.on({
-				click: this._openPopup,
-				keypress: this._onKeyPress,
-				remove: this.closePopup,
-				move: this._movePopup
-			});
-			this._popupHandlersAdded = true;
-		}
-
-		return this;
-	},
-
-	// @method unbindPopup(): this
-	// Removes the popup previously bound with `bindPopup`.
-	unbindPopup: function () {
-		if (this._popup) {
-			this.off({
-				click: this._openPopup,
-				keypress: this._onKeyPress,
-				remove: this.closePopup,
-				move: this._movePopup
-			});
-			this._popupHandlersAdded = false;
-			this._popup = null;
-		}
-		return this;
-	},
-
-	// @method openPopup(latlng?: LatLng): this
-	// Opens the bound popup at the specificed `latlng` or at the default popup anchor if no `latlng` is passed.
-	openPopup: function (layer, latlng) {
-		if (!(layer instanceof Layer)) {
-			latlng = layer;
-			layer = this;
-		}
-
-		if (layer instanceof FeatureGroup) {
-			for (var id in this._layers) {
-				layer = this._layers[id];
-				break;
-			}
-		}
-
-		if (!latlng) {
-			latlng = layer.getCenter ? layer.getCenter() : layer.getLatLng();
-		}
-
-		if (this._popup && this._map) {
-			// set popup source to this layer
-			this._popup._source = layer;
-
-			// update the popup (content, layout, ect...)
-			this._popup.update();
-
-			// open the popup on the map
-			this._map.openPopup(this._popup, latlng);
-		}
-
-		return this;
-	},
-
-	// @method closePopup(): this
-	// Closes the popup bound to this layer if it is open.
-	closePopup: function () {
-		if (this._popup) {
-			this._popup._close();
-		}
-		return this;
-	},
-
-	// @method togglePopup(): this
-	// Opens or closes the popup bound to this layer depending on its current state.
-	togglePopup: function (target) {
-		if (this._popup) {
-			if (this._popup._map) {
-				this.closePopup();
-			} else {
-				this.openPopup(target);
-			}
-		}
-		return this;
-	},
-
-	// @method isPopupOpen(): boolean
-	// Returns `true` if the popup bound to this layer is currently open.
-	isPopupOpen: function () {
-		return (this._popup ? this._popup.isOpen() : false);
-	},
-
-	// @method setPopupContent(content: String|HTMLElement|Popup): this
-	// Sets the content of the popup bound to this layer.
-	setPopupContent: function (content) {
-		if (this._popup) {
-			this._popup.setContent(content);
-		}
-		return this;
-	},
-
-	// @method getPopup(): Popup
-	// Returns the popup bound to this layer.
-	getPopup: function () {
-		return this._popup;
-	},
-
-	_openPopup: function (e) {
-		var layer = e.layer || e.target;
-
-		if (!this._popup) {
-			return;
-		}
-
-		if (!this._map) {
-			return;
-		}
-
-		// prevent map click
-		stop(e);
-
-		// if this inherits from Path its a vector and we can just
-		// open the popup at the new location
-		if (layer instanceof Path) {
-			this.openPopup(e.layer || e.target, e.latlng);
-			return;
-		}
-
-		// otherwise treat it like a marker and figure out
-		// if we should toggle it open/closed
-		if (this._map.hasLayer(this._popup) && this._popup._source === layer) {
-			this.closePopup();
-		} else {
-			this.openPopup(layer, e.latlng);
-		}
-	},
-
-	_movePopup: function (e) {
-		this._popup.setLatLng(e.latlng);
-	},
-
-	_onKeyPress: function (e) {
-		if (e.originalEvent.keyCode === 13) {
-			this._openPopup(e);
-		}
-	}
-});
-
-console.log(typeof(tooltip), typeof(popup));
-
-var BaseMapDistance = function(store, map){
-
-    var line = null;
-    var tooltip$$1 = null; 
-    store.on('map.drawMode', function(e)
-    {
-        if(e.new_val == DRAW_DISTANCE)
-        {
-            var ce = map.getCenter();
-            var b = map.getBounds();
-            var w = (b.getEast() - b.getWest()) / 4;
-            var ll = [toLatLng(ce.lat, ce.lng + w),  toLatLng(ce.lat, ce.lng - w)];
-            line = polyline(ll, {weight:2, color: 'red', dashArray:'5,10'});   
-            line.addTo(map);
-            setOptions(map.editTools, {skipMiddleMarkers: true});
-            line.enableEdit(map); 
-            line.on('editable:editing', on_edit);
-            on_edit({layer: line});
-        }
-        else if(e.old_val == DRAW_DISTANCE) {
-            setOptions(map.editTools, {skipMiddleMarkers: false}); 
-            store(BASE_DISTANCE_SET);
-        }
-    });
-
-    store.on('selectedBase.distance', function(e){
-        if(!e.new_val || !e.new_val.points) {
-            if(line) {
-                line.disableEdit();
-                map.removeLayer(line);
-                line = null;
-            }
-        }
-    });
-
-    store.on('selectedBase.size_m', function(e){
-        if(!line || !e.new_val || !selectedBase(store).distance) return
-        var points = selectedBase(store).distance.points;
-        var latLngs = points.map(function(it){
-            return map.unproject(it,1);
-        });
-        line.disableEdit();
-        line.setLatLngs(latLngs);
-        line.enableEdit(map);
-        updateTooltip(selectedBase(store).distance.length_m);
-    });
-
-    function on_edit(event)
-    {
-        var line = event.layer;
-        if(line.getLatLngs().length == 2) 
-        {
-            var latLngs = line.getLatLngs();
-            map.editTools.commitDrawing();
-            var points = latLngs.map(function(it){
-                return map.project(it,1);
-            });
-            var length_px = points[0].distanceTo(points[1]);
-            var length_m = Math.round(Simple.distance(latLngs[0], latLngs[1]));
-            updateTooltip(length_m);
-            store(BASE_DISTANCE_SET, {length_px: length_px, length_m:length_m, points: points});
-            // store(DRAWING_MODE_SET, null);
-        }
-    }
-
-    function updateTooltip(length_m){
-        var content = length_m + ' m';
-        if(line.getTooltip())
-            line.getTooltip().setLatLng(line.getCenter()).setContent(content);
-        else
-            line.bindTooltip(content, {permanent:true, interactive:true}); 
-                
-    }
-
-};
-
-var BaseGridEdit = function(store, map, bmv)
-{
-    function onGeometryChange()
-    {
-        var grid = bmv.grid.getPoints();
-        store(BASE_GRID_GEOMETRY, grid);
-    }
-
-    store.on('map.drawMode', function(e)
-    {
-        if(e.new_val == EDIT_GRID){
-            setOptions(map.editTools, {skipMiddleMarkers: true, draggable: true, nosnap: true});
-            bmv.grid.setStyle({fill: true, fillColor: '#ebf0fa'});
-            bmv.grid.enableEdit(map); 
-            bmv.grid.on('editable:dragend', onGeometryChange);
-            bmv.grid.on('editable:vertex:dragend', onGeometryChange);
-        }
-        else if(e.old_val == EDIT_GRID) {
-            bmv.grid.setStyle({fill: false});
-            bmv.grid.off('editable:dragend', onGeometryChange);
-            bmv.grid.off('editable:vertex:dragend', onGeometryChange);
-            bmv.grid.disableEdit();
-        }
-    });
-};
-
 var store = Store(reduceReducers([mapReducer, baseReducer]), [RequestsMiddleware]);
 store.state = initState;
 window.store = store;
 
 var map = Map$1('map', store);
-BaseView(store);
 var bmv = BaseMapView(store,map);
-BaseMapDistance(store,map);
-BaseGridEdit(store, map, bmv);
 store("INIT");
 
 }());
