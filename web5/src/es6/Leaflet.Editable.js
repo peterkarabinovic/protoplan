@@ -152,7 +152,8 @@ export var Editable = Evented.extend({
     },
 
     createVertexIcon: function (options) {
-        return Browser.touch ? new Editable.TouchVertexIcon(options) : new Editable.VertexIcon(options);
+        return new Editable.VertexIcon(options);
+        // return Browser.touch ? new Editable.TouchVertexIcon(options) : new Editable.VertexIcon(options);
     },
 
     createEditLayer: function () {
