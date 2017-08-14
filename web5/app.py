@@ -159,7 +159,7 @@ app = Flask(__name__, static_folder='')
 
 @app.route('/')
 @app.route('/<path>.html')
-def index(path):
+def index(path='index'):
   return app.send_static_file( path + '.html')
 
 
