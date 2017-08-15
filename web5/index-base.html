@@ -24,40 +24,43 @@
             
         </style>
     </head>
-    <body style="margin: 30px;">
-        <div id="map" class="w3-margin" style="width: 700px; height: 500px;">
-            
-        </div>
-        <div class="w3-container w3-padding-32">
-            <div class="w3-section w3-text-red w3-small">
-                <span id='error'></span>
-            </div>
-            <div class="w3-section">
-                <input type="file" id='file' class="w3-padding-small">
+    <body>
+        <div style="margin: 30px;">
+            <div id="id_layer_editor" class="" style="width: 700px; height: 500px;">
                 
             </div>
-            <div class="w3-section">
-                <label id='size' style="display: none" class="w3-small">
-                    Ширина x Высота:
-                    <span id='size_input' class="w3-padding-small"></span>
-                </label>
-                <label id='distance' style="display: none" class="w3-small">
-                    Длина отрезка:
-                    <input type="number" id='distance_input' >
-                </label>
+            <div class="w3-container w3-padding-32">
+                <div class="w3-section w3-text-red w3-small">
+                    <span id='error'></span>
+                </div>
+                <div class="w3-section">
+                    <input type="file" id='id_layer' class="w3-padding-small">
+                    
+                </div>
+                <div class="w3-section">
+                    <label id='size' style="" class="w3-small">
+                        Ширина x Высота:
+                        <span id='id_layer_size' class="w3-padding-small"></span>
+                    </label>
+                    <label id='distance' style="" class="field-box field-length w3-small">
+                        Длина отрезка:
+                        <input type="number" id='id_length' >
+                    </label>
+                </div>
+                <div class="w3-section">
+                </div>
+                <div id="toolbar" class="w3-section w3-small" style="">
+                    <p>
+                        <input id='id_set_scale' type="checkbox">Задать масштаб
+                    </p>
+                    <p>
+                        <input id='id_edit_grid' type="checkbox" >Изменить сетку
+                    </p>
+                </div>
             </div>
-            <div class="w3-section">
-            </div>
-            <div id="toolbar" class="w3-section w3-small" style="display: none">
-                <p>
-                    <input id='draw_line' type="checkbox">Задать масштаб
-                </p>
-                <p>
-                    <input id='grid_edit' type="checkbox" >Изменить сетку
-                </p>
-            </div>
+            <input id='id_layer_data' type='text'>
+        
         </div>
-	
-        <script src="dist/app-base.js"></script>
+        <script src="dist/editor-base.js"></script>
     </body>
 </html>

@@ -66,6 +66,16 @@ export var Grid = Rectangle.extend({
     _addAxis: function(map){
         var format_meters = function(d) { return d + ' м'}
         var map_size = map._container.getBoundingClientRect();
+        var body_size = document.body.getBoundingClientRect()
+        if(body_size.top < 0)
+            map_size = {
+                top:  map_size.top - body_size.top,
+                bottom:  map_size.bottom - body_size.top,
+                left: map_size.left - body_size.left,
+                right: map_size.right - body_size.left,
+                height: map_size.height,
+                width: map_size.width
+            };
         var margin = {left: 50, right: 0, top: 5, bottom: 30};
         this.$graphPanel = select('body')
             .append('svg')

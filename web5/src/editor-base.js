@@ -3,7 +3,6 @@ import {Store} from './utils/redux.js'
 import {reduceReducers} from './utils/redux.js'
 import initState from './state.js'
 import {mapReducer, baseReducer} from './reducers.js'
-import Middleware from './middleware/requests.js'
 import Map from './map/map.js'
 import BaseView from './modules/base/base-view.js'
 import BaseMapView from './modules/base/base-map-view.js'
@@ -12,11 +11,11 @@ import BaseGridEdit from './modules/base/base-grid-edit.js'
 
 
 
-var store = Store(reduceReducers([mapReducer, baseReducer]), [Middleware]);
+var store = Store(reduceReducers([mapReducer, baseReducer]));
 store.state = initState;
 window.store = store;
 
-var map = Map('map', store);
+var map = Map('id_layer_editor', store);
 BaseView(store);
 var bmv = BaseMapView(store,map)
 BaseMapDistance(store,map)
