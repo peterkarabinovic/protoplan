@@ -1,4 +1,6 @@
+import {Store as _Store} from './redux.js'
 import {Immutable} from './fp.js'
+
 
 /**
  * Add method `prop` for store instance to track changes of properties and store in changable object {$val: <value>} 
@@ -25,4 +27,10 @@ export function bindProp(store)
         store.on(path, listener(prop))
         return prop;
     }
+}
+
+export function Store(reducers, middleware){
+    var s = _Store(reducers, middleware);
+    bindProp(s);
+    return s;
 }
